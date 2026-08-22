@@ -1,0 +1,65 @@
+{% extends "layout.html" %} {% block title %} Entradas de Inventario {% endblock %} {% block main %}
+<div class="container-fluid px-2 py-3">
+    <h1 class="h3 mb-3">Registro de Entradas de Inventario</h1>
+
+    <!-- Filtros - Misma lógica que facturación -->
+    <form method="GET" action="{{ url_for('inventory.registro') }}" class="mb-4">
+        <div class="row g-2 g-sm-3 align-items-center">
+            <div class="col-12 col-sm-auto">
+                <label for="rango_fecha" class="col-form-label small">Filtrar por:</label>
+            </div>
+            <div class="col-8 col-sm-auto">
+                <select name="rango_fecha" id="rango_fecha" class="form-select form-select-sm">
+                    <option value="" {% if not rango_fecha_seleccionado %}selected{% endif %}>Todos los registros</option>
+                    <option value="hoy" {% if rango_fecha_seleccionado == 'hoy' %}selected{% endif %}>Hoy</option>
+                    <option value="ultimos_7_dias" {% if rango_fecha_seleccionado == 'ultimos_7_dias' %}selected{% endif %}>Últimos 7 días</option>
+                    <option value="ultimo_mes" {% if rango_fecha_seleccionado == 'ultimo_mes' %}selected{% endif %}>Último mes</option>
+                </select>
+            </div>
+            <div class="col-4 col-sm-auto">
+                <button type="submit" class="btn btn-primary btn-sm w-100">Aplicar</button>
+            </div>
+            {% if rango_fecha_seleccionado %}
+            <div class="col-12 col-sm-auto">
+                <a href="{{ url_for('inventory.registro') }}" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+            </div>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Tabla de entradas -->
+    <div class="table-responsive">
+        <table class="table table-sm table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th class="px-1 py-2">ID</th>
+                    <th class="px-1 py-2">Proveedor</th>
+                    <th class="px-1 py-2">Fecha</th>
+                    <th class="px-1 py-2">Producto</th>
+                    <th class="px-1 py-2">Cant.</th>
+                    <th class="px-1 py-2">Costo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entrada in registro %}
+                <tr>
+                    <td class="px-1 py-2 small">{{ entrada['entrada_id'] }}</td>
+                    <td class="px-1 py-2 small">{{ entrada['proveedor'][:15] }}{% if entrada['proveedor']|length > 15 %}...{% endif %}</td>
+                    <td class="px-1 py-2 small">
+                        {% if entrada['fecha_entrada'] is string %} {{ entrada['fecha_entrada'][:10] }}<br> {{ entrada['fecha_entrada'][11:16] }} {% else %} {{ entrada['fecha_entrada'].strftime('%d/%m/%Y') }}<br> {{ entrada['fecha_entrada'].strftime('%H:%M')
+                        }} {% endif %}
+                    </td>
+                    <td class="px-1 py-2 small">{{ entrada['producto_nombre'][:18] }}{% if entrada['producto_nombre']|length > 18 %}...{% endif %}</td>
+                    <td class="px-1 py-2 small">{{ entrada['cantidad_ingresada'] }}</td>
+                    <td class="px-1 py-2 small">C${{ "%.2f"|format(entrada['costo_unitario']) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-3">No hay registros para mostrar</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

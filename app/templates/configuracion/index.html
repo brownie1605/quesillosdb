@@ -1,0 +1,218 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Configuración{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: {% if current_user.rol.nombre == 'Administrador' %}1fr 1fr{% else %}1fr{% endif %}; gap: 20px;">
+    <!-- Preferencias -->
+    <div class="panel" style="padding: 20px;">
+        <h3>Preferencias del Sistema</h3>
+        <hr style="border: 1px solid #eee; margin-bottom: 20px;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <strong>Modo Oscuro</strong>
+                <p style="margin: 0; font-size: 13px; color: #666;">Cambiar entre tema claro y oscuro</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button type="button" id="btnColorPicker" style="background: #f1f5f9; border: 1px solid #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; transition: all 0.2s;" title="Personalizar Colores">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- Eyedropper icon from image -->
+                        <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path>
+                    </svg>
+                </button>
+                <label class="switch">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="slider round theme-slider">
+                        <span class="icon-sun">☀️</span>
+                        <span class="icon-moon">🌙</span>
+                    </span>
+                </label>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <strong>Notificaciones</strong>
+                <p style="margin: 0; font-size: 13px; color: #666;">Activar alertas del sistema</p>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="notificationsToggle" checked>
+                <span class="slider round"></span>
+            </label>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="flex: 1;">
+                <strong>Idioma</strong>
+                <p style="margin: 0; font-size: 13px; color: #666;">Idioma de la interfaz</p>
+            </div>
+            <select class="form-control" style="width: 150px;">
+                <option value="es">Español</option>
+                <option value="en">Inglés</option>
+            </select>
+        </div>
+    </div>
+
+    {% if current_user.rol.nombre == 'Administrador' %}
+    <!-- Seguridad -->
+    <div class="panel" style="padding: 20px;">
+        <h3>Seguridad</h3>
+        <hr style="border: 1px solid #eee; margin-bottom: 20px;">
+        
+        <form id="formPassword">
+            <div style="margin-bottom: 15px;">
+                <label>Contraseña Actual</label>
+                <input type="password" id="pass_actual" class="form-control" style="width: 100%;" required>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label>Nueva Contraseña</label>
+                <input type="password" id="pass_nueva" class="form-control" style="width: 100%;" required>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label>Confirmar Nueva Contraseña</label>
+                <input type="password" id="pass_confirmar" class="form-control" style="width: 100%;" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Actualizar Contraseña</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Selección de Colores -->
+<div id="colorPickerModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(3px);">
+    <div class="modal-content" style="background: var(--card-bg, #fff); border-radius: 16px; padding: 24px; width: 340px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0;">Colores del Sistema</h3>
+            <button id="closeColorPicker" style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-color, #333);">&times;</button>
+        </div>
+        
+        <div class="color-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 10px;">
+            <button class="color-swatch" data-color="#0b5cff" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid transparent; background: #0b5cff; cursor: pointer; position: relative; overflow: hidden; padding: 0;">
+                <div style="position: absolute; top: 0; left: 0; width: 50%; height: 50%; background: rgba(255,255,255,0.3);"></div>
+                <div style="position: absolute; bottom: 0; right: 0; width: 50%; height: 50%; background: rgba(0,0,0,0.2);"></div>
+            </button>
+            <button class="color-swatch" data-color="#16a34a" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid transparent; background: #16a34a; cursor: pointer; position: relative; overflow: hidden; padding: 0;">
+                <div style="position: absolute; top: 0; left: 0; width: 50%; height: 50%; background: rgba(255,255,255,0.3);"></div>
+                <div style="position: absolute; bottom: 0; right: 0; width: 50%; height: 50%; background: rgba(0,0,0,0.2);"></div>
+            </button>
+            <button class="color-swatch" data-color="#ea580c" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid transparent; background: #ea580c; cursor: pointer; position: relative; overflow: hidden; padding: 0;">
+                <div style="position: absolute; top: 0; left: 0; width: 50%; height: 50%; background: rgba(255,255,255,0.3);"></div>
+                <div style="position: absolute; bottom: 0; right: 0; width: 50%; height: 50%; background: rgba(0,0,0,0.2);"></div>
+            </button>
+            <button class="color-swatch" data-color="#9333ea" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid transparent; background: #9333ea; cursor: pointer; position: relative; overflow: hidden; padding: 0;">
+                <div style="position: absolute; top: 0; left: 0; width: 50%; height: 50%; background: rgba(255,255,255,0.3);"></div>
+                <div style="position: absolute; bottom: 0; right: 0; width: 50%; height: 50%; background: rgba(0,0,0,0.2);"></div>
+            </button>
+            <button class="color-swatch" data-color="#e11d48" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid transparent; background: #e11d48; cursor: pointer; position: relative; overflow: hidden; padding: 0;">
+                <div style="position: absolute; top: 0; left: 0; width: 50%; height: 50%; background: rgba(255,255,255,0.3);"></div>
+                <div style="position: absolute; bottom: 0; right: 0; width: 50%; height: 50%; background: rgba(0,0,0,0.2);"></div>
+            </button>
+            <button class="color-swatch" data-color="#0284c7" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid transparent; background: #0284c7; cursor: pointer; position: relative; overflow: hidden; padding: 0;">
+                <div style="position: absolute; top: 0; left: 0; width: 50%; height: 50%; background: rgba(255,255,255,0.3);"></div>
+                <div style="position: absolute; bottom: 0; right: 0; width: 50%; height: 50%; background: rgba(0,0,0,0.2);"></div>
+            </button>
+            <button class="color-swatch" data-color="#475569" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid transparent; background: #475569; cursor: pointer; position: relative; overflow: hidden; padding: 0;">
+                <div style="position: absolute; top: 0; left: 0; width: 50%; height: 50%; background: rgba(255,255,255,0.3);"></div>
+                <div style="position: absolute; bottom: 0; right: 0; width: 50%; height: 50%; background: rgba(0,0,0,0.2);"></div>
+            </button>
+            
+            <label style="width: 50px; height: 50px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px dashed #cbd5e1; position: relative;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                </svg>
+                <input type="color" id="customColorPicker" style="position: absolute; opacity: 0; width: 1px; height: 1px;">
+            </label>
+        </div>
+    </div>
+</div>
+
+<style>
+/* CSS para los switches */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+/* Icons for theme switch */
+.theme-slider .icon-sun, .theme-slider .icon-moon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    z-index: 1;
+}
+.theme-slider .icon-sun {
+    left: 8px;
+}
+.theme-slider .icon-moon {
+    right: 8px;
+    opacity: 0;
+}
+
+input:checked + .theme-slider {
+    background-color: #2c3e50;
+}
+input:checked + .theme-slider .icon-sun {
+    opacity: 0;
+}
+input:checked + .theme-slider .icon-moon {
+    opacity: 1;
+}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/configuracion.js') }}"></script>
+{% endblock %}

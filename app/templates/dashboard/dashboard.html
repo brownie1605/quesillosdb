@@ -1,0 +1,116 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="cards-grid">
+
+    <div class="kpi-card">
+        <p>Ventas del día</p>
+        <h2>C$ {{ "{:,.2f}".format(ventas_hoy | default(0.0)) }}</h2>
+        <span class="positive">Datos reales</span>
+    </div>
+
+    <div class="kpi-card">
+        <p>Ventas del mes</p>
+        <h2>C$ {{ "{:,.2f}".format(ventas_mes | default(0.0)) }}</h2>
+        <span class="positive">Datos reales</span>
+    </div>
+
+    <div class="kpi-card">
+        <p>Gastos del mes</p>
+        <h2 style="color: var(--danger-color, #e74c3c);">C$ {{ "{:,.2f}".format(gastos_mes | default(0.0)) }}</h2>
+        <span class="danger" style="color: var(--danger-color, #e74c3c); font-size: 0.9em;">Total en compras</span>
+    </div>
+
+    <div class="kpi-card">
+        <p>Ganancia del mes</p>
+        <h2>C$ {{ "{:,.2f}".format((ventas_mes | default(0.0)) - (gastos_mes | default(0.0))) }}</h2>
+        <span class="positive">Ventas - Gastos</span>
+    </div>
+
+    <div class="kpi-card">
+        <p>Productos</p>
+        <h2>{{ total_productos }}</h2>
+        <span>Total registrados</span>
+    </div>
+
+</div>
+
+<div class="dashboard-filters">
+    <div>
+        <label>Desde:</label>
+        <input type="date" id="filterDesde" class="form-control" style="width: auto; display: inline-block;">
+    </div>
+    <div>
+        <label>Hasta:</label>
+        <input type="date" id="filterHasta" class="form-control" style="width: auto; display: inline-block;">
+    </div>
+    <button id="btnQuitarFiltroDashboard" class="btn btn-secondary" title="Quitar Filtro">❌</button>
+</div>
+
+<div class="dashboard-grid">
+
+    <div class="panel large-panel">
+        <h3>Tendencia de ventas</h3>
+        <div style="height: 250px; width: 100%;">
+            <canvas id="ventasDashboardChart"></canvas>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Productos más vendidos</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Vendidos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for prod_nombre, total_v in mas_vendidos %}
+                <tr>
+                    <td>{{ loop.index }}. {{ prod_nombre }}</td>
+                    <td>{{ total_v }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2" style="text-align: center;">Sin ventas aún</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel">
+        <h3>Stock bajo</h3>
+
+        {% for prod, inv in bajo_stock %}
+        <div class="stock-item">
+            <span>{{ prod.nombre }}</span>
+            <strong class="danger">Stock: {{ inv.stock_actual }}</strong>
+        </div>
+        {% else %}
+        <div class="stock-item">
+            <span>Todo en orden</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="panel">
+        <h3>Top 5 Productos Más Vendidos</h3>
+        <div style="height: 250px; width: 100%; display: flex; justify-content: center;">
+            <canvas id="productosDonutChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3"></script>
+{% endblock %}

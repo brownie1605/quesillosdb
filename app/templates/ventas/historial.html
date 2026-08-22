@@ -1,0 +1,165 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Historial de Ventas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="filter-group">
+        <div class="search-bar">
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por cliente o factura...">
+        </div>
+        <input type="date" id="fechaInicioFilter" class="form-control" title="Fecha Inicio">
+        <input type="date" id="fechaFinFilter" class="form-control" title="Fecha Fin">
+        <select id="pagoFilter" class="form-control">
+            <option value="">Cualquier Método</option>
+            <option value="Efectivo">Efectivo</option>
+            <option value="Tarjeta">Tarjeta</option>
+            <option value="Transferencia">Transferencia</option>
+        </select>
+    </div>
+    <a href="{{ url_for('venta.pos') }}" class="btn btn-primary">Ir al Punto de Venta</a>
+</div>
+
+<div class="panel">
+    <table id="tablaVentas">
+        <thead>
+            <tr>
+                <th>No. Factura</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Subtotal</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Llenado por JS -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Detalles Venta -->
+<div id="modalDetalles" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style=" padding: 20px; border-radius: 8px; width: 600px; max-width: 90%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+            <h3 style="margin: 0;">Detalles de la Venta</h3>
+            <button onclick="cerrarModalDetalles()" style="background: none; border: none; font-size: 20px; cursor: pointer;">&times;</button>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: #f9fafb; text-align: left;">
+                    <tr>
+                        <th style="padding: 10px; border-bottom: 1px solid #eee;">Producto</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #eee;">Cant.</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #eee;">Precio U.</th>
+                        <th style="padding: 10px; border-bottom: 1px solid #eee;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaDetallesBody">
+                    <!-- Llenado por JS -->
+                </tbody>
+            </table>
+        </div>
+        <div style="text-align: right; margin-top: 15px;">
+            <button class="btn" style="background: #e0e0e0; color: #333;" onclick="cerrarModalDetalles()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let ventasList = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        cargarVentas();
+        document.getElementById('searchInput').addEventListener('input', renderizarTabla);
+        document.getElementById('fechaInicioFilter').addEventListener('change', renderizarTabla);
+        document.getElementById('fechaFinFilter').addEventListener('change', renderizarTabla);
+        document.getElementById('pagoFilter').addEventListener('change', renderizarTabla);
+    });
+
+    async function cargarVentas() {
+        try {
+            const res = await fetch('/ventas/api/historial');
+            ventasList = await res.json();
+            renderizarTabla();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function renderizarTabla() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        const fechaInicio = document.getElementById('fechaInicioFilter').value;
+        const fechaFin = document.getElementById('fechaFinFilter').value;
+        const pago = document.getElementById('pagoFilter').value;
+        const tbody = document.querySelector('#tablaVentas tbody');
+        tbody.innerHTML = '';
+
+        const filtrados = ventasList.filter(v => {
+            const matchSearch = v.numero_venta.toLowerCase().includes(query) || v.cliente.toLowerCase().includes(query);
+            
+            let matchFecha = true;
+            if (fechaInicio || fechaFin) {
+                // v.fecha_venta format: "YYYY-MM-DD HH:MM:SS"
+                const fechaVentaDate = new Date(v.fecha_venta).toISOString().split('T')[0];
+                if (fechaInicio && fechaVentaDate < fechaInicio) matchFecha = false;
+                if (fechaFin && fechaVentaDate > fechaFin) matchFecha = false;
+            }
+            
+            const matchPago = pago === '' || v.metodo_pago === pago;
+            
+            return matchSearch && matchFecha && matchPago;
+        });
+
+        filtrados.forEach(v => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${v.numero_venta}</strong></td>
+                <td>${v.fecha_venta}</td>
+                <td>${v.cliente}</td>
+                <td>C$ ${parseFloat(v.subtotal).toFixed(2)}</td>
+                <td><strong>C$ ${parseFloat(v.total).toFixed(2)}</strong></td>
+                <td><span class="badge badge-active">${v.estado}</span></td>
+                <td>
+                    <button class="btn-icon" title="Ver Detalles" onclick="verDetalles(${v.id_venta})">👁️</button>
+                    <button class="btn-icon" title="Ver Factura" onclick="window.open('/ventas/factura/${v.id_venta}', '_blank')">🧾</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function verDetalles(id_venta) {
+        try {
+            const res = await fetch(`/ventas/api/historial/${id_venta}/detalles`);
+            const detalles = await res.json();
+            
+            const tbody = document.getElementById('tablaDetallesBody');
+            tbody.innerHTML = '';
+            
+            detalles.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${d.producto}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${d.cantidad}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">C$ ${d.precio_unitario.toFixed(2)}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>C$ ${d.subtotal.toFixed(2)}</strong></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            
+            document.getElementById('modalDetalles').style.display = 'flex';
+        } catch (e) {
+            console.error("Error cargando detalles", e);
+        }
+    }
+
+    function cerrarModalDetalles() {
+        document.getElementById('modalDetalles').style.display = 'none';
+    }
+</script>
+{% endblock %}

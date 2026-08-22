@@ -1,0 +1,133 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Compras e Ingresos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="filter-group">
+        <div class="search-bar">
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar por proveedor o comprobante...">
+        </div>
+    </div>
+    
+    <button id="btnNuevaCompra" class="btn btn-primary">+ Nueva Compra</button>
+</div>
+
+<div class="panel">
+    <table id="tablaCompras">
+        <thead>
+            <tr>
+                <th>No. Compra</th>
+                <th>Fecha</th>
+                <th>Proveedor</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Generado por JS -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Nueva Compra -->
+<div id="modalNuevaCompra" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style=" padding: 20px; border-radius: 8px; width: 700px; max-width: 95%; max-height: 90vh; overflow-y: auto;">
+        <h3 id="tituloModalCompra" style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Registrar Nueva Compra</h3>
+        <input type="hidden" id="compra_id" value="">
+        
+        <div style="margin-bottom: 15px;">
+            <label>Proveedor</label>
+            <select id="compra_proveedor" class="form-control" style="width: 100%;">
+                <option value="">Seleccione un Proveedor...</option>
+            </select>
+        </div>
+
+        <div id="seccion-productos" class="modal-section" style="padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <h4>Agregar Producto</h4>
+            <div style="display: flex; gap: 10px; margin-top: 10px; align-items: end;">
+                <div style="flex: 2;">
+                    <label>Producto</label>
+                    <select id="compra_producto" class="form-control">
+                        <option value="">Seleccione...</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label>Cantidad</label>
+                    <input type="number" id="compra_cantidad" class="form-control" value="1" min="1" step="0.01">
+                </div>
+                <div style="flex: 1;">
+                    <label>Costo Unitario</label>
+                    <input type="number" id="compra_costo" class="form-control" value="0" min="0" step="0.01">
+                </div>
+                <div>
+                    <button type="button" id="btnAgregarItem" class="btn btn-secondary">Añadir</button>
+                </div>
+            </div>
+
+            <table id="tablaItemsCompra" style="margin-top: 20px; width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <thead>
+                    <tr>
+                        <th style="border-bottom: 2px solid #eee; padding-bottom: 5px;">Producto</th>
+                        <th style="border-bottom: 2px solid #eee; padding-bottom: 5px;">Cant.</th>
+                        <th style="border-bottom: 2px solid #eee; padding-bottom: 5px;">Costo U.</th>
+                        <th style="border-bottom: 2px solid #eee; padding-bottom: 5px;">Subtotal</th>
+                        <th style="border-bottom: 2px solid #eee; padding-bottom: 5px;"></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div> <!-- Fin seccion-productos -->
+
+        <div id="seccion-gasto-vario" class="modal-section" style="display: none; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <h4>Detalles del Gasto Vario</h4>
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+                <div>
+                    <label style="font-weight: 600; margin-bottom: 5px; display: block;">Descripción del Gasto</label>
+                    <input type="text" id="gasto_descripcion" class="form-control" placeholder="Ej. Pago de luz, Mantenimiento...">
+                </div>
+                <div>
+                    <label style="font-weight: 600; margin-bottom: 5px; display: block;">Monto (C$)</label>
+                    <input type="number" id="gasto_monto" class="form-control" value="0" min="0" step="0.01">
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: right; font-size: 18px; font-weight: bold; margin-bottom: 20px;">
+            Total Compra/Gasto: C$ <span id="compra_total">0.00</span>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button type="button" id="btnCerrarModalCompra" class="btn btn-cancel" style="flex: 1;">Cancelar</button>
+            <button type="button" id="btnGuardarCompra" class="btn btn-success" style="flex: 1;">Registrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalles Compra -->
+<div id="modalDetalles" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style=" padding: 20px; border-radius: 8px; width: 600px; max-width: 95%;">
+        <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Detalles de Compra</h3>
+        <table id="tablaDetallesView" style="margin-top: 15px; margin-bottom: 20px;">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cant.</th>
+                    <th>Costo U.</th>
+                    <th>Subtotal</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <div style="text-align: right;">
+            <button type="button" id="btnCerrarDetalles" class="btn btn-secondary">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/compras.js') }}?v=3"></script>
+{% endblock %}

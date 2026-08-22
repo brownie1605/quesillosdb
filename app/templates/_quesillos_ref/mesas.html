@@ -1,0 +1,805 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Mesas
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Estilos generales */
+    .mesas-container {
+        padding: 2rem;
+        background-color: #f9f5f0;
+        min-height: calc(100vh - 60px);
+        animation: fadeIn 0.8s ease-out;
+    }
+    
+    .mesas-title {
+        margin-bottom: 2.5rem;
+        color: #5d4037;
+        font-weight: 700;
+        position: relative;
+        padding-bottom: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 2.2rem;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    .mesas-title:after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 120px;
+        height: 4px;
+        background: linear-gradient(to right, #8d6e63, #d7ccc8);
+        border-radius: 4px;
+    }
+    
+    .mesas-title:before {
+        content: '🍽️';
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 2rem;
+    }
+    
+    /* Estilos para las tarjetas de mesas */
+    .mesa-card {
+        border: none;
+        border-radius: 12px;
+        text-align: center;
+        padding: 1.8rem 1.2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        transition: all 0.4s ease;
+        background-color: #fff;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(141, 110, 99, 0.1);
+        animation: slideUp 0.6s ease-out backwards;
+    }
+    
+    .mesa-card:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 5px;
+        background: linear-gradient(to right, #8d6e63, #d7ccc8);
+    }
+    
+    .mesa-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+    }
+    
+    .mesa-status {
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1.2rem;
+        display: inline-block;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+    
+    .mesa-status.normal {
+        background: linear-gradient(45deg, #4caf50, #8bc34a);
+        color: white;
+    }
+    
+    .mesa-status.atendida {
+        background: linear-gradient(45deg, #f44336, #ff5722);
+        color: white;
+    }
+    
+    .mesa-image-container {
+        position: relative;
+        margin: 0 auto 1.5rem;
+        width: 130px;
+        height: 130px;
+    }
+    
+    .mesa-image {
+        border-radius: 50%;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border: 6px solid #f5f5f5;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        transition: all 0.4s ease;
+        background-color: #fff;
+    }
+    
+    .mesa-card:hover .mesa-image {
+        transform: scale(1.08);
+        border-color: #d7ccc8;
+    }
+    
+    .mesa-image-container:after {
+        content: '';
+        position: absolute;
+        top: -5px;
+        left: -5px;
+        right: -5px;
+        bottom: -5px;
+        border-radius: 50%;
+        border: 2px dashed #d7ccc8;
+        animation: rotate 20s linear infinite;
+    }
+    
+    @keyframes rotate {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+    
+    .mesa-name {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-bottom: 1.2rem;
+        color: #5d4037;
+        font-family: 'Playfair Display', serif;
+    }
+    
+    .btn-atender {
+        font-size: 0.95rem;
+        padding: 0.6rem 1.5rem;
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        width: auto;
+        min-width: 130px;
+        margin: 0 auto;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-atender:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 7px 15px rgba(0,0,0,0.15);
+    }
+    
+    .btn-atender.btn-primary {
+        background: linear-gradient(45deg, #8d6e63, #bcaaa4);
+        border: none;
+    }
+    
+    .btn-atender.btn-danger {
+        background: linear-gradient(45deg, #d32f2f, #f44336);
+        border: none;
+    }
+    
+    .mesa-info {
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: #8d6e63;
+        font-style: italic;
+    }
+    
+    /* Estilos responsivos */
+    @media (max-width: 1199.98px) {
+        .mesa-image-container {
+            width: 110px;
+            height: 110px;
+        }
+        
+        .mesas-title {
+            font-size: 2rem;
+        }
+    }
+    
+    @media (max-width: 991.98px) {
+        .mesas-container {
+            padding: 1.5rem;
+        }
+        
+        .mesa-card {
+            padding: 1.5rem 1rem;
+        }
+        
+        .mesa-image-container {
+            width: 100px;
+            height: 100px;
+        }
+        
+        .mesas-title {
+            font-size: 1.8rem;
+        }
+    }
+    
+    @media (max-width: 767.98px) {
+        .mesas-title {
+            font-size: 1.6rem;
+            margin-bottom: 2rem;
+        }
+        
+        .mesa-card {
+            padding: 1.2rem 1rem;
+        }
+        
+        .mesa-image-container {
+            width: 90px;
+            height: 90px;
+        }
+        
+        .mesa-name {
+            font-size: 1.2rem;
+        }
+        
+        .btn-atender {
+            font-size: 0.85rem;
+            padding: 0.5rem 1.2rem;
+            min-width: 120px;
+        }
+    }
+    
+    @media (max-width: 575.98px) {
+        .mesas-container {
+            padding: 1rem;
+        }
+        
+        .mesa-card {
+            margin-bottom: 1.5rem;
+        }
+        
+        .mesa-image-container {
+            width: 80px;
+            height: 80px;
+        }
+        
+        .mesas-title {
+            font-size: 1.4rem;
+        }
+    }
+
+    /* Estilos para el modal de configuración */
+    .config-modal .modal-content {
+        border-radius: 15px;
+        border: none;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .config-modal .modal-header {
+        background: linear-gradient(45deg, #8d6e63, #bcaaa4);
+        color: white;
+        border-radius: 15px 15px 0 0;
+        padding: 1.5rem;
+    }
+
+    .config-modal .modal-body {
+        padding: 2rem;
+    }
+
+    .config-modal .form-label {
+        color: #5d4037;
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+    }
+
+    .config-modal .form-control {
+        border: 2px solid #d7ccc8;
+        border-radius: 10px;
+        padding: 0.8rem;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+    }
+
+    .config-modal .form-control:focus {
+        border-color: #8d6e63;
+        box-shadow: 0 0 0 0.2rem rgba(141, 110, 99, 0.25);
+    }
+
+    .config-modal .btn-confirm {
+        background: linear-gradient(45deg, #8d6e63, #bcaaa4);
+        border: none;
+        color: white;
+        padding: 0.8rem 2rem;
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .config-modal .btn-confirm:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(141, 110, 99, 0.3);
+    }
+
+    /* Ajuste para mesas ocultas */
+    .mesa-card.hidden {
+        display: none;
+    }
+
+    /* Estilos para el botón de edición */
+    .btn-edit-config {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(45deg, #8d6e63, #bcaaa4);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        z-index: 1000;
+    }
+
+    .btn-edit-config:hover {
+        transform: translateY(-2px) rotate(90deg);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+    }
+
+    .btn-edit-config i {
+        font-size: 1.5rem;
+    }
+
+    /* Ajustes responsivos para el botón de configuración */
+    @media (max-width: 767.98px) {
+        .btn-edit-config {
+            top: auto;
+            bottom: 20px;
+            right: 20px;
+            width: 45px;
+            height: 45px;
+        }
+        
+        .btn-edit-config i {
+            font-size: 1.3rem;
+        }
+    }
+
+    /* Estilos para la barra lateral */
+    .sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100vh;
+        width: 250px;
+        background: white;
+        box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+        transition: all 0.3s ease;
+        transform: translateX(100%);
+    }
+
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    .sidebar-header {
+        padding: 1.5rem;
+        background: linear-gradient(45deg, #8d6e63, #bcaaa4);
+        color: white;
+    }
+
+    .sidebar-content {
+        padding: 1.5rem;
+    }
+
+    /* Ajuste del contenido principal */
+    .mesas-container {
+        margin-right: 0;
+        transition: all 0.3s ease;
+    }
+
+    .mesas-container.sidebar-active {
+        margin-right: 250px;
+    }
+
+    /* Estilos para las secciones */
+    .section-title {
+        color: #5d4037;
+        font-weight: 700;
+        margin: 2rem 0 1.5rem;
+        padding-bottom: 0.8rem;
+        position: relative;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 1.8rem;
+    }
+
+    .section-title:after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 80px;
+        height: 4px;
+        background: linear-gradient(to right, #8d6e63, #d7ccc8);
+        border-radius: 4px;
+    }
+
+    .section-title:before {
+        content: '🍽️';
+        position: absolute;
+        top: -25px;
+        left: 0;
+        font-size: 1.5rem;
+    }
+
+    .section-title.barra:before {
+        content: '🍺';
+    }
+
+    .section-container {
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 15px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        border: 1px solid rgba(141, 110, 99, 0.1);
+    }
+
+    .section-container.barra {
+        background: rgba(255, 255, 255, 0.8);
+    }
+
+    /* Ajustes responsivos para las secciones */
+    @media (max-width: 767.98px) {
+        .section-title {
+            font-size: 1.5rem;
+            margin: 1.5rem 0 1rem;
+        }
+
+        .section-container {
+            padding: 1.5rem;
+        }
+    }
+
+    /* Estilos específicos para la barra */
+    .barra-card {
+        background: linear-gradient(135deg, #2c3e50, #34495e);
+        border: none;
+        border-radius: 12px;
+        text-align: center;
+        padding: 1.8rem 1.2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        transition: all 0.4s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .barra-card:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 5px;
+        background: linear-gradient(to right, #3498db, #2980b9);
+    }
+
+    .barra-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+    }
+
+    .barra-status {
+        padding: 0.6rem 1.2rem;
+        border-radius: 50px;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 1.2rem;
+        display: inline-block;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        background: linear-gradient(45deg, #3498db, #2980b9);
+        color: white;
+    }
+
+    .barra-status.ocupado {
+        background: linear-gradient(45deg, #e74c3c, #c0392b);
+    }
+
+    .barra-image-container {
+        position: relative;
+        margin: 0 auto 1.5rem;
+        width: 130px;
+        height: 130px;
+    }
+
+    .barra-image {
+        border-radius: 50%;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border: 6px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        transition: all 0.4s ease;
+    }
+
+    .barra-card:hover .barra-image {
+        transform: scale(1.08);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .barra-name {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-bottom: 1.2rem;
+        color: #ecf0f1;
+        font-family: 'Playfair Display', serif;
+    }
+
+    .btn-barra {
+        font-size: 0.95rem;
+        padding: 0.6rem 1.5rem;
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        width: auto;
+        min-width: 130px;
+        margin: 0 auto;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        background: linear-gradient(45deg, #3498db, #2980b9);
+        border: none;
+        color: white;
+    }
+
+    .btn-barra:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 7px 15px rgba(0,0,0,0.3);
+        background: linear-gradient(45deg, #2980b9, #3498db);
+    }
+
+    .barra-info {
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: #bdc3c7;
+        font-style: italic;
+    }
+
+    .section-container.barra {
+        background: rgba(44, 62, 80, 0.05);
+    }
+
+    /* Animaciones */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebar');
+        const mesasContainer = document.querySelector('.mesas-container');
+        const btnEditConfig = document.getElementById('btnEditConfig');
+        const mesasConfigForm = document.getElementById('mesasConfigForm');
+        
+        function toggleSidebar() {
+            sidebar.classList.toggle('active');
+            mesasContainer.classList.toggle('sidebar-active');
+        }
+
+        btnEditConfig.addEventListener('click', function() {
+            toggleSidebar();
+        });
+
+        mesasConfigForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const numMesas = parseInt(document.getElementById('numMesas').value);
+            const numBarra = parseInt(document.getElementById('numBarra').value);
+            
+            // Ocultar todas las mesas primero
+            document.querySelectorAll('.mesa-item').forEach(item => {
+                item.style.display = 'none';
+            });
+
+            // Mostrar mesas para llevar
+            document.querySelectorAll('.mesa-item:not(.barra-item)').forEach((item, index) => {
+                const mesaNum = parseInt(item.dataset.mesaNum);
+                item.style.display = mesaNum <= numMesas ? 'block' : 'none';
+            });
+
+            // Mostrar puestos de barra
+            document.querySelectorAll('.barra-item').forEach((item, index) => {
+                const barraNum = parseInt(item.dataset.barraNum);
+                item.style.display = barraNum <= numBarra ? 'block' : 'none';
+            });
+
+            // Guardar la configuración
+            localStorage.setItem('numMesasHabilitadas', numMesas);
+            localStorage.setItem('numBarraHabilitada', numBarra);
+            
+            toggleSidebar();
+        });
+
+        // Recuperar configuración guardada
+        const numMesasGuardadas = localStorage.getItem('numMesasHabilitadas');
+        const numBarraGuardada = localStorage.getItem('numBarraHabilitada');
+        
+        if (numMesasGuardadas) {
+            document.getElementById('numMesas').value = numMesasGuardadas;
+            document.querySelectorAll('.mesa-item:not(.barra-item)').forEach((item, index) => {
+                const mesaNum = parseInt(item.dataset.mesaNum);
+                item.style.display = mesaNum <= numMesasGuardadas ? 'block' : 'none';
+            });
+        }
+        
+        if (numBarraGuardada) {
+            document.getElementById('numBarra').value = numBarraGuardada;
+            document.querySelectorAll('.barra-item').forEach((item, index) => {
+                const barraNum = parseInt(item.dataset.barraNum);
+                item.style.display = barraNum <= numBarraGuardada ? 'block' : 'none';
+            });
+        } else {
+            toggleSidebar();
+        }
+
+        // Remover el overlay de transición si existe
+        const overlay = document.querySelector('.transition-overlay');
+        if (overlay) {
+            overlay.style.animation = 'overlayFadeOut 0.5s ease-out forwards';
+            setTimeout(() => overlay.remove(), 500);
+        }
+    });
+</script>
+{% endblock %}
+
+{% block main %}
+  <!-- Botón de edición de configuración -->
+  <button class="btn-edit-config" id="btnEditConfig">
+    <i class="bi bi-gear-fill"></i>
+  </button>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h5 class="mb-0">
+        <i class="bi bi-gear-fill me-2"></i>
+        Configuración
+      </h5>
+    </div>
+    <div class="sidebar-content">
+      <form id="mesasConfigForm">
+        <div class="mb-4">
+          <label for="numMesas" class="form-label">Número de Mesas para Llevar</label>
+          <input type="number" class="form-control" id="numMesas" min="1" max="13" value="5">
+          <small class="text-muted">Máximo 13 mesas disponibles</small>
+        </div>
+        <div class="mb-4">
+          <label for="numBarra" class="form-label">Número de Puestos en Barra</label>
+          <input type="number" class="form-control" id="numBarra" min="1" max="5" value="3">
+          <small class="text-muted">Máximo 5 puestos disponibles</small>
+        </div>
+        <div class="text-center">
+          <button type="submit" class="btn btn-confirm">
+            <i class="bi bi-check-circle me-2"></i>
+            Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Contenedor principal -->
+  <div class="mesas-container">
+    <h1 class="text-center mesas-title">Nuestras Mesas</h1>
+    
+    <!-- Sección de Mesas para Llevar -->
+    <div class="section-container">
+      <h2 class="section-title">Mesas para Llevar</h2>
+      <div class="row">
+          {% for mesa in mesas %}
+              <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mesa-item" data-mesa-num="{{ loop.index }}">
+                  <div class="mesa-card" data-mesa-id="{{ mesa.id }}">
+                      <div>
+                          <div class="mesa-status {% if mesa.atendida %}atendida{% else %}normal{% endif %}">
+                              Mesa {{ loop.index }}
+                          </div>
+                          
+                          <div class="mesa-image-container">
+                              <img src="../static/images/logos/{{ mesa.imagen or 'mesa.webp' }}" 
+                                   alt="Mesa {{ loop.index }}" 
+                                   class="mesa-image">
+                          </div>
+                          
+                          <div class="mesa-info">
+                              {% if not mesa.atendida %}
+                                  Disponible para atender
+                              {% else %}
+                                  Mesa en servicio
+                              {% endif %}
+                          </div>
+                      </div>
+                      
+                      <div>
+                          {% if not mesa.atendida %}
+                              <a class="btn btn-primary btn-atender" href="{{ url_for('orders.products', mesa_id=mesa.id) }}">
+                                  <i class="bi bi-cart-plus me-1"></i> Atender
+                              </a>
+                          {% else %}
+                              <a class="btn btn-danger btn-atender" href="{{ url_for('orders.finalizar', mesa_id=mesa.id) }}">
+                                  <i class="bi bi-eye me-1"></i> Ver Mesa
+                              </a>
+                          {% endif %}
+                      </div>
+                  </div>
+              </div>
+          {% endfor %}
+      </div>
+    </div>
+
+    <!-- Sección de Barra -->
+    <div class="section-container barra">
+      <h2 class="section-title barra">Barra</h2>
+      <div class="row">
+          {% for i in range(5) %}
+              <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6 mesa-item barra-item" data-barra-num="{{ loop.index }}">
+                  <div class="barra-card" data-barra-id="{{ loop.index }}">
+                      <div>
+                          <div class="barra-status">
+                              Puesto {{ loop.index }}
+                          </div>
+                          
+                          <div class="barra-image-container">
+                              <img src="../static/images/logos/barra.webp" 
+                                   alt="Puesto {{ loop.index }}" 
+                                   class="barra-image">
+                          </div>
+                          
+                          <div class="barra-info">
+                              Puesto disponible
+                          </div>
+                      </div>
+                      
+                      <div>
+                          <a class="btn btn-barra" href="{{ url_for('orders.barra', barra_id=loop.index) }}">
+                              <i class="bi bi-cash me-1"></i> Ordenar
+                          </a>
+                      </div>
+                  </div>
+              </div>
+          {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

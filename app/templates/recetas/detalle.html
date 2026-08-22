@@ -1,0 +1,42 @@
+{% extends 'layouts/base.html' %}
+{% block title %}{{ receta.nombre }} · Recetas{% endblock %}
+{% block page_title %}Receta: {{ receta.nombre }}{% endblock %}
+
+{% block content %}
+<div class="q-card">
+    <h3>{{ receta.producto.nombre if receta.producto else receta.nombre }}</h3>
+    <p class="q-sub">{{ receta.descripcion or 'Sin descripción' }}</p>
+    <div class="q-grid cols-4">
+        <div><strong>Rendimiento</strong><br>{{ receta.rendimiento }}</div>
+        <div><strong>Tiempo</strong><br>{{ receta.tiempo_preparacion or '—' }} min</div>
+        <div><strong>Costo</strong><br>C$ {{ receta.costo_total | number_format(2) }}</div>
+        <div><strong>Estado</strong><br><span class="q-chip {{ 'ok' if receta.estado == 'activo' else 'bajo' }}">{{ receta.estado }}</span></div>
+    </div>
+</div>
+
+<div class="q-card">
+    <h3>Ingredientes</h3>
+    <table class="q-table">
+        <thead><tr><th>Insumo</th><th>Cantidad</th><th>Unidad</th><th>Costo estimado</th></tr></thead>
+        <tbody>
+        {% for i in receta.ingredientes %}
+            <tr>
+                <td>{{ i.producto.nombre if i.producto else '—' }}</td>
+                <td>{{ i.cantidad_necesaria }}</td>
+                <td>{{ i.unidad.abreviatura if i.unidad else '—' }}</td>
+                <td>C$ {{ i.costo_estimado | number_format(2) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if receta.modo_preparacion %}
+<div class="q-card">
+    <h3>Modo de preparación</h3>
+    <p style="white-space:pre-line">{{ receta.modo_preparacion }}</p>
+</div>
+{% endif %}
+
+<a class="q-btn ghost" href="{{ url_for('receta.lista') }}">← Volver a recetas</a>
+{% endblock %}

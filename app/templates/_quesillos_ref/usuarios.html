@@ -1,0 +1,137 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Usuarios
+{% endblock %}
+
+{% block main %}
+
+<style>
+    @media (max-width: 767.98px) {
+
+        .table-compact th,
+        .table-compact td {
+            padding: 0.25rem 0.2rem !important;
+            font-size: 0.85rem;
+            vertical-align: middle;
+        }
+
+        .truncate-mobile {
+            max-width: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        .btn-compact {
+            padding: 0.1rem 0.3rem !important;
+            font-size: 0.85rem;
+        }
+    }
+</style>
+
+<div class="container py-4">
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title mb-3">Usuarios registrados</h5>
+
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle text-center table-compact">
+
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Email</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for i in info %}
+                        <tr class="{{ 'table-danger' if i.status == 3 else '' }}">
+
+                            <td>{{ i.id }}</td>
+
+                            <td>
+                                <span class="d-md-none truncate-mobile">{{ i.nombre_user }}</span>
+                                <span class="d-none d-md-inline">{{ i.nombre_user }}</span>
+                            </td>
+
+                            <td>
+                                <span
+                                    class="badge bg-{{ 'success' if i.rol == 'admin' else 'info' if i.rol == 'mesero' else 'warning text-dark' }}">
+                                    {{ i.rol|title }}
+                                </span>
+                            </td>
+
+                            <td>{{ i.email or 'No especificado' }}</td>
+
+                            <!-- ESTADO -->
+                            <td>
+                                {% if i.status == 1 or i.status == '1' %}<span class="badge bg-success">Activo</span>{%
+                                elif i.status == 3 or i.status == '3' %}<span class="badge bg-danger"><i
+                                        class="bi bi-x-circle"></i> Eliminado</span>{% else %}<span
+                                    class="badge bg-secondary">Desconocido</span>{% endif %}
+                            </td>
+
+                            <!-- ACCIONES -->
+                            <td>
+                                {% if i.status == 3 or i.status == '3' %}<span class="text-muted">No disponible</span>{%
+                                else %}<button class="btn btn-danger btn-sm" onclick="eliminarUsuario({{ i.id }})"><i
+                                        class="bi bi-trash"></i> Eliminar</button>{% endif %}
+                            </td>
+
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SWEETALERT -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    function eliminarUsuario(id) {
+        Swal.fire({
+            title: "¿Eliminar usuario?",
+            text: "Esta acción no se puede deshacer",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#6c757d",
+            confirmButtonText: "Sí, eliminar",
+            cancelButtonText: "Cancelar"
+        }).then((result) => {
+            if (result.isConfirmed) {
+
+                fetch(`/usuarios/eliminar/${id}`, {
+                    method: 'DELETE'
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            Swal.fire("Eliminado", "Usuario eliminado correctamente", "success")
+                                .then(() => location.reload());
+                        } else {
+                            Swal.fire("Error", data.message || "No se pudo eliminar", "error");
+                        }
+                    })
+                    .catch(() => {
+                        Swal.fire("Error", "Error de conexión", "error");
+                    });
+
+            }
+        });
+    }
+</script>
+
+{% endblock %}

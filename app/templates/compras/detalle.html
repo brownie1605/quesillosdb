@@ -1,0 +1,107 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Detalle de Compra{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <a href="{{ url_for('compra.lista') }}" class="btn btn-secondary" style="padding: 6px 12px;">←</a>
+        <h2 style="font-size: 20px;">Detalle de Compra</h2>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+        <span class="badge badge-active" style="padding: 6px 12px; font-size: 14px;">Completada</span>
+        <button class="btn btn-secondary">🖨️ Imprimir</button>
+    </div>
+</div>
+
+<div class="panel" style="margin-bottom: 24px;">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 24px;">
+        <div>
+            <span style="color: #6a768d; font-size: 13px; display: block; margin-bottom: 4px;">Proveedor</span>
+            <strong>Proveedor Central</strong>
+        </div>
+        <div>
+            <span style="color: #6a768d; font-size: 13px; display: block; margin-bottom: 4px;">Fecha</span>
+            <strong>25/05/2024</strong>
+        </div>
+        <div>
+            <span style="color: #6a768d; font-size: 13px; display: block; margin-bottom: 4px;">Total</span>
+            <strong style="font-size: 18px;">C$ 5,650.00</strong>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th style="text-align: center;">Cantidad</th>
+                <th style="text-align: right;">Precio Unit.</th>
+                <th style="text-align: right;">Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Coca Cola 1.5L</td>
+                <td style="text-align: center;">24</td>
+                <td style="text-align: right;">C$ 20.00</td>
+                <td style="text-align: right;">C$ 480.00</td>
+            </tr>
+            <tr>
+                <td>Arroz Progreso 1kg</td>
+                <td style="text-align: center;">50</td>
+                <td style="text-align: right;">C$ 18.00</td>
+                <td style="text-align: right;">C$ 900.00</td>
+            </tr>
+            <tr>
+                <td>Aceite Gourmet 900ml</td>
+                <td style="text-align: center;">30</td>
+                <td style="text-align: right;">C$ 45.00</td>
+                <td style="text-align: right;">C$ 1,350.00</td>
+            </tr>
+            <tr>
+                <td>Azúcar Morena 1kg</td>
+                <td style="text-align: center;">40</td>
+                <td style="text-align: right;">C$ 15.00</td>
+                <td style="text-align: right;">C$ 600.00</td>
+            </tr>
+            <tr>
+                <td>Leche Gloria 1L</td>
+                <td style="text-align: center;">20</td>
+                <td style="text-align: right;">C$ 20.00</td>
+                <td style="text-align: right;">C$ 400.00</td>
+            </tr>
+            <tr>
+                <td>Huevos 30und</td>
+                <td style="text-align: center;">15</td>
+                <td style="text-align: right;">C$ 70.00</td>
+                <td style="text-align: right;">C$ 1,050.00</td>
+            </tr>
+            <tr>
+                <td>Papel Higiénico Familiar</td>
+                <td style="text-align: center;">30</td>
+                <td style="text-align: right;">C$ 12.00</td>
+                <td style="text-align: right;">C$ 360.00</td>
+            </tr>
+            <tr>
+                <td>Detergente Surf 500g</td>
+                <td style="text-align: center;">25</td>
+                <td style="text-align: right;">C$ 30.00</td>
+                <td style="text-align: right;">C$ 750.00</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="display: flex; justify-content: flex-end; margin-top: 24px;">
+        <div style="width: 300px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px;">
+                <span style="color: #6a768d;">Subtotal</span>
+                <span>C$ 5,650.00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid #e1e7f0; padding-top: 12px; font-size: 18px; font-weight: bold;">
+                <span>Total</span>
+                <span>C$ 5,650.00</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

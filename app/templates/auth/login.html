@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>POS Inventario - Login</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+
+</head>
+
+<body>
+
+<div class="login-container">
+
+    <!-- PANEL IZQUIERDO -->
+    <section class="brand-panel">
+
+        <div class="logo-box">
+            🛒
+        </div>
+
+        <h1>
+            POS
+            <span>INVENTARIO</span>
+        </h1>
+
+        <h2>
+            Sistema de ventas e inventario
+        </h2>
+
+        <p>
+            Administra tus ventas, productos e inventario
+            de forma fácil y eficiente.
+        </p>
+
+        <div class="pos-illustration">
+            🖥️ 🧾 📦
+        </div>
+
+        <small>
+            © 2026 POS Inventario. Todos los derechos reservados. EST21
+        </small>
+
+    </section>
+
+    <!-- PANEL DERECHO -->
+    <section class="form-panel">
+
+        <div class="login-card">
+
+            <div class="lock-icon">
+                🔒
+            </div>
+
+            <h2>
+                Iniciar Sesión
+            </h2>
+
+            <p>
+                Ingresa tus credenciales para continuar
+            </p>
+
+            <!-- ALERTAS -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+
+                        <div style="
+                            background: #ffe5e5;
+                            color: #b30000;
+                            padding: 14px;
+                            border-radius: 8px;
+                            margin-bottom: 20px;
+                            font-size: 14px;
+                            text-align: center;
+                            border: 1px solid #ffb8b8;
+                        ">
+                            {{ message }}
+                        </div>
+
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- FORM LOGIN -->
+            <form method="POST" action="{{ url_for('auth.login') }}">
+
+                <!-- USUARIO -->
+                <label>
+                    Usuario
+                </label>
+
+                <input
+                    type="text"
+                    name="usuario"
+                    placeholder="Ingresa tu usuario"
+                    required
+                >
+
+                <!-- PASSWORD -->
+                <label>
+                    Contraseña
+                </label>
+
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Ingresa tu contraseña"
+                    required
+                >
+
+                <!-- OPCIONES -->
+                <div class="options">
+
+                    <span>
+                        ☑ Recordarme
+                    </span>
+
+                    <a href="#" id="forgotPasswordLink">
+                        ¿Olvidaste tu contraseña?
+                    </a>
+
+                </div>
+
+                <!-- BOTÓN LOGIN -->
+                <button type="submit">
+
+                    ↪ Iniciar Sesión
+
+                </button>
+
+                <!-- DIVIDER -->
+                <div class="divider">
+
+                    o continúa con
+
+                </div>
+
+                <!-- BOTÓN DEMO -->
+                <button
+                    type="button"
+                    class="demo-btn"
+                    onclick="document.querySelector('input[name=\'usuario\']').value='admin'; document.querySelector('input[name=\'password\']').value='admin123'; this.form.submit();"
+                >
+
+                    👤 Usuario Demo
+
+                </button>
+
+            </form>
+
+        </div>
+
+    </section>
+
+</div>
+
+<!-- Modal Forgot Password -->
+<div id="forgotPasswordModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: white; padding: 30px; border-radius: 12px; width: 400px; max-width: 90%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+        
+        <div id="step1">
+            <h3 style="margin-top: 0; color: #07152f; font-size: 20px;">Recuperar Contraseña</h3>
+            <p style="color: #6a768d; font-size: 14px; margin-bottom: 20px;">
+                Ingresa tu correo electrónico registrado y te enviaremos un código de recuperación a tu bandeja de entrada.
+            </p>
+            <input type="email" id="forgotEmailInput" placeholder="tu@correo.com" style="width: 100%; padding: 12px; border: 1px solid #e1e7f0; border-radius: 8px; margin-bottom: 20px; font-size: 14px; box-sizing: border-box;">
+            <div style="display: flex; gap: 10px;">
+                <button id="cancelForgotBtn" style="flex: 1; padding: 12px; background: #f4f7fb; color: #6a768d; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Cancelar</button>
+                <button id="sendForgotBtn" style="flex: 1; padding: 12px; background: #0b5cff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Enviar Código</button>
+            </div>
+        </div>
+
+        <div id="step2" style="display: none;">
+            <h3 style="margin-top: 0; color: #07152f; font-size: 20px;">Verificar Código</h3>
+            <p style="color: #6a768d; font-size: 14px; margin-bottom: 20px;">
+                Ingresa el código de 6 dígitos que enviamos a tu correo electrónico.
+            </p>
+            <input type="text" id="verifyCodeInput" placeholder="Ej: 123456" maxlength="6" style="width: 100%; padding: 12px; border: 1px solid #e1e7f0; border-radius: 8px; margin-bottom: 20px; font-size: 18px; letter-spacing: 5px; text-align: center; font-weight: bold; box-sizing: border-box;">
+            <div style="display: flex; gap: 10px;">
+                <button id="cancelVerifyBtn" style="flex: 1; padding: 12px; background: #f4f7fb; color: #6a768d; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Cancelar</button>
+                <button id="verifyBtn" style="flex: 1; padding: 12px; background: #00ca72; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Verificar</button>
+            </div>
+        </div>
+
+        <div id="step3" style="display: none;">
+            <h3 style="margin-top: 0; color: #07152f; font-size: 20px;">Nueva Contraseña</h3>
+            <p style="color: #6a768d; font-size: 14px; margin-bottom: 20px;">
+                Ingresa tu nueva contraseña para acceder al sistema.
+            </p>
+            <input type="password" id="newPasswordInput" placeholder="Nueva contraseña" style="width: 100%; padding: 12px; border: 1px solid #e1e7f0; border-radius: 8px; margin-bottom: 10px; font-size: 14px; box-sizing: border-box;">
+            <input type="password" id="confirmPasswordInput" placeholder="Confirmar contraseña" style="width: 100%; padding: 12px; border: 1px solid #e1e7f0; border-radius: 8px; margin-bottom: 20px; font-size: 14px; box-sizing: border-box;">
+            <div style="display: flex; gap: 10px;">
+                <button id="cancelResetBtn" style="flex: 1; padding: 12px; background: #f4f7fb; color: #6a768d; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Cancelar</button>
+                <button id="resetBtn" style="flex: 1; padding: 12px; background: #0b5cff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Guardar</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+let currentEmail = '';
+let currentCode = '';
+
+document.getElementById('forgotPasswordLink').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('step1').style.display = 'block';
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step3').style.display = 'none';
+    document.getElementById('forgotEmailInput').value = '';
+    document.getElementById('verifyCodeInput').value = '';
+    document.getElementById('newPasswordInput').value = '';
+    document.getElementById('confirmPasswordInput').value = '';
+    document.getElementById('forgotPasswordModal').style.display = 'flex';
+});
+
+document.getElementById('cancelForgotBtn').addEventListener('click', () => {
+    document.getElementById('forgotPasswordModal').style.display = 'none';
+});
+
+document.getElementById('cancelVerifyBtn').addEventListener('click', () => {
+    document.getElementById('forgotPasswordModal').style.display = 'none';
+});
+
+document.getElementById('cancelResetBtn').addEventListener('click', () => {
+    document.getElementById('forgotPasswordModal').style.display = 'none';
+});
+
+document.getElementById('sendForgotBtn').addEventListener('click', async () => {
+    const email = document.getElementById('forgotEmailInput').value;
+    if (!email) {
+        alert("Por favor ingresa un correo electrónico.");
+        return;
+    }
+    
+    const btn = document.getElementById('sendForgotBtn');
+    btn.disabled = true;
+    btn.textContent = "Enviando...";
+    
+    try {
+        const response = await fetch('/api/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ correo: email })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            if (result.message && result.message.includes("Modo Prueba")) {
+                alert(result.message);
+            }
+            currentEmail = email;
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+        } else {
+            alert(result.message);
+        }
+    } catch (e) {
+        alert("Error de conexión. Intenta más tarde.");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Enviar Código";
+    }
+});
+
+document.getElementById('verifyBtn').addEventListener('click', async () => {
+    const codigo = document.getElementById('verifyCodeInput').value;
+    if (!codigo || codigo.length !== 6) {
+        alert("Por favor ingresa el código de 6 dígitos.");
+        return;
+    }
+    
+    const btn = document.getElementById('verifyBtn');
+    btn.disabled = true;
+    btn.textContent = "Verificando...";
+    
+    try {
+        const response = await fetch('/api/verify-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ correo: currentEmail, codigo: codigo })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            currentCode = codigo;
+            document.getElementById('step2').style.display = 'none';
+            document.getElementById('step3').style.display = 'block';
+        } else {
+            alert(result.message);
+        }
+    } catch (e) {
+        alert("Error de conexión. Intenta más tarde.");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Verificar";
+    }
+});
+
+document.getElementById('resetBtn').addEventListener('click', async () => {
+    const newPass = document.getElementById('newPasswordInput').value;
+    const confPass = document.getElementById('confirmPasswordInput').value;
+    
+    if (!newPass || newPass !== confPass) {
+        alert("Las contraseñas no coinciden o están vacías.");
+        return;
+    }
+    
+    const btn = document.getElementById('resetBtn');
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+    
+    try {
+        const response = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ correo: currentEmail, codigo: currentCode, nueva_password: newPass })
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            alert("Contraseña restablecida con éxito. Ya puedes iniciar sesión.");
+            document.getElementById('forgotPasswordModal').style.display = 'none';
+        } else {
+            alert(result.message);
+            btn.disabled = false;
+            btn.textContent = "Guardar";
+        }
+    } catch (e) {
+        alert("Error de conexión. Intenta más tarde.");
+        btn.disabled = false;
+        btn.textContent = "Guardar";
+    }
+});
+</script>
+
+</body>
+</html>

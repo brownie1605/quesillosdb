@@ -1,0 +1,304 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Recetas · Quesillos Lo Nuestro{% endblock %}
+{% block page_title %}Recetas{% endblock %}
+
+{% block content %}
+<div class="q-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+        <div>
+            <h3>📖 Recetas del menú</h3>
+            <p class="q-sub">Cada receta define los insumos que se descuentan del inventario al vender el producto.</p>
+        </div>
+        <button class="q-btn" onclick="abrirModal()">+ Nueva receta</button>
+    </div>
+</div>
+
+<div class="q-card">
+    <table class="q-table" id="tabla-recetas">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Ingredientes</th>
+                <th>Costo</th>
+                <th>Precio venta</th>
+                <th>Margen</th>
+                <th>Se pueden preparar</th>
+                <th>Estado</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody><tr><td colspan="8">Cargando…</td></tr></tbody>
+    </table>
+</div>
+
+<!-- ------------------------------------------------------------ modal -->
+<div id="modal-receta" class="q-modal" style="display:none;">
+  <div class="q-modal-box">
+    <div class="q-modal-head">
+        <h3 id="modal-titulo">Nueva receta</h3>
+        <button class="q-btn ghost small" onclick="cerrarModal()">✕</button>
+    </div>
+
+    <input type="hidden" id="id_receta">
+
+    <div class="q-grid cols-2">
+        <div>
+            <label>Producto final</label>
+            <select id="id_producto" class="q-select"></select>
+        </div>
+        <div>
+            <label>Nombre de la receta</label>
+            <input id="nombre" class="q-input" placeholder="Ej. Quesillo Lo Nuestro">
+        </div>
+        <div>
+            <label>Rendimiento (unidades que produce)</label>
+            <input id="rendimiento" class="q-input" type="number" step="0.01" value="1">
+        </div>
+        <div>
+            <label>Unidad del rendimiento</label>
+            <select id="id_unidad_rendimiento" class="q-select">
+                <option value="">—</option>
+                {% for u in unidades %}
+                <option value="{{ u.id_unidad }}">{{ u.nombre }} ({{ u.abreviatura }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label>Tiempo de preparación (min)</label>
+            <input id="tiempo_preparacion" class="q-input" type="number" min="0">
+        </div>
+        <div>
+            <label>Estado</label>
+            <select id="estado" class="q-select">
+                <option value="activo">Activo</option>
+                <option value="inactivo">Inactivo</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-top:12px">
+        <label>Modo de preparación</label>
+        <textarea id="modo_preparacion" class="q-input" rows="3"
+                  placeholder="Ej. Calentar la tortilla, colocar el quesillo, agregar crema y cebolla encurtida."></textarea>
+    </div>
+
+    <hr style="margin:18px 0;border:none;border-top:1px solid var(--q-borde)">
+
+    <div style="display:flex;justify-content:space-between;align-items:center">
+        <h4 style="margin:0;color:var(--q-rojo)">Ingredientes (insumos)</h4>
+        <button class="q-btn small" onclick="agregarFila()">+ Agregar ingrediente</button>
+    </div>
+
+    <table class="q-table" style="margin-top:10px">
+        <thead>
+            <tr><th style="width:40%">Insumo</th><th>Cantidad</th><th>Unidad</th><th>Stock</th><th>Costo</th><th></th></tr>
+        </thead>
+        <tbody id="tbody-ingredientes"></tbody>
+        <tfoot>
+            <tr>
+                <th colspan="4" style="text-align:right">Costo total de la receta</th>
+                <th id="costo-total">0.00</th>
+                <th></th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+        <button class="q-btn ghost" onclick="cerrarModal()">Cancelar</button>
+        <button class="q-btn" id="btn-guardar" onclick="guardar()">Guardar receta</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.q-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);
+         z-index:9990;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 14px}
+.q-modal-box{background:var(--q-crema);border-radius:16px;padding:24px;width:900px;max-width:100%;
+             box-shadow:0 18px 50px rgba(0,0,0,.4)}
+.q-modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.q-modal-head h3{margin:0;color:var(--q-rojo)}
+.q-modal label{display:block;font-size:12.5px;font-weight:600;margin-bottom:4px;opacity:.75}
+.dark-theme .q-modal-box{background:#1e242c;color:#e6ebf2}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let INSUMOS = [];
+let UNIDADES = [
+    {% for u in unidades %}{id: {{ u.id_unidad }}, nombre: "{{ u.abreviatura }}"},{% endfor %}
+];
+
+async function cargar() {
+    const [recetas, insumos] = await Promise.all([
+        fetch('/recetas/api/lista').then(r => r.json()),
+        fetch('/recetas/api/insumos').then(r => r.json()),
+    ]);
+    INSUMOS = insumos;
+
+    const tb = document.querySelector('#tabla-recetas tbody');
+    if (!recetas.length) {
+        tb.innerHTML = '<tr><td colspan="8" style="text-align:center;opacity:.6">Aún no hay recetas registradas.</td></tr>';
+        return;
+    }
+    tb.innerHTML = recetas.map(r => `
+        <tr>
+            <td><strong>${r.producto_nombre || r.nombre}</strong><br><small style="opacity:.6">${r.ingredientes.length} ingredientes</small></td>
+            <td style="font-size:12.5px">${r.ingredientes.map(i => `${i.producto_nombre} ×${i.cantidad_necesaria}${i.unidad ? ' ' + i.unidad : ''}`).join('<br>')}</td>
+            <td>C$ ${r.costo_total.toFixed(2)}</td>
+            <td>C$ ${r.precio_venta.toFixed(2)}</td>
+            <td><span class="q-chip ${r.margen >= 0 ? 'ok' : 'bajo'}">C$ ${r.margen.toFixed(2)}</span></td>
+            <td><span class="q-chip ${r.max_producible >= 1 ? 'ok' : 'bajo'}">${Math.floor(r.max_producible)}</span></td>
+            <td><span class="q-chip ${r.estado === 'activo' ? 'ok' : 'bajo'}">${r.estado}</span></td>
+            <td style="white-space:nowrap">
+                <button class="q-btn small ghost" onclick='editar(${JSON.stringify(r)})'>Editar</button>
+                <button class="q-btn small danger" onclick="eliminar(${r.id_receta})">Eliminar</button>
+            </td>
+        </tr>`).join('');
+}
+
+async function abrirModal() {
+    document.getElementById('modal-titulo').textContent = 'Nueva receta';
+    document.getElementById('id_receta').value = '';
+    ['nombre','rendimiento','tiempo_preparacion','modo_preparacion'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('rendimiento').value = 1;
+    document.getElementById('tbody-ingredientes').innerHTML = '';
+
+    const productos = await fetch('/recetas/api/productos-disponibles').then(r => r.json());
+    const sel = document.getElementById('id_producto');
+    sel.disabled = false;
+    sel.innerHTML = productos.map(p => `<option value="${p.id_producto}">${p.nombre} — C$ ${p.precio_venta.toFixed(2)}</option>`).join('')
+        || '<option value="">No hay productos finales sin receta</option>';
+
+    agregarFila();
+    document.getElementById('modal-receta').style.display = 'flex';
+}
+
+function editar(r) {
+    document.getElementById('modal-titulo').textContent = 'Editar receta';
+    document.getElementById('id_receta').value = r.id_receta;
+    document.getElementById('nombre').value = r.nombre || '';
+    document.getElementById('rendimiento').value = r.rendimiento || 1;
+    document.getElementById('tiempo_preparacion').value = r.tiempo_preparacion || '';
+    document.getElementById('modo_preparacion').value = r.modo_preparacion || '';
+    document.getElementById('estado').value = r.estado || 'activo';
+
+    const sel = document.getElementById('id_producto');
+    sel.innerHTML = `<option value="${r.id_producto}">${r.producto_nombre}</option>`;
+    sel.disabled = true;
+
+    document.getElementById('tbody-ingredientes').innerHTML = '';
+    r.ingredientes.forEach(i => agregarFila(i));
+    recalcular();
+    document.getElementById('modal-receta').style.display = 'flex';
+}
+
+function cerrarModal() { document.getElementById('modal-receta').style.display = 'none'; }
+
+function agregarFila(datos) {
+    datos = datos || {};
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>
+            <select class="q-select ing-producto" onchange="recalcular()">
+                <option value="">— Selecciona un insumo —</option>
+                ${INSUMOS.map(i => `<option value="${i.id_producto}" data-costo="${i.precio_compra}" data-stock="${i.stock}"
+                    ${datos.id_producto == i.id_producto ? 'selected' : ''}>${i.nombre}</option>`).join('')}
+            </select>
+        </td>
+        <td><input type="number" step="0.0001" min="0" class="q-input ing-cantidad"
+                   value="${datos.cantidad_necesaria || ''}" oninput="recalcular()" style="width:110px"></td>
+        <td>
+            <select class="q-select ing-unidad" style="width:100px">
+                <option value="">—</option>
+                ${UNIDADES.map(u => `<option value="${u.id}" ${datos.id_unidad == u.id ? 'selected' : ''}>${u.nombre}</option>`).join('')}
+            </select>
+        </td>
+        <td class="ing-stock" style="font-size:12.5px;opacity:.7">—</td>
+        <td class="ing-costo">0.00</td>
+        <td><button class="q-btn small danger" onclick="this.closest('tr').remove();recalcular()">✕</button></td>`;
+    document.getElementById('tbody-ingredientes').appendChild(tr);
+    recalcular();
+}
+
+function recalcular() {
+    let total = 0;
+    document.querySelectorAll('#tbody-ingredientes tr').forEach(tr => {
+        const sel = tr.querySelector('.ing-producto');
+        const opt = sel.options[sel.selectedIndex];
+        const cant = parseFloat(tr.querySelector('.ing-cantidad').value) || 0;
+        const costoUnit = opt ? parseFloat(opt.dataset.costo || 0) : 0;
+        const stock = opt ? parseFloat(opt.dataset.stock || 0) : 0;
+        const costo = costoUnit * cant;
+        tr.querySelector('.ing-costo').textContent = costo.toFixed(2);
+        tr.querySelector('.ing-stock').textContent = sel.value ? stock.toFixed(2) : '—';
+        tr.querySelector('.ing-stock').className = 'ing-stock';
+        if (sel.value && stock < cant) tr.querySelector('.ing-stock').innerHTML = `<span class="q-chip bajo">${stock.toFixed(2)}</span>`;
+        total += costo;
+    });
+    document.getElementById('costo-total').textContent = 'C$ ' + total.toFixed(2);
+}
+
+function recolectar() {
+    const ingredientes = [];
+    document.querySelectorAll('#tbody-ingredientes tr').forEach(tr => {
+        const id = tr.querySelector('.ing-producto').value;
+        const cant = parseFloat(tr.querySelector('.ing-cantidad').value);
+        if (!id || !cant) return;
+        ingredientes.push({
+            id_producto: parseInt(id),
+            cantidad_necesaria: cant,
+            id_unidad: tr.querySelector('.ing-unidad').value || null,
+        });
+    });
+    return {
+        id_producto: parseInt(document.getElementById('id_producto').value),
+        nombre: document.getElementById('nombre').value,
+        rendimiento: parseFloat(document.getElementById('rendimiento').value) || 1,
+        id_unidad_rendimiento: document.getElementById('id_unidad_rendimiento').value || null,
+        tiempo_preparacion: parseInt(document.getElementById('tiempo_preparacion').value) || null,
+        modo_preparacion: document.getElementById('modo_preparacion').value,
+        estado: document.getElementById('estado').value,
+        ingredientes: ingredientes,
+    };
+}
+
+async function guardar() {
+    const datos = recolectar();
+    if (!datos.ingredientes.length) {
+        Q.toast('warning', 'Faltan ingredientes', 'Agrega al menos un insumo con su cantidad.');
+        return;
+    }
+    const id = document.getElementById('id_receta').value;
+    const url = id ? `/recetas/api/${id}/actualizar` : '/recetas/api/crear';
+    const btn = document.getElementById('btn-guardar');
+    btn.disabled = true;
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(datos),
+        });
+        const r = await res.json();
+        if (r.success) {
+            Q.toast('success', 'Listo', r.message);
+            cerrarModal();
+            cargar();
+        } else {
+            Q.toast('error', 'No se pudo guardar', r.message);
+        }
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function eliminar(id) {
+    if (!confirm('¿Eliminar esta receta? El producto dejará de descontar insumos al venderse.')) return;
+    const r = await fetch(`/recetas/api/${id}/eliminar`, {method: 'POST'}).then(r => r.json());
+    if (r.success) { Q.toast('success', 'Receta eliminada', ''); cargar(); }
+    else Q.toast('error', 'Error', r.message);
+}
+
+cargar();
+</script>
+{% endblock %}

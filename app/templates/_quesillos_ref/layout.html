@@ -1,0 +1,2086 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Quesillos lo nuestro {% block title %} {% endblock %}</title>
+    <link rel="shortcut icon" type="image/png" href="../static/images/logos/logo.jpg" />
+    <link rel="stylesheet" href="../static/css/styles.min.css" />
+    <!-- Bootstrap Icons CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- SweetAlert2 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css">
+    <!-- Socket.IO Client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Estilos base */
+
+        :root {
+            --sidebar-width: 260px;
+            --header-height: 60px;
+            --primary-color: #8d6e63;
+            --secondary-color: #bcaaa4;
+        }
+
+        .sidebar-nav {
+            max-height: 100vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 100px;
+        }
+
+        /* Estilos para notificaciones */
+
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+
+        .toast {
+            min-width: 300px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            margin-bottom: 10px;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast-header {
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-radius: 8px 8px 0 0;
+            padding: 0.75rem 1rem;
+        }
+
+        .toast-body {
+            padding: 1rem;
+            color: #333;
+        }
+
+        /* Estilos responsivos */
+
+        @media (max-width: 1200px) {
+            .container-fluid {
+                padding: 1rem;
+            }
+        }
+
+        @media (max-width: 991.98px) {
+            .sidebar-nav {
+                max-height: calc(100vh - var(--header-height));
+                padding-bottom: 150px;
+            }
+
+            .brand-logo img {
+                width: 150px !important;
+                height: 75px !important;
+            }
+
+            .left-sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                transform: translateX(-100%);
+                height: 100%;
+                z-index: 1030;
+                transition: transform 0.3s ease;
+                background-color: #fff;
+                box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+                width: var(--sidebar-width);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                right: auto;
+                will-change: transform;
+                display: block;
+            }
+
+            .left-sidebar.show {
+                transform: translateX(0) !important;
+                left: 0 !important;
+                right: auto !important;
+                display: block !important;
+                height: 100%;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .mobile-toggle {
+                display: block !important;
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                z-index: 1031;
+                background: #fff;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+                border: none;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .mobile-toggle:hover {
+                transform: scale(1.1);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+
+            .mobile-toggle i {
+                font-size: 1.2rem;
+                color: #333;
+            }
+
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1029;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+
+            .sidebar-overlay.show {
+                display: block;
+                opacity: 1;
+            }
+
+            .close-btn {
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background: transparent;
+                border: none;
+                font-size: 1.2rem;
+                color: #333;
+                cursor: pointer;
+                padding: 5px;
+                transition: all 0.3s ease;
+            }
+
+            .close-btn:hover {
+                transform: rotate(90deg);
+                color: #dc3545;
+            }
+
+            .body-wrapper {
+                margin-left: 0 !important;
+            }
+
+            /* Mejoras para móvil */
+            .container-fluid {
+                padding: 0.5rem;
+            }
+
+            .table-responsive {
+                margin: 0;
+                padding: 0;
+            }
+
+            .card {
+                margin-bottom: 1rem;
+            }
+
+            .btn {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+
+            .form-group {
+                margin-bottom: 1rem;
+            }
+
+            .modal-dialog {
+                margin: 0.5rem;
+            }
+
+            /* Ajustes responsivos para notificaciones */
+            .toast-container {
+                top: auto;
+                bottom: 20px;
+                right: 10px;
+                left: 10px;
+            }
+
+            .toast {
+                min-width: auto;
+                width: 100%;
+                margin-bottom: 8px;
+            }
+
+            .toast-header {
+                padding: 0.5rem 0.75rem;
+            }
+
+            .toast-body {
+                padding: 0.75rem;
+            }
+        }
+
+        /* Estilos para tablets */
+
+        @media (max-width: 768px) {
+            .brand-logo img {
+                width: 130px !important;
+                height: 65px !important;
+            }
+
+            .container-fluid {
+                padding: 0.75rem;
+            }
+
+            .card {
+                margin-bottom: 0.75rem;
+            }
+
+            .btn {
+                padding: 0.5rem 1rem;
+            }
+        }
+
+        /* Estilos para móviles */
+
+        @media (max-width: 576px) {
+            .brand-logo img {
+                width: 120px !important;
+                height: 60px !important;
+            }
+
+            .mobile-toggle {
+                top: 8px;
+                left: 8px;
+                width: 35px;
+                height: 35px;
+            }
+
+            .mobile-toggle i {
+                font-size: 1rem;
+            }
+
+            .left-sidebar {
+                width: 85%;
+                max-width: var(--sidebar-width);
+            }
+
+            .sidebar-link {
+                padding: 8px !important;
+                font-size: 14px !important;
+            }
+
+            .sidebar-link i {
+                font-size: 18px !important;
+            }
+
+            .container-fluid {
+                padding: 0.5rem;
+            }
+
+            .card {
+                margin-bottom: 0.5rem;
+            }
+
+            .btn {
+                padding: 0.4rem 0.8rem;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Estilos para dispositivos muy pequeños */
+
+        @media (max-width: 360px) {
+            .brand-logo img {
+                width: 100px !important;
+                height: 50px !important;
+            }
+
+            .mobile-toggle {
+                width: 30px;
+                height: 30px;
+            }
+
+            .mobile-toggle i {
+                font-size: 0.9rem;
+            }
+
+            .left-sidebar {
+                width: 100%;
+            }
+
+            .sidebar-link {
+                padding: 6px !important;
+                font-size: 13px !important;
+            }
+
+            .sidebar-link i {
+                font-size: 16px !important;
+            }
+
+            /* Responsive para campanita de notificaciones */
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] {
+                width: calc(100vw - 20px) !important;
+                max-width: none !important;
+                left: 10px !important;
+                right: 10px !important;
+                position: fixed !important;
+                top: 60px !important;
+                max-height: calc(100vh - 80px) !important;
+                border-radius: 8px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .d-flex.justify-content-between {
+                flex-direction: column !important;
+                gap: 8px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] h6 {
+                font-size: 14px !important;
+                margin: 0 !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .btn-sm {
+                font-size: 12px !important;
+                padding: 4px 8px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .dropdown-item {
+                padding: 8px 12px !important;
+                font-size: 13px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .small {
+                font-size: 11px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .badge {
+                font-size: 10px !important;
+                padding: 2px 6px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .fs-5 {
+                font-size: 16px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .fs-6 {
+                font-size: 14px !important;
+            }
+        }
+
+        /* Estilos para dispositivos muy pequeños */
+
+        @media (max-width: 394px) {
+            .brand-logo img {
+                width: 120px !important;
+                height: 60px !important;
+            }
+
+            .mobile-toggle {
+                top: 8px;
+                left: 8px;
+                width: 35px;
+                height: 35px;
+            }
+
+            .mobile-toggle i {
+                font-size: 1rem;
+            }
+
+            .left-sidebar {
+                width: 260px;
+            }
+
+            .sidebar-link {
+                padding: 8px !important;
+                font-size: 14px !important;
+            }
+
+            .sidebar-link i {
+                font-size: 18px !important;
+            }
+
+            .nav-small-cap {
+                font-size: 11px !important;
+                margin-top: 15px !important;
+            }
+
+            .container-fluid {
+                padding: 0.25rem;
+            }
+
+            .card {
+                margin-bottom: 0.75rem;
+            }
+
+            .card-body {
+                padding: 0.75rem;
+            }
+
+            .table th,
+            .table td {
+                padding: 0.5rem;
+                font-size: 0.85rem;
+            }
+
+            .btn {
+                padding: 0.375rem 0.75rem;
+                font-size: 0.875rem;
+            }
+
+            .form-control {
+                font-size: 0.875rem;
+                padding: 0.375rem 0.75rem;
+            }
+
+            .modal-dialog {
+                margin: 0.25rem;
+            }
+
+            .modal-content {
+                border-radius: 0.5rem;
+            }
+
+            .modal-header {
+                padding: 0.75rem;
+            }
+
+            .modal-body {
+                padding: 0.75rem;
+            }
+
+            .modal-footer {
+                padding: 0.75rem;
+            }
+
+            /* Ajustes para el header */
+            .app-header {
+                padding: 0 10px;
+            }
+
+            .app-header .navbar {
+                min-height: 60px;
+            }
+
+            .app-header .navbar .navbar-nav .nav-item .nav-link {
+                padding: 4px 8px;
+                line-height: 60px;
+                height: 60px;
+                font-size: 18px;
+            }
+
+            /* Ajustes para dropdowns */
+            .dropdown-menu {
+                width: 100%;
+                margin-top: 0.5rem;
+                font-size: 0.875rem;
+            }
+
+            .dropdown-item {
+                padding: 0.5rem 0.75rem;
+            }
+
+            /* Ajustes para notificaciones */
+            .toast-container {
+                bottom: 10px;
+                right: 5px;
+                left: 5px;
+            }
+
+            .toast {
+                margin-bottom: 5px;
+            }
+
+            /* Ajustes para el contenido principal */
+            .body-wrapper>.container-fluid {
+                padding: 10px;
+            }
+
+            /* Ajustes para tablas */
+            .table-responsive {
+                margin: 0 -10px;
+                padding: 0 10px;
+            }
+
+            /* Ajustes para formularios */
+            .form-label {
+                font-size: 0.875rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .input-group {
+                flex-wrap: wrap;
+            }
+
+            .input-group>* {
+                margin-bottom: 0.25rem;
+            }
+
+            /* Ajustes para botones de acción */
+            .btn-group {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .btn-group .btn {
+                margin-bottom: 0.25rem;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .brand-logo img {
+                width: 150px !important;
+                height: 75px !important;
+            }
+
+            .navbar-nav {
+                padding: 0.5rem;
+            }
+
+            .container-fluid {
+                padding: 0.5rem;
+            }
+
+            /* Ajustes adicionales para móvil */
+            .table th,
+            .table td {
+                padding: 0.5rem;
+                font-size: 0.9rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .btn-group {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .btn-group .btn {
+                margin-bottom: 0.5rem;
+            }
+
+            .dropdown-menu {
+                width: 100%;
+                margin-top: 0.5rem;
+            }
+        }
+
+        /* Mejoras generales de responsividad */
+
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .img-fluid {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .flex-wrap {
+            flex-wrap: wrap;
+        }
+
+        /* Mejoras para formularios */
+
+        .form-control {
+            width: 100%;
+        }
+
+        .input-group {
+            flex-wrap: wrap;
+        }
+
+        .input-group>* {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Mejoras para modales */
+
+        .modal-content {
+            border-radius: 0.5rem;
+        }
+
+        @media (max-width: 575.98px) {
+            .modal-dialog {
+                margin: 0.25rem;
+            }
+
+            .card {
+                border-radius: 0.5rem;
+            }
+
+            .btn {
+                padding: 0.375rem 0.75rem;
+            }
+        }
+
+        /* Mejoras para la navegación */
+
+        .navbar {
+            padding: 0.5rem;
+        }
+
+        .nav-link {
+            padding: 0.5rem;
+        }
+
+        /* Mejoras para las alertas */
+
+        .alert {
+            margin: 0.5rem;
+            border-radius: 0.5rem;
+        }
+
+        /* Mejoras para los badges */
+
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        /* Mejoras para los tooltips */
+
+        .tooltip {
+            font-size: 0.875rem;
+        }
+
+        /* Mejoras para los popovers */
+
+        .popover {
+            max-width: 90%;
+        }
+
+        .sidebar-link {
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-link:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .nav-icon-hover {
+            transition: all 0.3s ease;
+        }
+
+        .nav-icon-hover:hover {
+            transform: scale(1.1);
+        }
+
+        .dropdown-menu {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+
+        .mobile-toggle {
+            display: block !important;
+        }
+
+        /* Estilos responsivos generales */
+
+        @media (min-width: 1400px) {
+            .container-fluid {
+                max-width: 1320px;
+                margin: 0 auto;
+            }
+
+            .left-sidebar {
+                width: 280px;
+            }
+
+            .brand-logo img {
+                width: 250px !important;
+                height: 125px !important;
+            }
+
+            .sidebar-link {
+                font-size: 16px !important;
+                padding: 12px !important;
+            }
+
+            .sidebar-link i {
+                font-size: 24px !important;
+            }
+        }
+
+        @media (min-width: 1200px) and (max-width: 1399.98px) {
+            .container-fluid {
+                max-width: 1140px;
+                margin: 0 auto;
+            }
+
+            .left-sidebar {
+                width: 260px;
+            }
+
+            .brand-logo img {
+                width: 220px !important;
+                height: 110px !important;
+            }
+        }
+
+        @media (min-width: 992px) and (max-width: 1199.98px) {
+            .container-fluid {
+                max-width: 960px;
+                margin: 0 auto;
+            }
+
+            .left-sidebar {
+                width: 240px;
+            }
+
+            .brand-logo img {
+                width: 200px !important;
+                height: 100px !important;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 991.98px) {
+            .container-fluid {
+                max-width: 720px;
+                margin: 0 auto;
+            }
+
+            .left-sidebar {
+                width: 220px;
+            }
+
+            .brand-logo img {
+                width: 180px !important;
+                height: 90px !important;
+            }
+
+            .sidebar-link {
+                font-size: 15px !important;
+                padding: 10px !important;
+            }
+
+            .sidebar-link i {
+                font-size: 20px !important;
+            }
+        }
+
+        @media (min-width: 576px) and (max-width: 767.98px) {
+            .container-fluid {
+                max-width: 540px;
+                margin: 0 auto;
+            }
+
+            .left-sidebar {
+                width: 200px;
+            }
+
+            .brand-logo img {
+                width: 160px !important;
+                height: 80px !important;
+            }
+
+            .sidebar-link {
+                font-size: 14px !important;
+                padding: 8px !important;
+            }
+
+            .sidebar-link i {
+                font-size: 18px !important;
+            }
+
+            .nav-small-cap {
+                font-size: 12px !important;
+            }
+        }
+
+        @media (min-width: 395px) and (max-width: 575.98px) {
+            .container-fluid {
+                width: 100%;
+                padding: 0.5rem;
+            }
+
+            .left-sidebar {
+                width: 85%;
+                max-width: 280px;
+            }
+
+            .brand-logo img {
+                width: 140px !important;
+                height: 70px !important;
+            }
+
+            .sidebar-link {
+                font-size: 14px !important;
+                padding: 8px !important;
+            }
+
+            .sidebar-link i {
+                font-size: 18px !important;
+            }
+
+            .nav-small-cap {
+                font-size: 11px !important;
+            }
+        }
+
+        /* Estilos para orientación horizontal en móviles */
+
+        @media (max-height: 500px) and (orientation: landscape) {
+            .left-sidebar {
+                height: 100vh;
+                overflow-y: auto;
+            }
+
+            .brand-logo {
+                padding: 10px;
+            }
+
+            .brand-logo img {
+                width: 100px !important;
+                height: 50px !important;
+            }
+
+            .sidebar-link {
+                padding: 6px !important;
+            }
+
+            .nav-small-cap {
+                margin-top: 10px !important;
+            }
+
+            .app-header .navbar {
+                min-height: 50px;
+            }
+
+            .app-header .navbar .navbar-nav .nav-item .nav-link {
+                line-height: 50px;
+                height: 50px;
+            }
+        }
+
+        /* Estilos para dispositivos táctiles */
+
+        @media (hover: none) {
+            .sidebar-link:hover {
+                background-color: transparent;
+            }
+
+            .btn:hover {
+                transform: none;
+            }
+
+            .nav-icon-hover:hover {
+                transform: none;
+            }
+
+            .mobile-toggle:hover {
+                transform: none;
+            }
+
+            .close-btn:hover {
+                transform: none;
+            }
+        }
+
+        /* Estilos específicos para pantallas de 355px (como 355x712) */
+
+        @media (max-width: 355px) {
+
+            /* Responsive específico para campanita de notificaciones */
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] {
+                width: calc(100vw - 16px) !important;
+                max-width: none !important;
+                left: 8px !important;
+                right: 8px !important;
+                position: fixed !important;
+                top: 55px !important;
+                max-height: calc(100vh - 70px) !important;
+                border-radius: 6px !important;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .d-flex.justify-content-between {
+                flex-direction: column !important;
+                gap: 6px !important;
+                padding: 8px 12px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] h6 {
+                font-size: 13px !important;
+                margin: 0 !important;
+                font-weight: 600 !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .btn-sm {
+                font-size: 11px !important;
+                padding: 3px 6px !important;
+                white-space: nowrap !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .dropdown-item {
+                padding: 6px 10px !important;
+                font-size: 12px !important;
+                margin-bottom: 4px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .small {
+                font-size: 10px !important;
+                line-height: 1.3 !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .badge {
+                font-size: 9px !important;
+                padding: 1px 4px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .fs-5 {
+                font-size: 15px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .fs-6 {
+                font-size: 13px !important;
+            }
+
+            /* Ajustes para el contenido de las notificaciones */
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .d-flex.justify-content-between.align-items-start {
+                flex-direction: column !important;
+                gap: 4px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .text-primary {
+                font-size: 12px !important;
+                font-weight: 600 !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .text-muted {
+                font-size: 10px !important;
+            }
+
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] .border-top {
+                margin-top: 6px !important;
+                padding-top: 6px !important;
+            }
+
+            /* Ajuste para el botón de la campanita */
+            .dropdown.me-3 .btn-link {
+                padding: 4px !important;
+            }
+
+            .dropdown.me-3 .btn-link i {
+                font-size: 16px !important;
+            }
+
+            #notificaciones-badge {
+                font-size: 0.5rem !important;
+                padding: 1px 3px !important;
+            }
+
+            /* Protección para botones en pantallas pequeñas */
+            #submit-order {
+                min-height: 44px !important;
+                min-width: 44px !important;
+                touch-action: manipulation !important;
+                -webkit-tap-highlight-color: transparent !important;
+            }
+
+            /* Prevenir zoom en input en iOS */
+            input[type="text"],
+            input[type="email"],
+            input[type="number"],
+            input[type="tel"] {
+                font-size: 16px !important;
+            }
+        }
+
+        @media (max-width: 430px) {
+            .dropdown-menu[aria-labelledby="notificacionesDropdown"] {
+                width: 96vw !important;
+                left: 2vw !important;
+                right: 2vw !important;
+                min-width: unset !important;
+                max-width: unset !important;
+                position: fixed !important;
+                top: 60px !important;
+                border-radius: 10px !important;
+                padding: 0 !important;
+            }
+        }
+    </style>
+    {% block extra_head %} {% endblock %}
+</head>
+
+<body>
+    <!--  Body Wrapper -->
+    <div class="page-wrapper" id="main-wrapper" data-layout="vertical" data-navbarbg="skin6" data-sidebartype="full"
+        data-sidebar-position="fixed" data-header-position="fixed">
+
+        <!-- Botón de toggle para móvil -->
+        <button class="mobile-toggle d-lg-none" id="mobileSidebarToggle">
+            <i class="bi bi-list"></i>
+        </button>
+
+        <!-- Overlay para cerrar sidebar en móvil -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <!-- Sidebar Start -->
+        <aside class="left-sidebar">
+            <!-- Sidebar scroll-->
+            <div class="d-flex flex-column" style="height: 100vh; overflow: hidden;">
+                <div class="brand-logo d-flex align-items-center justify-content-between flex-shrink-0">
+                    <a href="" class="text-nowrap logo-img">
+                        <img src="../static/images/logos/logo.jpg" class="img-fluid" alt="Logo" width="300"
+                            height="150" />
+                    </a>
+                    <div class="close-btn d-xl-none d-block sidebartoggler cursor-pointer" id="sidebarCollapse">
+                        <i data-lucide="x"></i>
+                    </div>
+                </div>
+
+                <!-- Buscador del sidebar -->
+                <div class="px-3 py-2">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-transparent border-end-0 text-muted">
+                            <i data-lucide="search" width="16" height="16"></i>
+                        </span>
+                        <input type="text" id="menuSearch" class="form-control border-start-0 ps-0 shadow-none"
+                            placeholder="Buscar menú...">
+                    </div>
+                </div>
+
+                <!-- Sidebar navigation-->
+                <nav class="sidebar-nav scroll-sidebar flex-grow-1" style="height: 0; padding-bottom: 2rem;"
+                    data-simplebar="">
+                    <ul id="sidebarnav" class="p-0">
+                        <!-- ⭐ FAVORITOS -->
+                        {% if session.get('rol') == 'admin' %}
+                        <li class="nav-small-cap mt-1">
+                            <span class="hide-menu fw-bold d-flex align-items-center text-warning"
+                                style="font-size: 0.75rem;">
+                                <i data-lucide="star" class="me-1" width="14" height="14"></i> FAVORITOS
+                            </span>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('products.catalogoproductos') }}">
+                                <span><i data-lucide="package-search" width="20" height="20"></i></span>
+                                <span class="hide-menu">Productos</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('admin.historial') }}">
+                                <span><i data-lucide="trending-up" width="20" height="20"></i></span>
+                                <span class="hide-menu">Ventas</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <!-- 🍽️ ACTIVOS -->
+                        <li class="nav-small-cap mt-3">
+                            <span class="hide-menu fw-bold text-muted" style="font-size: 0.75rem;">🍽️ ACTIVOS</span>
+                        </li>
+
+                        {% if session.get('rol') != 'cocinero' %}
+                        <li class="sidebar-item">
+                            <a class="sidebar-link"
+                                href="{{ url_for('admin.admin_pedidos_en_curso') if session.get('rol') == 'admin' else url_for('main.mesas1') }}">
+                                <span><i data-lucide="shopping-basket" width="20" height="20"></i></span>
+                                <span class="hide-menu">Pedidos</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('orders.cocina_pedidos_pendientes') }}">
+                                <span><i data-lucide="chef-hat" width="20" height="20"></i></span>
+                                <span class="hide-menu">Cocina</span>
+                            </a>
+                        </li>
+
+                        <!-- 📦 INVENTARIO -->
+                        {% if session.get('rol') in ['admin', 'mesero', 'cocinero'] %}
+                        <li class="nav-small-cap mt-3">
+                            <span class="hide-menu fw-bold text-muted" style="font-size: 0.75rem;">📦 INVENTARIO</span>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('inventory.entradaproductos') }}">
+                                <span><i data-lucide="arrow-down-to-line" width="20" height="20"></i></span>
+                                <span class="hide-menu">Entrada</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% if session.get('rol') in ['admin', 'mesero'] %}
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('products.ingresoproducto') }}">
+                                <span><i data-lucide="plus-circle" width="20" height="20"></i></span>
+                                <span class="hide-menu">Nuevo Prod.</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% if session.get('rol') == 'admin' %}
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('products.catalogoproductos') }}">
+                                <span><i data-lucide="list" width="20" height="20"></i></span>
+                                <span class="hide-menu">Listado Prod.</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('inventory.registro') }}">
+                                <span><i data-lucide="history" width="20" height="20"></i></span>
+                                <span class="hide-menu">H. Entradas</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <!-- 💰 VENTAS -->
+                        {% if session.get('rol') in ['admin', 'cajero'] %}
+                        <li class="nav-small-cap mt-3">
+                            <span class="hide-menu fw-bold text-muted" style="font-size: 0.75rem;">💰 VENTAS</span>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('admin.facturacion') }}">
+                                <span><i data-lucide="receipt" width="20" height="20"></i></span>
+                                <span class="hide-menu">H. Pedidos</span>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% if session.get('rol') == 'admin' %}
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('admin.historial') }}">
+                                <span><i data-lucide="line-chart" width="20" height="20"></i></span>
+                                <span class="hide-menu">H. Ventas</span>
+                            </a>
+                        </li>
+
+                        <!-- 👥 ADMINISTRADOR -->
+                        <li class="nav-small-cap mt-3">
+                            <span class="hide-menu fw-bold text-muted" style="font-size: 0.75rem;">👥
+                                ADMINISTRACIÓN</span>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('admin.clientes') }}">
+                                <span><i data-lucide="users" width="20" height="20"></i></span>
+                                <span class="hide-menu">Clientes</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('admin.mostrar_empleados') }}">
+                                <span><i data-lucide="users-round" width="20" height="20"></i></span>
+                                <span class="hide-menu">Empleados</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('admin.usuarios') }}">
+                                <span><i data-lucide="shield-check" width="20" height="20"></i></span>
+                                <span class="hide-menu">Usuarios</span>
+                            </a>
+                        </li>
+
+                        <!-- 🧾 FINANZAS -->
+                        <li class="nav-small-cap mt-3">
+                            <span class="hide-menu fw-bold text-muted" style="font-size: 0.75rem;">🧾 FINANZAS</span>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('admin.cierre_corte') }}">
+                                <span><i data-lucide="scissors" width="20" height="20"></i></span>
+                                <span class="hide-menu">Cierre Corte</span>
+                            </a>
+                        </li>
+                        <li class="sidebar-item">
+                            <a class="sidebar-link" href="{{ url_for('admin.movimiento_caja_page') }}">
+                                <span><i data-lucide="badge-dollar-sign" width="20" height="20"></i></span>
+                                <span class="hide-menu">Gastos</span>
+                            </a>
+                        </li>
+
+
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+        <!--  Sidebar End -->
+        <!--  Main wrapper -->
+        <div class="body-wrapper">
+            <!--  Header Start -->
+            <header class="app-header">
+                <nav class="navbar navbar-expand-lg navbar-light">
+                    <div class="container-fluid">
+
+                        <div class="d-flex align-items-center ms-auto">
+                            <!-- Botón de ayuda de templates -->
+                            <button class="btn btn-link text-dark me-3" type="button" id="templateHelpBtn"
+                                title="Ver ayuda de templates">
+                                <i class="bi bi-question-circle"></i>
+                                <span class="ms-1 d-none d-md-inline">Ayuda</span>
+                            </button> {% if session.get('username') %} {% if session.get('rol') in ['admin', 'mesero',
+                            'cocinero'] %}
+                            <div class="dropdown me-3">
+                                <button class="btn btn-link position-relative p-0" type="button"
+                                    id="notificacionesDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-bell-fill fs-5 text-dark"></i>
+                                    <span id="notificaciones-badge"
+                                        class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                        style="font-size: 0.6rem; display: none;">
+                                        0
+                                    </span>
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-end shadow-sm"
+                                    aria-labelledby="notificacionesDropdown"
+                                    style="width: 350px; max-height: 500px; overflow-y: auto; border: none; border-radius: 10px;">
+                                    <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+                                        <h6 class="mb-0">Notificaciones</h6>
+                                        <button class="btn btn-sm btn-link text-primary p-0" id="marcar-todas-leidas">
+                                            Marcar todas como leídas
+                                        </button>
+                                    </div>
+                                    <div id="notificaciones-lista" class="p-2">
+                                        <!-- Las notificaciones se cargarán aquí dinámicamente -->
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <div class="dropdown">
+                                <button
+                                    class="btn btn-link dropdown-toggle d-flex align-items-center text-dark text-decoration-none p-0"
+                                    type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <span class="fs-6">{{ session.get('username') }}</span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="userDropdown"
+                                    style="border: none; border-radius: 10px; min-width: 200px;">
+                                    <li class="px-3 py-2 border-bottom">
+                                        <div class="d-flex align-items-center">
+                                            <div>
+                                                <div class="fw-bold">{{ session.get('username') }}</div>
+                                                <small class="text-muted">{{ session.get('rol')|title }}</small>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center py-2"
+                                            href="{{ url_for('auth.logout') }}" style="color: #dc3545;">
+                                            <i class="bi bi-box-arrow-right me-2"></i>
+                                            <span>Cerrar sesión</span>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </nav>
+            </header>
+            <!-- SweetAlert2 Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    {% for category, message in messages %}
+                    Swal.fire({
+                        icon: '{{ "success" if category == "success" else "error" if category == "error" else "info" }}',
+                        title: '{{ "¡Éxito!" if category == "success" else "¡Atención!" }}',
+                        text: '{{ message }}',
+                        timer: 3500,
+                        timerProgressBar: true,
+                        showConfirmButton: false
+                    });
+                    {% endfor %}
+                });
+            </script>
+            {% endif %}
+            {% endwith %}
+
+            <!-- Global Confirmation Helper (SweetAlert2) -->
+            <script>
+                window.confirmAction = function (options = {}) {
+                    return Swal.fire({
+                        title: options.title || '¿Estás seguro?',
+                        text: options.text || 'Esta acción no se puede deshacer.',
+                        icon: options.icon || 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3085d6',
+                        cancelButtonColor: '#d33',
+                        confirmButtonText: options.confirmText || 'Sí, continuar',
+                        cancelButtonText: options.cancelText || 'Cancelar',
+                        reverseButtons: true
+                    });
+                };
+            </script>
+            <div class="container-fluid">
+                <div class="row">
+                    {% block main %} {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+    <script src="../static/libs/jquery/dist/jquery.min.js"></script>
+    <script src="../static/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../static/libs/apexcharts/dist/apexcharts.min.js"></script>
+    <script src="../static/libs/simplebar/dist/simplebar.js"></script>
+    <script src="../static/js/sidebarmenu.js"></script>
+    <script src="../static/js/app.min.js"></script>
+    <script src="../static/js/dashboard.js"></script>
+    <!-- SweetAlert2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+
+    <!-- Script para validación de formularios -->
+    <script>
+        // Función para sanitizar input
+        function sanitizeInput(input) {
+            return input.replace(/[<>]/g, '');
+        }
+
+        // Función para validar formularios
+        function validateForm(form) {
+            const inputs = form.querySelectorAll('input, textarea');
+            let isValid = true;
+
+            inputs.forEach(input => {
+                // Sanitizar input
+                if (input.value) {
+                    input.value = sanitizeInput(input.value);
+                }
+
+                // Validar campos requeridos
+                if (input.hasAttribute('required') && !input.value.trim()) {
+                    isValid = false;
+                    input.classList.add('is-invalid');
+                    const feedback = input.nextElementSibling;
+                    if (feedback && feedback.classList.contains('invalid-feedback')) {
+                        feedback.textContent = 'Este campo es requerido';
+                    }
+                } else {
+                    input.classList.remove('is-invalid');
+                }
+
+                // Validar email
+                if (input.type === 'email' && input.value) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(input.value)) {
+                        isValid = false;
+                        input.classList.add('is-invalid');
+                        const feedback = input.nextElementSibling;
+                        if (feedback && feedback.classList.contains('invalid-feedback')) {
+                            feedback.textContent = 'Email inválido';
+                        }
+                    }
+                }
+
+                // Validar números
+                if (input.type === 'number' && input.value) {
+                    if (isNaN(input.value) || input.value < 0) {
+                        isValid = false;
+                        input.classList.add('is-invalid');
+                        const feedback = input.nextElementSibling;
+                        if (feedback && feedback.classList.contains('invalid-feedback')) {
+                            feedback.textContent = 'Debe ser un número válido';
+                        }
+                    }
+                }
+
+                // Validar longitud mínima
+                if (input.hasAttribute('minlength')) {
+                    const minLength = parseInt(input.getAttribute('minlength'));
+                    if (input.value.length < minLength) {
+                        isValid = false;
+                        input.classList.add('is-invalid');
+                        const feedback = input.nextElementSibling;
+                        if (feedback && feedback.classList.contains('invalid-feedback')) {
+                            feedback.textContent = `Mínimo ${minLength} caracteres`;
+                        }
+                    }
+                }
+            });
+
+            return isValid;
+        }
+
+        // Aplicar validación a todos los formularios
+        document.addEventListener('DOMContentLoaded', function () {
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    if (!validateForm(this)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                });
+
+                // Validación en tiempo real
+                const inputs = form.querySelectorAll('input, textarea');
+                inputs.forEach(input => {
+                    input.addEventListener('input', function () {
+                        if (this.value) {
+                            this.value = sanitizeInput(this.value);
+                        }
+                        validateForm(form);
+                    });
+
+                    input.addEventListener('blur', function () {
+                        validateForm(form);
+                    });
+                });
+            });
+
+            // Prevenir XSS en contenido dinámico
+            const sanitizeContent = (content) => {
+                const div = document.createElement('div');
+                div.textContent = content;
+                return div.innerHTML;
+            };
+
+            // Aplicar sanitización a contenido dinámico
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === 1) { // Element node
+                                const elements = node.querySelectorAll('[data-sanitize]');
+                                elements.forEach(element => {
+                                    if (element.dataset.sanitize === 'true') {
+                                        element.innerHTML = sanitizeContent(element.textContent);
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        });
+
+        // Función para validar contraseña
+        function validatePassword(password) {
+            const minLength = 8;
+            const hasUpperCase = /[A-Z]/.test(password);
+            const hasLowerCase = /[a-z]/.test(password);
+            const hasNumbers = /\d/.test(password);
+            const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+            const errors = [];
+            if (password.length < minLength) {
+                errors.push(`Mínimo ${minLength} caracteres`);
+            }
+            if (!hasUpperCase) {
+                errors.push('Al menos una mayúscula');
+            }
+            if (!hasLowerCase) {
+                errors.push('Al menos una minúscula');
+            }
+            if (!hasNumbers) {
+                errors.push('Al menos un número');
+            }
+            if (!hasSpecialChar) {
+                errors.push('Al menos un carácter especial');
+            }
+
+            return {
+                isValid: errors.length === 0,
+                errors: errors
+            };
+        }
+
+        // Aplicar validación de contraseña
+        const passwordInputs = document.querySelectorAll('input[type="password"]');
+        passwordInputs.forEach(input => {
+            const feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            input.parentNode.appendChild(feedback);
+
+            input.addEventListener('input', function () {
+                const result = validatePassword(this.value);
+                if (this.value && !result.isValid) {
+                    this.classList.add('is-invalid');
+                    feedback.innerHTML = result.errors.join('<br>');
+                } else {
+                    this.classList.remove('is-invalid');
+                    feedback.innerHTML = '';
+                }
+            });
+        });
+    </script>
+
+    <!-- Script para manejar el sidebar en móvil -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Elementos del DOM
+            const sidebar = document.querySelector('.left-sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const mobileToggle = document.getElementById('mobileSidebarToggle');
+            const closeBtn = document.getElementById('sidebarCollapse');
+
+            // Función para mostrar/ocultar el sidebar
+            function toggleSidebar() {
+                if (sidebar.classList.contains('show')) {
+                    sidebar.classList.remove('show');
+                    overlay.classList.remove('show');
+                    document.body.style.overflow = '';
+                } else {
+                    sidebar.classList.add('show');
+                    overlay.classList.add('show');
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+
+            // Event listeners
+            if (mobileToggle) {
+                mobileToggle.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleSidebar();
+                });
+            }
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleSidebar();
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', function () {
+                    toggleSidebar();
+                });
+            }
+
+            // Cerrar sidebar al hacer clic en un enlace
+            const sidebarLinks = document.querySelectorAll('.sidebar-link');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function () {
+                    if (window.innerWidth < 992) {
+                        toggleSidebar();
+                    }
+                });
+            });
+
+            // Cerrar sidebar al redimensionar la ventana
+            window.addEventListener('resize', function () {
+                if (window.innerWidth >= 992 && sidebar.classList.contains('show')) {
+                    toggleSidebar();
+                }
+            });
+        });
+    </script>
+
+    {% if session.get('rol') in ['admin', 'mesero', 'cocinero'] %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let notificaciones = [];
+            // Exponer a nivel global para que SocketIO pueda actualizar sin red
+            window.notificaciones_globales = notificaciones;
+
+            const notificacionesLista = document.getElementById('notificaciones-lista');
+            const notificacionesBadge = document.getElementById('notificaciones-badge');
+            const marcarTodasLeidas = document.getElementById('marcar-todas-leidas');
+
+            function actualizarNotificaciones() {
+                // No actualizar si estamos en una página de detalles de pedido o finalizar
+                if (window.location.pathname.includes('/pedido/') || window.location.pathname.includes('/finalizar/')) {
+                    return;
+                }
+
+                fetch('/notificaciones')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) return;
+                        notificaciones = data;
+                        window.notificaciones_globales = notificaciones;
+                        actualizarInterfaz();
+                    })
+                    .catch(error => console.error('Error al obtener notificaciones:', error));
+            }
+
+            function actualizarInterfaz() {
+                window.notificaciones_globales = notificaciones;
+
+                const noLeidas = notificaciones.filter(n => !n.leida).length;
+
+                if (noLeidas > 0) {
+                    notificacionesBadge.textContent = noLeidas;
+                    notificacionesBadge.style.display = 'block';
+                } else {
+                    notificacionesBadge.style.display = 'none';
+                }
+                window.actualizarInterfazGlobal = actualizarInterfaz;
+
+                // Actualizar lista de notificaciones
+                if (notificaciones.length === 0) {
+                    notificacionesLista.innerHTML = '<div class="text-center py-3 text-muted">No hay notificaciones pendientes</div>';
+                    return;
+                }
+
+                notificacionesLista.innerHTML = '';
+                notificaciones.forEach(notif => {
+                    const item = document.createElement('div');
+                    item.className = `dropdown-item p-3 mb-2 ${notif.leida ? '' : 'bg-light'} rounded`;
+                    item.style.border = notif.leida ? 'none' : '1px solid #e9ecef';
+
+                    const productosList = notif.detalles.productos
+                        .map(p => `${p.cantidad}x ${p.nombre}`)
+                        .join('<br>');
+
+                    item.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <strong class="text-primary">${notif.mensaje}</strong>
+                  ${!notif.leida ? `
+                    <button class="btn btn-sm btn-link text-success p-0 marcar-leida" 
+                            data-id="${notif.id}" title="Marcar como leída">
+                      <i class="bi bi-check2-circle"></i>
+                    </button>
+                  ` : ''}
+                </div>
+                <div class="small text-muted mb-2">
+                  <i class="bi bi-clock"></i> ${notif.fecha}
+                </div>
+                <div class="small mb-2">
+                  <i class="bi bi-person"></i> ${notif.detalles.cliente}
+                </div>
+                <div class="small mb-2">
+                  ${productosList}
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+                  <span class="badge bg-primary">
+                    <i class="bi bi-box"></i> ${notif.detalles.total_productos} productos
+                  </span>
+                  <strong class="text-success">
+                    C$${notif.detalles.total_monto.toFixed(2)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          `;
+                    notificacionesLista.appendChild(item);
+                });
+
+                // Agregar event listeners a los botones de marcar como leída
+                document.querySelectorAll('.marcar-leida').forEach(btn => {
+                    btn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const id = this.dataset.id;
+                        marcarComoLeida(id);
+                    });
+                });
+            }
+
+            function marcarComoLeida(id) {
+                fetch(`/marcar_notificacion_leida/${id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            console.error('Error:', data.error);
+                            return;
+                        }
+                        // Eliminar la notificación del array local
+                        notificaciones = notificaciones.filter(n => n.id !== id);
+                        // Actualizar la interfaz inmediatamente
+                        actualizarInterfaz();
+                    })
+                    .catch(error => console.error('Error al marcar notificación como leída:', error));
+            }
+
+            marcarTodasLeidas.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Obtener todas las notificaciones no leídas
+                const notificacionesNoLeidas = notificaciones.filter(n => !n.leida);
+                // Marcar todas como leídas
+                Promise.all(notificacionesNoLeidas.map(notif =>
+                    fetch(`/marcar_notificacion_leida/${notif.id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                ))
+                    .then(() => {
+                        // Limpiar el array local y actualizar la interfaz inmediatamente
+                        notificaciones = [];
+                        actualizarInterfaz();
+                        actualizarInterfaz();
+                    })
+                    .catch(error => console.error('Error al marcar todas las notificaciones como leídas:', error));
+            });
+
+            // Actualizar notificaciones al cargar
+            actualizarNotificaciones();
+
+            // Ya no usamos setInterval aquí, los WebSockets avisarán cuando haya cambios.
+
+            // Agregar un listener para actualizar las notificaciones cuando la página se vuelve visible
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible' &&
+                    !window.location.pathname.includes('/pedido/') &&
+                    !window.location.pathname.includes('/finalizar/')) {
+                    actualizarNotificaciones();
+                }
+            });
+
+            // Agregar un listener para actualizar las notificaciones cuando se agrega una nueva
+            document.addEventListener('nueva_notificacion', function () {
+                if (!window.location.pathname.includes('/pedido/') &&
+                    !window.location.pathname.includes('/finalizar/')) {
+                    // Actualizar inmediatamente
+                    actualizarNotificaciones();
+                }
+            });
+        });
+    </script>
+    {% endif %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            // Sistema de ayuda de templates
+            const TEMPLATE_HELP = {
+                'mesas': {
+                    title: 'Gestión de Mesas',
+                    description: 'Aquí puedes gestionar las mesas del restaurante, crear nuevos pedidos y ver el estado de las mesas activas.',
+                    features: [
+                        'Crear nuevos pedidos',
+                        'Ver estado de mesas',
+                        'Gestionar pedidos activos',
+                        'Finalizar pedidos'
+                    ]
+                },
+                'pedidos': {
+                    title: 'Gestión de Pedidos',
+                    description: 'Interfaz para gestionar todos los pedidos activos, ver detalles y realizar modificaciones.',
+                    features: [
+                        'Ver todos los pedidos activos',
+                        'Modificar pedidos existentes',
+                        'Ver detalles de cada pedido',
+                        'Gestionar estado de pedidos'
+                    ]
+                },
+                'cocina': {
+                    title: 'Panel de Cocina',
+                    description: 'Panel especializado para la cocina, donde se muestran los pedidos pendientes y su estado.',
+                    features: [
+                        'Ver pedidos pendientes',
+                        'Marcar pedidos como preparados',
+                        'Ver detalles de preparación',
+                        'Gestionar prioridades'
+                    ]
+                },
+                'historial': {
+                    title: 'Historial de Ventas',
+                    description: 'Registro completo de todas las ventas realizadas, con filtros y opciones de búsqueda.',
+                    features: [
+                        'Ver historial de ventas',
+                        'Filtrar por fecha',
+                        'Exportar reportes',
+                        'Ver detalles de ventas'
+                    ]
+                },
+                'productos': {
+                    title: 'Gestión de Productos',
+                    description: 'Administración del catálogo de productos, precios y disponibilidad.',
+                    features: [
+                        'Agregar nuevos productos',
+                        'Modificar productos existentes',
+                        'Gestionar precios',
+                        'Control de inventario'
+                    ]
+                },
+                'empleados': {
+                    title: 'Gestión de Empleados',
+                    description: 'Administración del personal, roles y permisos del sistema.',
+                    features: [
+                        'Registrar nuevos empleados',
+                        'Gestionar roles y permisos',
+                        'Ver historial de empleados',
+                        'Modificar información'
+                    ]
+                },
+                'respaldos': {
+                    title: 'Sistema de Respaldos',
+                    description: 'Gestión de copias de seguridad y restauración del sistema.',
+                    features: [
+                        'Crear respaldos automáticos',
+                        'Restaurar datos desde respaldos',
+                        'Gestionar historial de respaldos',
+                        'Configurar programación de respaldos'
+                    ]
+                },
+                'movimiento_caja': {
+                    title: 'Movimientos de Caja',
+                    description: 'Control y registro de todos los movimientos financieros del restaurante.',
+                    features: [
+                        'Registrar gastos diarios',
+                        'Ver historial de movimientos',
+                        'Categorizar gastos',
+                        'Generar reportes financieros'
+                    ]
+                },
+                'cierre_corte': {
+                    title: 'Cierre de Corte',
+                    description: 'Proceso de cierre diario y balance de caja.',
+                    features: [
+                        'Realizar cierre de caja',
+                        'Ver balance diario',
+                        'Generar reporte de cierre',
+                        'Conciliar movimientos'
+                    ]
+                },
+                'clientes': {
+                    title: 'Gestión de Clientes',
+                    description: 'Administración de la base de datos de clientes y sus preferencias.',
+                    features: [
+                        'Registrar nuevos clientes',
+                        'Ver historial de compras',
+                        'Gestionar preferencias',
+                        'Enviar promociones'
+                    ]
+                },
+                'facturacion': {
+                    title: 'Sistema de Facturación',
+                    description: 'Gestión de facturas y documentos fiscales.',
+                    features: [
+                        'Generar facturas',
+                        'Ver historial de facturas',
+                        'Imprimir documentos',
+                        'Gestionar pagos'
+                    ]
+                },
+                'usuarios': {
+                    title: 'Gestión de Usuarios',
+                    description: 'Administración de usuarios del sistema y sus permisos.',
+                    features: [
+                        'Crear nuevos usuarios',
+                        'Asignar roles y permisos',
+                        'Gestionar accesos',
+                        'Ver actividad de usuarios'
+                    ]
+                }
+            };
+
+            // Función para mostrar el modal de ayuda de templates
+            function showTemplateHelp() {
+                const modal = document.createElement('div');
+                modal.className = 'modal fade';
+                modal.id = 'templateHelpModal';
+                modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="bi bi-question-circle me-2"></i>
+                                Guía de Templates
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body template-help-body">
+                            <div class="template-help-grid">
+                                ${Object.entries(TEMPLATE_HELP).map(([key, info]) => `
+                                    <div class="template-help-item">
+                                        <h6 class="template-title">${info.title}</h6>
+                                        <p class="template-desc">${info.description}</p>
+                                        <ul class="template-features">
+                                            ${info.features.map(feature => `
+                                                <li><i class="bi bi-check-circle-fill text-success me-2"></i>${feature}</li>
+                                            `).join('')}
+                                        </ul>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+                // Añadir estilos
+                const style = document.createElement('style');
+                style.textContent = `
+                .template-help-body {
+                    max-height: 70vh;
+                    overflow-y: auto;
+                    padding-right: 10px;
+                }
+                .template-help-body::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .template-help-body::-webkit-scrollbar-track {
+                    background: #f1f1f1;
+                    border-radius: 4px;
+                }
+                .template-help-body::-webkit-scrollbar-thumb {
+                    background: #888;
+                    border-radius: 4px;
+                }
+                .template-help-body::-webkit-scrollbar-thumb:hover {
+                    background: #555;
+                }
+                .template-help-grid {
+                    display: grid;
+                    gap: 1.5rem;
+                    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                }
+                .template-help-item {
+                    background: var(--bs-light);
+                    border-radius: 0.5rem;
+                    padding: 1rem;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                    transition: transform 0.2s ease;
+                }
+                .template-help-item:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                }
+                .template-title {
+                    color: var(--bs-primary);
+                    font-weight: 600;
+                    margin-bottom: 0.5rem;
+                }
+                .template-desc {
+                    color: var(--bs-gray-700);
+                    font-size: 0.9rem;
+                    margin-bottom: 1rem;
+                }
+                .template-features {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                }
+                .template-features li {
+                    font-size: 0.9rem;
+                    margin-bottom: 0.5rem;
+                    display: flex;
+                    align-items: center;
+                }
+            `;
+
+                document.head.appendChild(style);
+                document.body.appendChild(modal);
+                const modalInstance = new bootstrap.Modal(modal);
+                modalInstance.show();
+
+                modal.addEventListener('hidden.bs.modal', function () {
+                    document.body.removeChild(modal);
+                });
+            }
+
+            // --- WebSocket Real-Time Notifications (BAJA LATENCIA ~50ms) ---
+            const socket = io();
+
+            socket.on('connect', () => {
+                console.log('✅ Conectado al servidor de WebSockets');
+            });
+
+            socket.on('nuevo_pedido_realtime', function (notificacion) {
+                console.log('🔔 Notificación en TIEMPO REAL recibida:', notificacion);
+
+                // 1. Mostrar Toast/Alerta inmediata
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: '¡Nuevo Pedido!',
+                        text: notificacion.mensaje,
+                        icon: 'info',
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 5000,
+                        timerProgressBar: true,
+                        didOpen: (toast) => {
+                            toast.addEventListener('mouseenter', Swal.stopTimer)
+                            toast.addEventListener('mouseleave', Swal.resumeTimer)
+                        }
+                    });
+                }
+
+                // 2. Alerta Sonora (Opcional, puede estar bloqueada por el navegador)
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.play().catch(e => console.log("Audio play blocked"));
+                } catch (e) { }
+
+                // 3. Actualizar la campana de notificaciones LOCALMENTE (Cero Latencia)
+                if (typeof window.notificaciones_globales !== 'undefined') {
+                    window.notificaciones_globales.unshift(notificacion);
+                    if (typeof window.actualizarInterfazGlobal === 'function') {
+                        window.actualizarInterfazGlobal();
+                    }
+                } else {
+                    // Fallback: Disparar evento para que el listener en el otro bloque lo recoja
+                    const event = new CustomEvent('nueva_notificacion_socket', { detail: notificacion });
+                    document.dispatchEvent(event);
+                }
+
+                // 4. Si estamos en cocina, recargar (o mejor aún, actualizar la lista si es reactiva)
+                const currentPath = window.location.pathname;
+                if (currentPath.includes('cocina')) {
+                    // Pequeño delay para que el usuario vea la alerta antes de recargar
+                    setTimeout(() => location.reload(), 1500);
+                }
+            });
+
+            // Event listeners para los botones
+            document.getElementById('templateHelpBtn').addEventListener('click', showTemplateHelp);
+
+            const currentUrl = window.location.pathname;
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                if (link.getAttribute('href') === currentUrl) {
+                    link.classList.add('active');
+                    // Opcionalmente abrir el colapsable si lo hubiera
+                }
+
+                link.addEventListener('click', function () {
+                    document.querySelectorAll('.sidebar-link').forEach(el => {
+                        el.classList.remove('active');
+                    });
+
+                    this.classList.add('active');
+                });
+            });
+
+            // --- 1. Buscador de menú (PRO LEVEL) ---
+            const menuSearch = document.getElementById("menuSearch");
+            if (menuSearch) {
+                menuSearch.addEventListener("keyup", function () {
+                    let value = this.value.toLowerCase();
+
+                    document.querySelectorAll(".sidebar-item").forEach(item => {
+                        if (item.classList.contains("nav-small-cap")) return;
+                        item.style.display = item.textContent.toLowerCase().includes(value) ? "block" : "none";
+                    });
+                });
+            }
+
+            // --- 2. Inicializar Iconos Lucide ---
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,124 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Empleados
+{% endblock %}
+
+{% block main %}
+<div class="container-fluid">
+
+    <!-- BOTÓN -->
+    <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#modalEmpleado">
+        + Nuevo Empleado
+    </button>
+
+    <!-- TABLA (ejemplo básico) -->
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Lista de Empleados</h5>
+
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Cargo</th>
+                        <th>Salario</th>
+                        <th>Teléfono</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in empleados %}
+                    <tr>
+                        <td>{{ e.nombre }}</td>
+                        <td>{{ e.cargo }}</td>
+                        <td>C$ {{ e.salario }}</td>
+                        <td>{{ e.telefono }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal fade" id="modalEmpleado" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+
+            <!-- HEADER -->
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Registrar Empleado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <!-- FORM -->
+            <form method="POST" action="/registro_empleado">
+                <div class="modal-body">
+
+                    <div class="row">
+
+                        <div class="col-md-6 mb-3">
+                            <label>Nombre</label>
+                            <input type="text" name="nombre" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Cargo</label>
+                            <select name="cargo" class="form-select" required>
+                                <option value="">Seleccione</option>
+                                <option value="Administrador">Administrador</option>
+                                <option value="Cocinero">Cocinero</option>
+                                <option value="Mesero">Mesero</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Salario (C$)</label>
+                            <input type="number" name="salario" class="form-control" required min="0" step="0.01">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Teléfono</label>
+                            <input type="tel" name="telefono" class="form-control" pattern="[0-9]{8}" maxlength="8"
+                                required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Dirección</label>
+                            <input type="text" name="direccion" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Email</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Usuario</label>
+                            <input type="text" name="username" class="form-control" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label>Contraseña</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <!-- FOOTER -->
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Guardar</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}

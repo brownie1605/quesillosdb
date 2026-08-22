@@ -1,0 +1,78 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Proveedores{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="filter-group">
+        <div class="search-bar">
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar proveedor (nombre, ruc, teléfono)...">
+        </div>
+    </div>
+    
+    <button id="btnNuevoProveedor" class="btn btn-primary">+ Nuevo Proveedor</button>
+</div>
+
+<div class="panel">
+    <table id="tablaProveedores">
+        <thead>
+            <tr>
+                <th>Proveedor</th>
+                <th>RUC</th>
+                <th>Teléfono</th>
+                <th>Correo</th>
+                <th>Dirección</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Llenado por JS -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Proveedor -->
+<div id="modalProveedor" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style=" padding: 20px; border-radius: 8px; width: 400px; max-width: 90%;">
+        <h3 id="modalProveedorTitle" style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Nuevo Proveedor</h3>
+        
+        <form id="formProveedor">
+            <input type="hidden" id="prov_id">
+            
+            <div style="margin-bottom: 10px;">
+                <label>Nombre Comercial *</label>
+                <input type="text" id="prov_nombre" class="form-control" style="width: 100%;" required>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label>RUC</label>
+                <input type="text" id="prov_ruc" class="form-control" style="width: 100%;">
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                    <label>Teléfono</label>
+                    <input type="text" id="prov_telefono" class="form-control" style="width: 100%;">
+                </div>
+                <div style="flex: 1;">
+                    <label>Correo</label>
+                    <input type="email" id="prov_correo" class="form-control" style="width: 100%;">
+                </div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label>Dirección</label>
+                <textarea id="prov_direccion" class="form-control" style="width: 100%; height: 60px;"></textarea>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="btnCerrarModalProveedor" class="btn" style="flex: 1; background: #e0e0e0; color: #333;">Cancelar</button>
+                <button type="submit" class="btn btn-success" style="flex: 1;">Guardar Proveedor</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/proveedores.js') }}"></script>
+{% endblock %}

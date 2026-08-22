@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editar Pedido</title>
+  <link rel="shortcut icon" type="image/png" href="../static/images/logos/logo.jpg" />
+  <link rel="stylesheet" href="../static/css/styles.min.css" />
+  <style>
+    /* Estilos generales */
+    .editar-container {
+      padding: 0;
+      background-color: #f5f7fa;
+      min-height: calc(100vh - 60px);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .editar-container:before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23f5f7fa"/><path d="M0,0 L100,100 M100,0 L0,100" stroke="%23e8eaed" stroke-width="1" opacity="0.3"/></svg>');
+      opacity: 0.5;
+      z-index: 0;
+    }
+    
+    .editar-content {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 60px);
+    }
+    
+    .header-section {
+      background-color: #1a365d;
+      color: #ffffff;
+      padding: 2rem;
+      position: relative;
+    }
+    
+    .header-section:after {
+      content: '';
+      position: absolute;
+      bottom: -20px;
+      left: 0;
+      width: 100%;
+      height: 40px;
+      background-color: #f5f7fa;
+      clip-path: polygon(0 0, 100% 0, 100% 100%, 0 50%);
+    }
+    
+    .header-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      letter-spacing: 2px;
+      font-size: 2rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      color: #ffffff;
+    }
+    
+    .header-info {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.2rem;
+      color: #e2e8f0;
+    }
+
+    .category-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      overflow-y: auto;
+      max-height: 400px;
+    }
+
+    .category-item {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      transition: background-color 0.3s;
+    }
+
+    .category-item:hover {
+      background-color: #e2e8f0;
+    }
+
+    .category-item img {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 5px;
+    }
+
+    .product-table {
+      max-height: 400px;
+      overflow-y: auto;
+      display: block;
+      width: 100%;
+    }
+
+    .order-table tbody {
+      max-height: 220px;
+      overflow-y: auto;
+      display: block;
+    }
+    
+    .order-table thead, .order-table tbody tr {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+    }
+
+    .totals-container {
+      margin-top: 15px;
+    }
+
+    .btn-back {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.3s;
+    }
+
+    .btn-back:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-primary {
+      background-color: #1a365d;
+      border-color: #1a365d;
+      padding: 0.5rem 1.5rem;
+      font-weight: 500;
+      transition: all 0.3s;
+    }
+
+    .btn-primary:hover {
+      background-color: #2c5282;
+      border-color: #2c5282;
+      transform: translateY(-1px);
+    }
+
+    .card {
+      border: none;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .table {
+      background-color: white;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .table th {
+      background-color: #1a365d;
+      color: white;
+      font-weight: 500;
+    }
+
+    .form-control {
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      padding: 0.5rem 1rem;
+    }
+
+    .form-control:focus {
+      border-color: #1a365d;
+      box-shadow: 0 0 0 0.2rem rgba(26, 54, 93, 0.25);
+    }
+
+    @media (max-width: 768px) {
+      .header-title {
+        font-size: 1.5rem;
+      }
+
+      .header-info {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+      }
+
+      .order-table th, .order-table td {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+      }
+
+      .summary-item {
+        font-size: 0.9rem;
+      }
+
+      .summary-total {
+        font-size: 1.1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="editar-container">
+    <div class="editar-content">
+      <div class="header-section">
+        <a href="{{ url_for('main.mesas1') }}" class="btn btn-back">
+          <img style="height: 20px; width: 20px;" src="../static/images/logos/editar.png" alt="Editar">
+        </a>
+        <h1 class="header-title">Editar Pedido - {{ mesa_nombre }}</h1>
+        <div class="header-info">
+          <span>Fecha: {{ info[0]['fecha'] }}</span>
+          <span>Cliente: {{ info[0]['nombre'] }}</span>
+        </div>
+      </div>
+
+      <div class="container-fluid mt-4">
+        <div class="row">
+          <div class="col-lg-2">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <h5 class="card-title">Categorías</h5>
+                <div class="category-menu" id="category-menu">
+                  <!-- Categorías dinámicas -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-4">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <h3 class="card-title">Productos</h3>
+                <div class="table-responsive">
+                  <table class="table w-100 text-wrap align-middle mb-0 product-table">
+                    <thead>
+                      <tr class="border-2 border-bottom border-primary border-0">
+                        <th style="width: 12.00%;" class="flex-fill">ID</th>
+                        <th style="width: 40.00%;" class="flex-fill">Nombre</th>
+                        <th style="width: 23.00%;" class="flex-fill">Precio</th>
+                        <th style="width: 25.00%;" class="flex-fill">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody id="product-table-body">
+                      <!-- Productos dinámicos -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card shadow-sm">
+              <div class="card-body">
+                <h3 class="card-title">Pedido</h3>
+                <div class="table-responsive">
+                  <table class="table text-wrap align-middle mb-0 order-table">
+                    <thead>
+                      <tr class="border-2 border-bottom border-primary border-0">
+                        <th>Nombre</th>
+                        <th>Precio</th>
+                        <th>Cantidad</th>
+                        <th>Total</th>
+                        <th>Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody id="order-table-body">
+                      <!-- Productos del pedido dinámicos -->
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="card shadow-sm mt-3">
+                  <div class="card-body">
+                    <div class="totals-container">
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Subtotal:</label>
+                        <div class="col-sm-8">
+                          <input type="text" id="subtotal" class="form-control" readonly>
+                        </div>
+                      </div>
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">PROPINA (10%):</label>
+                        <div class="col-sm-8">
+                          <input type="text" id="iva" class="form-control" readonly>
+                        </div>
+                      </div>
+                      <div class="form-group row">
+                        <label class="col-sm-4 col-form-label">Total:</label>
+                        <div class="col-sm-8">
+                          <input type="text" id="total" class="form-control" readonly>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="text-end mt-3">
+                  <button id="submit-order" type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const categories = [
+      { id: 1, name: "desayuno", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR3TfoRscnBjdgIrOT8CMxlpmKbpRs5G8jJgA&s" },
+      { id: 2, name: "asados", image: "https://chefmont.com/wp-content/uploads/2019/09/asados.jpg" },
+      { id: 3, name: "quesillo", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSRknQpUj8_JUK4yttG_JDjimSNlK_EaP4OoQ&s" },
+      { id: 4, name: "bebidas", image: "https://s3.amazonaws.com/images.ecwid.com/images/29960109/1540948372.jpg" },
+      { id: 5, name: "antojos tipicos", image: "https://i.pinimg.com/originals/5b/ea/4c/5bea4c73230d111ad53384bfaa3bac58.jpg" },
+      { id: 5, name: "postres", image: "https://www.elmueble.com/medio/2023/12/14/ideas-de-postres-para-navidad-que-puedes-preparar-con-antelacion-y-congelar_0cf3e42e_231128110103_231214150004_900x900.jpg" },
+      { id: 5, name: "extras", image: "https://static01.nyt.com/images/2024/08/06/multimedia/11EATrex-flour-tortillas-mvfk/11EATrex-flour-tortillas-mvfk-googleFourByThree.jpg" }
+    ];
+  
+      const orderItems = [];
+  
+      function loadCategories() {
+        const categoryMenu = document.getElementById('category-menu');
+        categoryMenu.innerHTML = '';
+        categories.forEach(category => {
+          const categoryItem = document.createElement('div');
+          categoryItem.className = 'category-item';
+          categoryItem.innerHTML = `
+            <img src="${category.image}" alt="${category.name}">
+            <span>${category.name}</span>
+          `;
+          categoryItem.onclick = () => loadProducts(category.name);
+          categoryMenu.appendChild(categoryItem);
+        });
+      }
+  
+      function loadProducts(categoryName) {
+        fetch(`/products/${categoryName}`)
+          .then(response => response.json())
+          .then(products => {
+            const productTableBody = document.getElementById('product-table-body');
+            productTableBody.innerHTML = '';
+            products.forEach(product => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${product.id}</td>
+                <td>${product.nombre}</td>
+                <td>C$${Number(product.precio).toFixed(2)}</td>
+                <td><button onclick="addToOrder(${product.id}, '${product.nombre}', ${product.precio})" class="btn btn-primary btn-sm">Añadir</button></td>
+              `;
+              productTableBody.appendChild(row);
+            });
+          });
+      }
+  
+      function addToOrder(id, nombre, precio) {
+        const existingItem = orderItems.find(item => item.id === id);
+        if (existingItem) {
+          existingItem.cantidad++;
+        } else {
+          orderItems.push({ id, nombre, precio, cantidad: 1 });
+        }
+        renderOrderTable();
+        calculateTotals();
+      }
+      function removeFromOrder(id) {
+          const itemIndex = orderItems.findIndex(item => item.id === id);
+          if (itemIndex !== -1) {
+              orderItems.splice(itemIndex, 1); // Eliminar el producto del array
+              renderOrderTable();             // Renderizar la tabla actualizada
+              calculateTotals();              // Recalcular los totales
+          }
+      }
+  
+      function renderOrderTable() {
+        const orderTableBody = document.getElementById('order-table-body');
+        orderTableBody.innerHTML = '';
+        orderItems.forEach(item => {
+          const total = item.precio * item.cantidad;
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${item.nombre}</td>
+            <td>C$${item.precio.toFixed(2)}</td>
+            <td>
+              <div class="input-group input-group-sm" style="width: 120px;">
+                <button class="btn btn-outline-secondary" type="button" onclick="decreaseQuantity(${item.id})">-</button>
+                <input type="text" class="form-control text-center" value="${item.cantidad}" readonly>
+                <button class="btn btn-outline-secondary" type="button" onclick="increaseQuantity(${item.id})">+</button>
+              </div>
+            </td>
+            <td>C$${total.toFixed(2)}</td>
+            <td>
+              <button onclick="removeFromOrder(${item.id})" class="btn btn-danger btn-sm">
+                <img src="../static/images/logos/delete.png" alt="Eliminar" width="16" height="16">
+              </button>
+            </td>
+          `;
+          orderTableBody.appendChild(row);
+        });
+      }
+  
+      function updateQuantity(id, cantidad) {
+        const item = orderItems.find(item => item.id === id);
+        if (item) {
+          item.cantidad = parseInt(cantidad);
+          renderOrderTable();
+          calculateTotals();
+        }
+      }
+
+      function increaseQuantity(id) {
+        const item = orderItems.find(item => item.id === id);
+        if (item) {
+          updateQuantity(id, item.cantidad + 1);
+        }
+      }
+
+      function decreaseQuantity(id) {
+        const item = orderItems.find(item => item.id === id);
+        if (item && item.cantidad > 1) {
+          updateQuantity(id, item.cantidad - 1);
+        } else if (item && item.cantidad === 1) {
+          removeFromOrder(id); // Eliminar si la cantidad llega a 1 y se disminuye de nuevo
+        }
+      }
+  
+      function calculateTotals() {
+        let subtotal = 0;
+        orderItems.forEach(item => {
+          subtotal += item.precio * item.cantidad;
+        });
+        const iva = subtotal * 0.10;
+        const total = subtotal + iva;
+  
+        document.getElementById('subtotal').value = `C$${subtotal.toFixed(2)}`;
+        document.getElementById('iva').value = `C$${iva.toFixed(2)}`;
+        document.getElementById('total').value = `C$${total.toFixed(2)}`;
+      }
+      
+      
+      document.addEventListener('DOMContentLoaded', loadCategories);
+  </script>
+
+  <script>
+    function loadOrder() {
+  // Obtén el ID del pedido desde la variable de plantilla
+      //const pedidoId = {{ pedido_id }};
+      
+      // Realiza la solicitud para obtener los datos del pedido
+      fetch(`/pedido/{{ pedido_id }}/data`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Error al cargar los datos del pedido no hay respuesta.");
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Actualiza los datos del pedido en la tabla
+          orderItems.push(...data.orderItems);
+          renderOrderTable();
+          calculateTotals(); // Calcula totales al cargar los datos
+        })
+        .catch(error => {
+          console.error('Error al cargar el pedido:', error);
+          alert('No se pudieron cargar los datos del pedido .');
+        });
+    };
+
+    document.getElementById('submit-order').addEventListener('click', function() {
+      // Recopila los datos del pedido
+      const orderData = orderItems.map(item => ({
+        id: item.id,
+        nombre: item.nombre,
+        precio: item.precio,
+        cantidad: item.cantidad,
+        total: (item.precio * item.cantidad).toFixed(2)
+      }));
+
+      if (orderData.length === 0) {
+        alert("El pedido está vacío. Agrega productos antes de enviarlo.");
+        return;
+      }
+      //obtenemos el nombre del cliente
+      const clienteInput = document.getElementById('nombre_cliente');
+      const cliente = clienteInput ? clienteInput.value.trim() : '';
+  
+      
+  
+      // Enviar los datos al servidor
+      fetch(`/editar_pedido/{{ pedido_id }}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderData , cliente }), // Enviar solo los datos necesarios
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.text().then(err => { throw new Error(err); });
+        }
+        return response.json();
+        })
+      .then(data => {
+        if (data.redirect) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Pedido editado correctamente',
+          text: 'El pedido ha sido actualizado con éxito.',
+          confirmButtonText: 'Aceptar'
+        }).then(() => {
+          // Redirige después de cerrar la alerta
+          window.location.href = data.redirect;
+        });
+      } else {
+        console.log('Pedido procesado', data);
+      }
+        })
+      .catch(error => {
+        console.error('Error:', error.message); // Muestra el error exacto
+        alert('Ocurrió un error al enviar el pedido: ' + error.message);
+      });
+    });
+    document.addEventListener('DOMContentLoaded', loadOrder);
+
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+</body>
+</html>

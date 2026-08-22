@@ -1,0 +1,226 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Usuarios
+{% endblock %}
+
+{% block main %}
+<div class="container-fluid px-0 px-md-4">
+  <div class="card">
+    <div class="card-body p-1">
+      <h5 class="card-title mb-1">Listado de los clientes de Quesillos lo nuestro</h5>
+
+      <div class="mb-2 d-flex flex-column flex-md-row gap-1">
+        <input type="text" id="filterInput" class="form-control search-input" placeholder="Ingrese el nombre a buscar">
+        <button onclick="filterTable()" class="btn btn-primary touch-button">Filtrar</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table text-nowrap align-middle mb-0" id="clientesTable">
+          <thead>
+            <tr class="border-2 border-bottom border-primary border-0">
+              <th scope="col">ID</th>
+              <th scope="col">Nombre</th>
+              <th scope="col">Teléfono</th>
+              <th scope="col">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="table-group-divider">
+            {% for i in info %}
+            {% if i['nombre']!= '-' %}
+              <tr>
+                <td>{{ i['id'] }}</td>
+                <td>{{ i['nombre'] }}</td>
+                <td>{{ i['telefono'] }}</td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-secondary btn-sm touch-button" data-bs-toggle="modal" data-bs-target="#editModal" onclick="setEditData({{ i['id'] }}, '{{ i['nombre'] }}', '{{ i['telefono'] }}', '{{ i['direccion'] }}', '{{ i['email'] }}')">
+                      <img src="../static/images/logos/editar.png" alt="Editar" width="12" height="12">
+                    </button>
+
+                    <button class="btn btn-danger btn-sm touch-button" onclick="confirmDelete({{ i['id'] }})">
+                      <img src="../static/images/logos/delete.png" alt="Eliminar" width="12" height="12">
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Edición -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-1">
+        <h5 class="modal-title" id="editModalLabel">Editar Cliente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-1">
+        <form id="editForm">
+          <input type="hidden" id="editId">
+          <div class="mb-1">
+            <label for="editNombre" class="form-label">Nombre</label>
+            <input type="text" class="form-control touch-input" id="editNombre" required>
+          </div>
+          <div class="mb-1">
+            <label for="editTelefono" class="form-label">Teléfono</label>
+            <input type="text" class="form-control touch-input" id="editTelefono" required>
+          </div>
+          <div class="mb-1">
+            <label for="editDireccion" class="form-label">Dirección</label>
+            <input type="text" class="form-control touch-input" id="editDireccion" required>
+          </div>
+          <div class="mb-1">
+            <label for="editEmail" class="form-label">Email</label>
+            <input type="email" class="form-control touch-input" id="editEmail" required>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer py-1">
+        <button type="button" class="btn btn-secondary touch-button" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary touch-button" onclick="saveEdit()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Confirmación de Eliminación -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-1">
+        <h5 class="modal-title" id="confirmDeleteLabel">Confirmar Eliminación</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body py-1">
+        ¿Estás seguro de que deseas eliminar este cliente?
+      </div>
+      <div class="modal-footer py-1">
+        <button type="button" class="btn btn-secondary touch-button" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger touch-button" id="confirmDeleteButton">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Estilos generales para móviles */
+  @media (max-width: 768px) {
+    .container-fluid {
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+    
+    .table {
+      font-size: 0.75rem;
+    }
+    
+    .btn-sm {
+      padding: 0.2rem 0.4rem;
+    }
+    
+    .modal-dialog {
+      margin: 0.25rem;
+    }
+    
+    .form-label {
+      font-size: 0.75rem;
+      margin-bottom: 0.2rem;
+    }
+    
+    .form-control, .form-select {
+      font-size: 0.75rem;
+    }
+  }
+
+  /* Estilos para pantallas muy pequeñas */
+  @media screen and (max-width: 280px) {
+    .container-fluid {
+      padding-left: 2px;
+      padding-right: 2px;
+    }
+
+    .card {
+      margin-bottom: 0.25rem;
+    }
+
+    .card-title {
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .table {
+      font-size: 0.7rem;
+    }
+
+    .touch-button {
+      min-height: 32px;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .touch-input, .touch-select {
+      min-height: 32px;
+      font-size: 12px;
+      padding: 0.25rem 0.35rem;
+    }
+
+    .search-input {
+      min-height: 32px;
+      font-size: 12px;
+    }
+
+    .modal-dialog {
+      margin: 0.15rem;
+    }
+
+    .modal-content {
+      border-radius: 6px;
+    }
+
+    .modal-header {
+      padding: 0.35rem;
+    }
+
+    .modal-body {
+      padding: 0.35rem;
+    }
+
+    .modal-footer {
+      padding: 0.35rem;
+    }
+
+    .btn {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+    }
+
+    .mb-1 {
+      margin-bottom: 0.25rem !important;
+    }
+
+    .py-1 {
+      padding-top: 0.25rem !important;
+      padding-bottom: 0.25rem !important;
+    }
+
+    .gap-1 {
+      gap: 0.25rem !important;
+    }
+
+    .table th, .table td {
+      padding: 0.25rem;
+    }
+  }
+</style>
+
+<!-- Enlace a los archivos JavaScript -->
+<script src="{{ url_for('static', filename='js/filter.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modals.js') }}"></script>
+{% endblock %}

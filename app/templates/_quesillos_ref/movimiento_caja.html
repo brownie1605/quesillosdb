@@ -1,0 +1,94 @@
+{% extends "layout.html" %}
+{% block title %}Movimiento de Caja{% endblock %}
+
+{% block main %}
+<div class="container py-4">
+  <h2>Movimiento de Caja</h2>
+
+  <!-- Formulario -->
+  <form id="formMovimiento">
+    <div class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">Monto</label>
+        <input type="number" step="0.01" min="0" id="monto" class="form-control" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Tipo</label>
+        <select id="tipo" class="form-select" required>
+          <option value="">Seleccione</option>
+          <option value="entrada">Entrada</option>
+          <option value="salida">Salida</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Concepto</label>
+        <input type="text" id="descripcion" class="form-control" required>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-success w-100" type="submit">
+          <i class="bi bi-plus-circle"></i> Registrar
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Tabla -->
+  <div class="table-responsive mt-4">
+    <table class="table table-striped">
+      <thead class="table-light">
+        <tr>
+          <th>#</th><th>Fecha</th><th>Tipo</th><th>Concepto</th><th class="text-end">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in movimientos %}
+        <tr>
+          <td>{{ m.id }}</td>
+          <td>{{ m.fecha|datetimeformat('%d/%m/%Y %H:%M') }}</td>
+          <td>{{ m.tipo }}</td>
+          <td>{{ m.descripcion }}</td>
+          <td class="text-end">C${{ m.precio|number_format(2) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('formMovimiento');
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+
+    const payload = {
+      monto: parseFloat(document.getElementById('monto').value),
+      tipo: document.getElementById('tipo').value,
+      descripcion: document.getElementById('descripcion').value
+    };
+
+    fetch('{{ url_for("movimiento_caja_page") }}', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(json => {
+      if (json.status === 'success') {
+        location.reload();       // refresca para ver el nuevo registro
+      } else {
+        alert(json.message);
+      }
+
+      
+    })
+    .catch(err => {
+      console.error(err);
+      alert('Error al registrar movimiento');
+    });
+  });
+});
+</script>
+{% endblock %}

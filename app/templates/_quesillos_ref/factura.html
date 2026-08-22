@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura {{ factura.codigo }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .factura { width: 50%; margin: auto; border: 1px solid #ddd; padding: 20px; }
+        h1 { color: #333; }
+        p { font-size: 18px; }
+    </style>
+</head>
+<body>
+    <div class="factura">
+        <h1>Factura #{{ factura.codigo }}</h1>
+        <p><strong>Pedido ID:</strong> {{ factura.pedido_id }}</p>
+        <p><strong>Monto:</strong> C${{ factura.monto }}</p>
+        <p><strong>Fecha:</strong> {{ factura.fecha_hora }}</p>
+        <p><strong>Estado:</strong> {{ factura.estado }}</p>
+    </div>
+</body>
+</html>

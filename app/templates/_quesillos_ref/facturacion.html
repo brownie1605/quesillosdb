@@ -1,0 +1,671 @@
+{% extends "layout.html" %}
+
+{% block title %}Facturación{% endblock %}
+
+{% block extra_head %}
+
+<!-- Incluir jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+<style>
+    .table-responsive {
+        overflow-x: auto;
+    }
+    .filter-container {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .status-badge {
+        font-size: 0.85em;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+    .badge-pendiente {
+        background-color: #ffc107;
+        color: #212529;
+    }
+    .badge-pagada {
+        background-color: #28a745;
+        color: white;
+    }
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .action-buttons .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    .action-buttons .btn:hover {
+        transform: translateY(-1px);
+    }
+    .action-buttons .btn-primary {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    .action-buttons .btn-success {
+        background-color: #198754;
+        border-color: #198754;
+    }
+    .modal-print {
+        max-width: 80%;
+    }
+    .factura-header {
+        text-align: center;
+        margin-bottom: 20px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+    }
+    .factura-info {
+        margin-bottom: 30px;
+        padding: 20px;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .factura-table {
+        width: 100%;
+        margin-bottom: 20px;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .factura-table th {
+        background-color: #f8f9fa;
+        text-align: center;
+        padding: 12px;
+        font-weight: 600;
+    }
+    .factura-table td {
+        padding: 12px;
+        vertical-align: middle;
+    }
+    .factura-totales {
+        margin-top: 20px;
+        float: right;
+        width: 300px;
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+    }
+    .badge {
+        padding: 6px 12px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .badge i {
+        font-size: 1.1em;
+    }
+    .table > :not(caption) > * > * {
+        padding: 1rem;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+    .btn-filter {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        font-weight: 500;
+    }
+    .btn-filter i {
+        font-size: 1.1em;
+    }
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+        body {
+            font-size: 12pt;
+            background: white;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 100%;
+            padding: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block main %}
+<div class="container mt-4">
+    <h1 class="mb-4">Gestión de Facturas</h1>
+    
+    <div class="filter-container no-print">
+        <form method="GET" action="{{ url_for('admin.facturacion') }}" class="row g-3">
+            <div class="col-md-4">
+                <label for="estado" class="form-label">Estado:</label>
+                <select name="estado" id="estado" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="pendiente" {% if estado_seleccionado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                    <option value="pagada" {% if estado_seleccionado == 'pagada' %}selected{% endif %}>Pagada</option>
+                </select>
+            </div>
+            
+            <div class="col-md-4">
+                <label for="rango_fecha" class="form-label">Rango de fechas:</label>
+                <select name="rango_fecha" id="rango_fecha" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="hoy" {% if rango_fecha_seleccionado == 'hoy' %}selected{% endif %}>Hoy</option>
+                    <option value="ultimos_7_dias" {% if rango_fecha_seleccionado == 'ultimos_7_dias' %}selected{% endif %}>Últimos 7 días</option>
+                    <option value="ultimo_mes" {% if rango_fecha_seleccionado == 'ultimo_mes' %}selected{% endif %}>Último mes</option>
+                </select>
+            </div>
+            
+            <div class="col-md-4">
+                <label for="tipo_ubicacion" class="form-label">Ubicación:</label>
+                <select name="tipo_ubicacion" id="tipo_ubicacion" class="form-select">
+                    <option value="">Todas</option>
+                    <option value="mesa" {% if tipo_ubicacion_seleccionado == 'mesa' %}selected{% endif %}>Mesas</option>
+                    <option value="barra" {% if tipo_ubicacion_seleccionado == 'barra' %}selected{% endif %}>Barra</option>
+                </select>
+            </div>
+            
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-filter me-2">
+                    <i class="bi bi-funnel"></i> Filtrar
+                </button>
+                <a href="{{ url_for('admin.facturacion') }}" class="btn btn-outline-secondary btn-filter">
+                    <i class="bi bi-arrow-counterclockwise"></i> Limpiar
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="table-responsive">
+        {% if facturas %}
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Cliente</th>
+                    <th>Código</th>
+                    <th>Pedido ID</th>
+                    <th>Monto</th>
+                    <th>Propina</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Tipo de Pago</th>
+                    <th class="no-print">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in facturas %}
+                <tr>
+                    <td>{{ factura['nombre'] }}</td>
+                    <td>{{ factura['codigo'] }}</td>
+                    <td>{{ factura['pedido_id'] }}</td>
+                    <td>C${{ "%.2f"|format(factura['monto']) }}</td>
+                    <td>C${{ "%.2f"|format(factura['propina']) }}</td>
+                    <td>
+                        {% if factura['fecha_hora'] is string %}
+                            {{ factura['fecha_hora'][:10] }} {{ factura['fecha_hora'][11:16] }}
+                        {% else %}
+                            {{ factura['fecha_hora'].strftime('%d/%m/%Y %H:%M') }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge badge-{{ factura['estado'] }}">
+                            {{ factura['estado'].capitalize() }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if factura['tipo_pago'] %}
+                            <span class="badge bg-info">
+                                <i class="bi {% if factura['tipo_pago'] == 'efectivo' %}bi-cash-coin{% else %}bi-credit-card{% endif %}"></i>
+                                {{ factura['tipo_pago'].capitalize() }}
+                                {% if factura['tipo_pago'] == 'tarjeta' and factura['tipo_tarjeta'] %}
+                                    ({{ factura['tipo_tarjeta'].upper() }})
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">No especificado</span>
+                        {% endif %}
+                    </td>
+                    <td class="action-buttons no-print">
+                        <button type="button" 
+                                class="btn btn-primary" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#facturaModal"
+                                onclick="cargarDetalleFactura(
+                                    '{{ factura['codigo'] }}',
+                                    '{{ factura['nombre'] }}',
+                                    '{{ factura['pedido_id'] }}',
+                                    '{{ "%.2f"|format(factura['monto']) }}',
+                                    '{% if factura['fecha_hora'] is string %}{{ factura['fecha_hora'][:10] }} {{ factura['fecha_hora'][11:16] }}{% else %}{{ factura['fecha_hora'].strftime('%d/%m/%Y %H:%M') }}{% endif %}',
+                                    '{{ factura['estado'] }}',
+                                    '{{ factura['num_mesa'] }}',
+                                    '{{ factura['mesero'] }}',
+                                    '{{ "%.2f"|format(factura['propina']) }}',
+                                    '{{ factura['tipo_pago'] }}',
+                                    '{{ factura['tipo_tarjeta'] }}'
+                                )">
+                            <i class="bi bi-eye"></i> Ver Factura
+                        </button>
+                        {% if factura['estado'] == 'pendiente' %}
+                            <form action="{{ url_for('orders.finalizar', mesa_id=factura['num_mesa'], pedido_id=factura['pedido_id']) }}" 
+                                  method="post" 
+                                  style="display: inline;">
+                                
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-info text-center">
+            <i class="bi bi-info-circle"></i> No se encontraron facturas con los filtros seleccionados
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal para ver factura -->
+<div class="modal fade" id="facturaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-print">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalle de Factura</h5>
+                <button type="button" class="btn-close no-print" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="facturaModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p>Cargando detalles de la factura...</p>
+                </div>
+            </div>
+            <div class="modal-footer no-print">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Cerrar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="generarPDF()">
+                    <i class="bi bi-file-earmark-pdf"></i> Generar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Declarar variable global para almacenar los datos de la factura
+    let currentFactura = {};
+
+    function cargarDetalleFactura(codigo, cliente, pedidoId, monto, fecha, estado, mesa, mesero, propina, tipo_pago, tipo_tarjeta) {
+        currentFactura = {
+            codigo: codigo,
+            cliente: cliente,
+            pedidoId: pedidoId,
+            monto: parseFloat(monto),
+            propina: parseFloat(propina),
+            fecha: fecha,
+            estado: estado,
+            mesa: mesa,
+            mesero: mesero,
+            tipo_pago: tipo_pago,
+            tipo_tarjeta: tipo_tarjeta
+        };
+        
+        // Hacer una petición AJAX para obtener los productos
+        fetch(`/pedido/${pedidoId}/data`)
+            .then(response => response.json())
+            .then(data => {
+                currentFactura.productos = data.orderItems;
+                currentFactura.subtotal = currentFactura.monto - currentFactura.propina;
+                mostrarDetalleFactura();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al cargar los productos');
+            });
+    }
+    
+    function mostrarDetalleFactura() {
+        const modalBody = document.getElementById('facturaModalBody');
+        
+        // Generar filas de productos
+        let productosHTML = '';
+        if (currentFactura.productos && currentFactura.productos.length > 0) {
+            currentFactura.productos.forEach(producto => {
+                productosHTML += `
+                    <tr>
+                        <td>${producto.nombre}</td>
+                        <td>C$${producto.precio.toFixed(2)}</td>
+                        <td>${producto.cantidad}</td>
+                        <td>C$${(producto.precio * producto.cantidad).toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            productosHTML = '<tr><td colspan="4" class="text-center">No hay productos registrados</td></tr>';
+        }
+        
+        const html = `
+            <div class="factura-detalle" id="facturaContent">
+                <div class="factura-header">
+                    <h3>QUESILLOS LO NUESTRO</h3>
+                    <p>DIR. CONTIGUO A CLARO ALTAMIRA</p>
+                    <p>MANAGUA, NICARAGUA</p>
+                    <p>TELÉFONO: 2277-4001</p>
+                </div>
+                
+                <hr>
+                
+                <div class="factura-info">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <p><strong>Numero de factura:</strong> ${currentFactura.codigo}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>FECHA:</strong> ${currentFactura.fecha}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <p><strong>MESA:</strong> ${currentFactura.mesa}</p>
+                        </div>
+                    </div>
+                    <p><strong>CLIENTE:</strong> ${currentFactura.cliente}</p>
+                    <p><strong>Atendido por:</strong> ${currentFactura.mesero}</p>
+                    <p><strong>Tipo de Pago:</strong> 
+                        <span class="badge bg-info">
+                            <i class="bi ${currentFactura.tipo_pago === 'efectivo' ? 'bi-cash-coin' : 'bi-credit-card'}"></i>
+                            ${currentFactura.tipo_pago ? currentFactura.tipo_pago.charAt(0).toUpperCase() + currentFactura.tipo_pago.slice(1) : 'No especificado'}
+                            ${currentFactura.tipo_pago === 'tarjeta' && currentFactura.tipo_tarjeta ? ` (${currentFactura.tipo_tarjeta.toUpperCase()})` : ''}
+                        </span>
+                    </p>
+                </div>
+                
+                <table class="table table-bordered factura-table">
+                    <thead>
+                        <tr>
+                            <th>PRODUCTOS</th>
+                            <th>PRECIO UNITARIO</th>
+                            <th>CANTIDAD</th>
+                            <th>TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${productosHTML}
+                    </tbody>
+                </table>
+                
+                <div class="factura-totales">
+                    <table class="table">
+                        <tr>
+                            <td><strong>SUBTOTAL:</strong></td>
+                            <td>C$${currentFactura.subtotal.toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>PROPINA:</strong></td>
+                            <td>C$${currentFactura.propina.toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>TOTAL:</strong></td>
+                            <td>C$${currentFactura.monto.toFixed(2)}</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <p>¡Gracias por su preferencia!</p>
+                </div>
+            </div>
+        `;
+        
+        modalBody.innerHTML = html;
+    }
+
+    function generarPDF() {
+        // Usar jsPDF (que ya está incluido vía CDN)
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        // Definir colores
+        const colors = {
+            primary: [41, 128, 185],    // Azul principal
+            secondary: [52, 152, 219],  // Azul secundario
+            accent: [231, 76, 60],      // Rojo acento
+            success: [46, 204, 113],    // Verde
+            lightGray: [236, 240, 241], // Gris claro
+            darkGray: [44, 62, 80]      // Gris oscuro
+        };
+
+        // Función para generar el contenido del PDF
+        function generarContenidoPDF() {
+            // Fondo decorativo para el encabezado
+            doc.setFillColor(...colors.lightGray);
+            doc.rect(0, 38, 210, 25, 'F');
+            
+            // Encabezado de la factura
+            doc.setFontSize(22);
+            doc.setTextColor(...colors.primary);
+            doc.setFont('helvetica', 'bold');
+            doc.text('QUESILLOS LO NUESTRO', 105, 48, { align: 'center' });
+            
+            doc.setFontSize(11);
+            doc.setTextColor(...colors.darkGray);
+            doc.setFont('helvetica', 'normal');
+            doc.text('DIR. CONTIGUO A CLARO ALTAMIRA', 105, 55, { align: 'center' });
+            doc.text('MANAGUA, NICARAGUA', 105, 61, { align: 'center' });
+            doc.text('TELÉFONO: 2277-4001', 105, 67, { align: 'center' });
+            
+            // Línea separadora decorativa
+            doc.setDrawColor(...colors.primary);
+            doc.setLineWidth(0.5);
+            doc.line(15, 73, 195, 73);
+            
+            // Información de la factura con fondo
+            doc.setFillColor(...colors.lightGray);
+            doc.roundedRect(15, 78, 180, 45, 2, 2, 'F');
+            
+            // Dividir la información en dos columnas
+            doc.setFontSize(11);
+            doc.setTextColor(...colors.primary);
+            doc.setFont('helvetica', 'bold');
+            doc.text('INFORMACIÓN DE LA FACTURA', 20, 85);
+            
+            doc.setFontSize(10);
+            doc.setTextColor(...colors.darkGray);
+            doc.setFont('helvetica', 'normal');
+            
+            // Columna izquierda
+            doc.text(`ID Factura: ${currentFactura.codigo}`, 20, 92);
+            doc.text(`Fecha: ${currentFactura.fecha}`, 20, 99);
+            doc.text(`Mesa: ${currentFactura.mesa}`, 20, 106);
+            
+            // Columna derecha
+            doc.text(`Cliente: ${currentFactura.cliente}`, 110, 92);
+            doc.text(`Mesero: ${currentFactura.mesero}`, 110, 99);
+            
+            // Tipo de pago con badge
+            const tipoPago = currentFactura.tipo_pago ? currentFactura.tipo_pago.toUpperCase() : 'NO ESPECIFICADO';
+            doc.setFillColor(...colors.secondary);
+            doc.roundedRect(20, 113, 40, 8, 2, 2, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.text(`Pago: ${tipoPago}`, 25, 118);
+            
+            if (currentFactura.tipo_pago === 'tarjeta' && currentFactura.tipo_tarjeta) {
+                const tipoTarjeta = currentFactura.tipo_tarjeta.toLowerCase();
+                
+                // Primero dibujar el texto del tipo de tarjeta
+                doc.setFillColor(...colors.accent);
+                doc.roundedRect(65, 113, 30, 8, 2, 2, 'F');
+                doc.text(`${currentFactura.tipo_tarjeta.toUpperCase()}`, 70, 118);
+                
+                // Luego dibujar el logo del banco a la derecha
+                const bancoX = 100;  // Mover más a la derecha
+                const bancoY = 113;
+                const bancoWidth = tipoTarjeta === 'banpro' ? 12 : 15;  // Aún más pequeño
+                const bancoHeight = tipoTarjeta === 'banpro' ? 6 : 8;   // Aún más pequeño
+                
+                // Fondo blanco para el logo
+                doc.setFillColor(255, 255, 255);
+                doc.rect(bancoX, bancoY, bancoWidth, bancoHeight, 'F');
+                
+                // Cargar y agregar el logo del banco
+                const bancoLogo = new Image();
+                bancoLogo.src = tipoTarjeta === 'banpro' ? '/static/images/logos/banpro.jpg' : '/static/images/logos/bac.png';
+                
+                bancoLogo.onload = function() {
+                    doc.addImage(
+                        bancoLogo, 
+                        tipoTarjeta === 'banpro' ? 'JPEG' : 'PNG', 
+                        bancoX, 
+                        bancoY, 
+                        bancoWidth, 
+                        bancoHeight,
+                        undefined,
+                        'FAST'
+                    );
+                    
+                    // Continuar con el resto del PDF
+                    continuarGeneracionPDF();
+                };
+                
+                bancoLogo.onerror = function() {
+                    // Si hay error al cargar el logo, continuar sin él
+                    continuarGeneracionPDF();
+                };
+            } else {
+                continuarGeneracionPDF();
+            }
+        }
+        
+        function continuarGeneracionPDF() {
+            // Tabla de productos con estilo mejorado
+            const productosData = currentFactura.productos.map(p => [
+                p.nombre,
+                `C$${p.precio.toFixed(2)}`,
+                p.cantidad,
+                `C$${(p.precio * p.cantidad).toFixed(2)}`
+            ]);
+            
+            doc.autoTable({
+                startY: 128,
+                head: [['PRODUCTOS', 'PRECIO UNITARIO', 'CANTIDAD', 'TOTAL']],
+                body: productosData,
+                margin: { left: 15, right: 15 },
+                styles: { 
+                    fontSize: 9,
+                    cellPadding: 4,
+                    textColor: colors.darkGray
+                },
+                headStyles: { 
+                    fillColor: colors.primary,
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    halign: 'center',
+                    fontSize: 10
+                },
+                alternateRowStyles: {
+                    fillColor: colors.lightGray
+                },
+                columnStyles: {
+                    0: { cellWidth: 'auto' },
+                    1: { halign: 'right', cellWidth: 35 },
+                    2: { halign: 'center', cellWidth: 25 },
+                    3: { halign: 'right', cellWidth: 35 }
+                }
+            });
+            
+            // Resumen de pago con estilo mejorado
+            const finalY = doc.lastAutoTable.finalY + 5;
+            
+            // Fondo para el resumen
+            doc.setFillColor(...colors.lightGray);
+            doc.roundedRect(120, finalY, 75, 35, 3, 3, 'F');
+            
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...colors.primary);
+            doc.text('RESUMEN DE PAGO', 125, finalY + 8);
+            
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...colors.darkGray);
+            doc.text(`Subtotal:`, 125, finalY + 15);
+            doc.text(`C$${currentFactura.subtotal.toFixed(2)}`, 190, finalY + 15, { align: 'right' });
+            
+            doc.text(`Propina:`, 125, finalY + 22);
+            doc.text(`C$${currentFactura.propina.toFixed(2)}`, 190, finalY + 22, { align: 'right' });
+            
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...colors.accent);
+            doc.text(`Total:`, 125, finalY + 29);
+            doc.text(`C$${currentFactura.monto.toFixed(2)}`, 190, finalY + 29, { align: 'right' });
+            
+            // Pie de página con estilo
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(...colors.primary);
+            doc.text('¡Gracias por su preferencia!', 105, finalY + 45, { align: 'center' });
+            
+            // Línea decorativa final
+            doc.setDrawColor(...colors.primary);
+            doc.setLineWidth(0.2);
+            doc.line(15, finalY + 50, 195, finalY + 50);
+            
+            // Guardar el PDF
+            doc.save(`Factura_${currentFactura.codigo}.pdf`);
+        }
+
+        // Cargar el logo principal
+        const logo = new Image();
+        logo.src = '/static/images/logos/logo2.png';
+        
+        logo.onload = function() {
+            // Calcular dimensiones para mantener la proporción
+            const maxWidth = 40;
+            const maxHeight = 25;
+            let width = logo.width;
+            let height = logo.height;
+            
+            if (width > maxWidth) {
+                height = (maxWidth * height) / width;
+                width = maxWidth;
+            }
+            if (height > maxHeight) {
+                width = (maxHeight * width) / height;
+                height = maxHeight;
+            }
+            
+            // Centrar el logo horizontalmente
+            const x = (210 - width) / 2;
+            
+            // Agregar el logo al PDF
+            doc.addImage(logo, 'PNG', x, 8, width, height);
+            
+            // Iniciar la generación del contenido
+            generarContenidoPDF();
+        };
+        
+        logo.onerror = function() {
+            // Si hay error al cargar el logo principal, continuar sin él
+            generarContenidoPDF();
+        };
+    }
+
+    // Configurar el modal para que se cargue cuando se muestre
+    document.getElementById('facturaModal').addEventListener('show.bs.modal', function () {
+        if (Object.keys(currentFactura).length > 0) {
+            mostrarDetalleFactura();
+        }
+    });
+</script>
+{% endblock %}

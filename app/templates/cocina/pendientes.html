@@ -1,0 +1,75 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Cocina · Quesillos Lo Nuestro{% endblock %}
+{% block page_title %}Cocina{% endblock %}
+
+{% block content %}
+<div class="q-card">
+    <h3>👨‍🍳 Órdenes pendientes</h3>
+    <p class="q-sub">Se actualiza automáticamente cada 15 segundos.</p>
+    <div id="ordenes" class="q-grid cols-3"></div>
+</div>
+
+<div class="q-card">
+    <h3>📖 Disponibilidad de recetas</h3>
+    <p class="q-sub">Cuántas unidades se pueden preparar con el inventario actual.</p>
+    <table class="q-table" id="tabla-disp">
+        <thead><tr><th>Receta</th><th>Se pueden preparar</th><th>Insumos faltantes</th></tr></thead>
+        <tbody><tr><td colspan="3">Cargando…</td></tr></tbody>
+    </table>
+</div>
+
+<style>
+.orden{background:#fff;border:1px solid var(--q-borde);border-left:5px solid var(--q-maiz);
+       border-radius:12px;padding:14px}
+.orden h4{margin:0 0 2px;color:var(--q-rojo);font-size:15px}
+.orden .hora{font-size:12px;opacity:.6}
+.orden ul{margin:10px 0;padding-left:18px;font-size:13.5px}
+.dark-theme .orden{background:#1e242c;border-color:#2f3742}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function cargarOrdenes() {
+    const datos = await fetch('/cocina/api/pendientes').then(r => r.json());
+    const cont = document.getElementById('ordenes');
+    if (!datos.length) {
+        cont.innerHTML = '<p style="opacity:.6">No hay órdenes pendientes. 🎉</p>';
+        return;
+    }
+    cont.innerHTML = datos.map(o => `
+        <div class="orden">
+            <h4>${o.numero_venta}</h4>
+            <div class="hora">${o.fecha_venta}${o.mesero ? ' · ' + o.mesero : ''}</div>
+            <ul>${o.items.map(i => `<li>${i.cantidad} × ${i.producto}${i.consumio_receta ? ' 📖' : ''}</li>`).join('')}</ul>
+            <button class="q-btn small verde" onclick="marcarListo(${o.id_venta})">✔ Marcar lista</button>
+        </div>`).join('');
+}
+
+async function marcarListo(id) {
+    const r = await fetch(`/cocina/api/${id}/listo`, {method: 'POST'}).then(r => r.json());
+    if (r.success) { Q.toast('success', 'Orden lista', ''); cargarOrdenes(); }
+}
+
+async function cargarDisponibilidad() {
+    const datos = await fetch('/cocina/api/disponibilidad').then(r => r.json());
+    const tb = document.querySelector('#tabla-disp tbody');
+    if (!datos.length) {
+        tb.innerHTML = '<tr><td colspan="3" style="text-align:center;opacity:.6">No hay recetas activas.</td></tr>';
+        return;
+    }
+    tb.innerHTML = datos.map(d => `
+        <tr>
+            <td><strong>${d.producto || d.receta}</strong></td>
+            <td><span class="q-chip ${d.max_producible >= 1 ? 'ok' : 'bajo'}">${Math.floor(d.max_producible)}</span></td>
+            <td style="font-size:12.5px">${d.faltantes.length
+                ? d.faltantes.map(f => `<span class="q-chip bajo">${f.producto}: hay ${f.hay}, necesita ${f.necesita}</span>`).join(' ')
+                : '<span style="opacity:.5">—</span>'}</td>
+        </tr>`).join('');
+}
+
+function refrescar() { cargarOrdenes(); cargarDisponibilidad(); }
+refrescar();
+setInterval(refrescar, 15000);
+</script>
+{% endblock %}

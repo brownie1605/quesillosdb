@@ -1,0 +1,119 @@
+{% extends 'layouts/base.html' %}
+{% block title %}Sincronización · Quesillos Lo Nuestro{% endblock %}
+{% block page_title %}Sincronización local ↔ nube{% endblock %}
+
+{% block content %}
+<div class="q-grid cols-4">
+    <div class="q-card"><h3 id="est-conexion">—</h3><p class="q-sub">Estado de la conexión</p></div>
+    <div class="q-card"><h3 id="est-pendientes">—</h3><p class="q-sub">Operaciones pendientes</p></div>
+    <div class="q-card"><h3 id="est-conflictos">—</h3><p class="q-sub">Conflictos por resolver</p></div>
+    <div class="q-card"><h3 id="est-ultima" style="font-size:14px">—</h3><p class="q-sub">Última sincronización</p></div>
+</div>
+
+<div class="q-card">
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="q-btn" onclick="sincronizar()">🔄 Sincronizar ahora</button>
+        <button class="q-btn ghost" onclick="soloPush()">⬆ Subir pendientes</button>
+        <button class="q-btn ghost" onclick="soloPull()">⬇ Bajar cambios</button>
+        <button class="q-btn ghost" onclick="probar()">📡 Probar conexión</button>
+    </div>
+    <pre id="salida" style="margin-top:14px;background:rgba(0,0,0,.05);padding:12px;border-radius:10px;
+         font-size:12px;max-height:240px;overflow:auto;display:none"></pre>
+</div>
+
+<div class="q-card">
+    <h3>⚠️ Conflictos</h3>
+    <p class="q-sub">Cuando dos usuarios venden la última existencia, gana la venta con la hora más temprana;
+       la otra se anula automáticamente y se avisa al usuario.</p>
+    <table class="q-table" id="tabla-conflictos">
+        <thead><tr><th>Detectado</th><th>Tipo</th><th>Registro</th><th>Hora local</th><th>Hora nube</th><th>Estado</th><th></th></tr></thead>
+        <tbody><tr><td colspan="7">Cargando…</td></tr></tbody>
+    </table>
+</div>
+
+<div class="q-card">
+    <h3>📋 Cola de sincronización</h3>
+    <table class="q-table" id="tabla-cola">
+        <thead><tr><th>#</th><th>Operación</th><th>Tabla</th><th>Registro</th><th>Hora</th><th>Estado</th></tr></thead>
+        <tbody><tr><td colspan="6">Cargando…</td></tr></tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function mostrar(datos) {
+    const pre = document.getElementById('salida');
+    pre.style.display = 'block';
+    pre.textContent = JSON.stringify(datos, null, 2);
+}
+
+async function estado() {
+    const d = await fetch('/api/sync/status').then(r => r.json());
+    document.getElementById('est-conexion').innerHTML = d.online
+        ? '<span style="color:#16b978">🟢 En línea</span>'
+        : '<span style="color:#ff4d4d">🔴 Sin conexión</span>';
+    document.getElementById('est-pendientes').textContent = d.pendientes;
+    document.getElementById('est-conflictos').textContent = d.conflictos_pendientes;
+    document.getElementById('est-ultima').textContent = d.ultima_sincronizacion
+        ? d.ultima_sincronizacion.replace('T', ' ').slice(0, 19) : 'Nunca';
+}
+
+async function sincronizar() { mostrar(await fetch('/api/sync/now', {method:'POST'}).then(r=>r.json())); refrescar(); }
+async function soloPush()    { mostrar(await fetch('/api/sync/push', {method:'POST'}).then(r=>r.json())); refrescar(); }
+async function soloPull()    { mostrar(await fetch('/api/sync/pull', {method:'POST'}).then(r=>r.json())); refrescar(); }
+async function probar()      { mostrar(await fetch('/api/sync/check', {method:'POST'}).then(r=>r.json())); estado(); }
+
+async function conflictos() {
+    const datos = await fetch('/api/conflicts?estado=todos').then(r => r.json());
+    const tb = document.querySelector('#tabla-conflictos tbody');
+    if (!datos.length) {
+        tb.innerHTML = '<tr><td colspan="7" style="text-align:center;opacity:.6">Sin conflictos registrados. 👌</td></tr>';
+        return;
+    }
+    tb.innerHTML = datos.map(c => `
+        <tr>
+            <td>${(c.timestamp_deteccion || '').replace('T',' ').slice(0,19)}</td>
+            <td><span class="q-chip receta">${c.tipo_conflicto}</span></td>
+            <td>${c.tabla_afectada} #${c.registro_id}</td>
+            <td>${(c.timestamp_local || '—').replace('T',' ').slice(0,19)}</td>
+            <td>${(c.timestamp_remoto || '—').replace('T',' ').slice(0,19)}</td>
+            <td><span class="q-chip ${c.estado_resolucion === 'pendiente_resolucion' ? 'bajo' : 'ok'}">${c.estado_resolucion}</span></td>
+            <td>${c.estado_resolucion === 'pendiente_resolucion' ? `
+                <button class="q-btn small ghost" onclick="resolver(${c.id_conflicto},'prioridad_local')">Gana local</button>
+                <button class="q-btn small danger" onclick="resolver(${c.id_conflicto},'prioridad_remoto')">Gana nube</button>` : ''}</td>
+        </tr>`).join('');
+}
+
+async function resolver(id, resolucion) {
+    const r = await fetch('/api/sync/conflict/resolve', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({conflict_id: id, resolution: resolucion})
+    }).then(r => r.json());
+    if (r.success) { Q.toast('success', 'Conflicto resuelto', ''); refrescar(); }
+    else Q.toast('error', 'Error', r.message);
+}
+
+async function cola() {
+    const datos = await fetch('/api/sync/queue').then(r => r.json());
+    const tb = document.querySelector('#tabla-cola tbody');
+    if (!datos.length) {
+        tb.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.6">La cola está vacía.</td></tr>';
+        return;
+    }
+    tb.innerHTML = datos.map(q => `
+        <tr>
+            <td>${q.id_sync_queue}</td>
+            <td>${q.operation_type}</td>
+            <td>${q.tabla_afectada}</td>
+            <td>#${q.registro_id}</td>
+            <td>${(q.timestamp_operacion || '').replace('T',' ').slice(0,19)}</td>
+            <td><span class="q-chip ${q.estado_sync === 'sinc_remoto' ? 'ok' : 'bajo'}">${q.estado_sync}</span></td>
+        </tr>`).join('');
+}
+
+function refrescar() { estado(); conflictos(); cola(); }
+refrescar();
+setInterval(estado, 10000);
+</script>
+{% endblock %}

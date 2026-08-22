@@ -1,0 +1,211 @@
+<div class="mobile-magic-nav">
+    <ul>
+        <li class="list {% if request.blueprint == 'dashboard' %}active{% endif %}">
+            <a href="{{ url_for('dashboard.dashboard') if current_user.rol.nombre == 'Administrador' else url_for('venta.historial') }}">
+                <span class="icon"><ion-icon name="home-outline"></ion-icon></span>
+                <span class="text">Inicio</span>
+            </a>
+        </li>
+        <li class="list {% if request.blueprint == 'venta' and request.endpoint == 'venta.pos' %}active{% endif %}">
+            <a href="{{ url_for('venta.pos') }}">
+                <span class="icon"><ion-icon name="cart-outline"></ion-icon></span>
+                <span class="text">Venta</span>
+            </a>
+        </li>
+        <li class="list {% if request.blueprint == 'producto' %}active{% endif %}">
+            <a href="{{ url_for('producto.lista') }}">
+                <span class="icon"><ion-icon name="cube-outline"></ion-icon></span>
+                <span class="text">Stock</span>
+            </a>
+        </li>
+        {% if current_user.rol.nombre == 'Administrador' %}
+        <li class="list {% if request.blueprint == 'auditoria' or request.blueprint == 'reporte' %}active{% endif %}">
+            <a href="{{ url_for('auditoria.index') }}">
+                <span class="icon"><ion-icon name="shield-checkmark-outline"></ion-icon></span>
+                <span class="text">Admin</span>
+            </a>
+        </li>
+        {% else %}
+        <li class="list {% if request.blueprint == 'compra' %}active{% endif %}">
+            <a href="{{ url_for('compra.lista') }}">
+                <span class="icon"><ion-icon name="receipt-outline"></ion-icon></span>
+                <span class="text">Compras</span>
+            </a>
+        </li>
+        {% endif %}
+        <li class="list {% if request.blueprint == 'configuracion' %}active{% endif %}">
+            <a href="{{ url_for('configuracion.index') }}">
+                <span class="icon"><ion-icon name="settings-outline"></ion-icon></span>
+                <span class="text">Config</span>
+            </a>
+        </li>
+        <div class="indicator"></div>
+    </ul>
+</div>
+
+<style>
+/* CSS para el Magic Nav Bar */
+.mobile-magic-nav {
+    display: none; /* Oculto por defecto en escritorio */
+    position: fixed;
+    bottom: 20px;
+    left: 15px;
+    right: 15px;
+    height: 70px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+/* Detectar dispositivos móviles (Android/iOS) mediante media query */
+@media (max-width: 768px) {
+    .mobile-magic-nav {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Ocultar el sidebar tradicional en móvil si se desea, o dejarlo y ocultar el bottom nav si el sidebar está activo */
+    /* .sidebar { display: none; } */
+    
+    /* Ajustar el padding inferior de la página para que el contenido no quede detrás del navbar */
+    .app-layout .main-content {
+        padding-bottom: 90px; 
+    }
+}
+
+.mobile-magic-nav ul {
+    display: flex;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    list-style: none;
+}
+
+.mobile-magic-nav ul li {
+    position: relative;
+    list-style: none;
+    width: 20%; /* 5 elementos = 100/5 */
+    height: 70px;
+    z-index: 1;
+}
+
+.mobile-magic-nav ul li a {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
+    text-align: center;
+    font-weight: 500;
+    text-decoration: none;
+}
+
+.mobile-magic-nav ul li a .icon {
+    position: relative;
+    display: block;
+    line-height: 75px;
+    font-size: 1.5em;
+    text-align: center;
+    transition: 0.5s;
+    color: #222327;
+}
+
+.dark-theme .mobile-magic-nav { background: #1a1b20; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+.dark-theme .mobile-magic-nav ul li a .icon { color: #fff; }
+
+.mobile-magic-nav ul li.active a .icon {
+    transform: translateY(-32px);
+    color: #fff;
+}
+
+.mobile-magic-nav ul li a .text {
+    position: absolute;
+    color: #222327;
+    font-weight: 400;
+    font-size: 0.75em;
+    letter-spacing: 0.05em;
+    transition: 0.5s;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+.dark-theme .mobile-magic-nav ul li a .text { color: #fff; }
+
+.mobile-magic-nav ul li.active a .text {
+    opacity: 1;
+    transform: translateY(10px);
+}
+
+/* Indicador animado */
+.mobile-magic-nav .indicator {
+    position: absolute;
+    top: -50%;
+    /* width base on 20% item width.  (100% / 5 items = 20%). */
+    /* width is 70px, li is usually larger or smaller based on screen. Let's make it a fixed 70x70 circle */
+    width: 70px;
+    height: 70px;
+    background: #29fd53;
+    border-radius: 50%;
+    border: 6px solid var(--bg-color, #f4f7fa); /* match app background */
+    transition: 0.5s;
+    /* Center it correctly: left = calc( item_width/2 - indicator_width/2 ) */
+    left: calc(10% - 35px); 
+}
+.dark-theme .mobile-magic-nav .indicator {
+    border-color: #121317; /* match dark background */
+}
+
+/* Calcular posición del indicador basado en el índice del elemento activo */
+.mobile-magic-nav ul li:nth-child(1).active ~ .indicator { left: calc(10% - 35px); }
+.mobile-magic-nav ul li:nth-child(2).active ~ .indicator { left: calc(30% - 35px); }
+.mobile-magic-nav ul li:nth-child(3).active ~ .indicator { left: calc(50% - 35px); }
+.mobile-magic-nav ul li:nth-child(4).active ~ .indicator { left: calc(70% - 35px); }
+.mobile-magic-nav ul li:nth-child(5).active ~ .indicator { left: calc(90% - 35px); }
+
+/* Las curvas del indicador */
+.mobile-magic-nav .indicator::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -22px;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border-top-right-radius: 20px;
+    box-shadow: 1px -10px 0 0 var(--bg-color, #f4f7fa);
+}
+.dark-theme .mobile-magic-nav .indicator::before { box-shadow: 1px -10px 0 0 #121317; }
+
+.mobile-magic-nav .indicator::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -22px;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border-top-left-radius: 20px;
+    box-shadow: -1px -10px 0 0 var(--bg-color, #f4f7fa);
+}
+.dark-theme .mobile-magic-nav .indicator::after { box-shadow: -1px -10px 0 0 #121317; }
+</style>
+
+<script>
+    // Configurar JS para que al hacer click se añada la clase active 
+    // y se cambie la url, o para SPA
+    const listItems = document.querySelectorAll('.mobile-magic-nav .list');
+    
+    // Si queremos efecto visual ANTES de navegar, o solo marcar si estamos en esa vista (ya lo hace el Jinja server-side)
+    // Para navegación rápida sin recarga usaríamos fetch, pero como es server-side solo marcamos visualmente al hacer click antes de ir
+    listItems.forEach(item => {
+        item.addEventListener('click', function() {
+            // listItems.forEach(li => li.classList.remove('active'));
+            // this.classList.add('active');
+            // La navegación real ocurre por el <a href="...">
+        });
+    });
+</script>

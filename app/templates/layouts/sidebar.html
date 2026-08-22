@@ -1,0 +1,60 @@
+{% set rol = (current_user.rol.nombre if current_user.rol else '') | lower %}
+{% set es_admin = rol in ['admin', 'administrador'] %}
+
+<aside class="sidebar">
+
+    <div class="brand">
+        <div class="brand-icon">🫓</div>
+        <div>
+            <h2>QUESILLOS</h2>
+            <span>LO NUESTRO</span>
+        </div>
+    </div>
+
+    <div class="user-box">
+        <div class="avatar">👤</div>
+        <div>
+            <strong>{{ current_user.nombre_completo }}</strong>
+            <span>{{ current_user.rol.nombre if current_user.rol else '' }}</span>
+        </div>
+    </div>
+
+    <nav class="menu">
+        {% if es_admin %}
+        <a href="{{ url_for('dashboard.dashboard') }}" class="{% if request.blueprint == 'dashboard' %}active{% endif %}">🏠 Dashboard</a>
+        {% endif %}
+
+        {% if es_admin or rol in ['cajero', 'mesero'] %}
+        <a href="{{ url_for('venta.pos') }}" class="{% if request.endpoint == 'venta.pos' %}active{% endif %}">💵 Punto de venta</a>
+        <a href="{{ url_for('venta.historial') }}" class="{% if request.endpoint == 'venta.historial' %}active{% endif %}">🧾 Historial de ventas</a>
+        {% endif %}
+
+        {% if es_admin or rol == 'cocinero' %}
+        <a href="{{ url_for('cocina.pendientes') }}" class="{% if request.blueprint == 'cocina' %}active{% endif %}">👨‍🍳 Cocina</a>
+        <a href="{{ url_for('receta.lista') }}" class="{% if request.blueprint == 'receta' %}active{% endif %}">📖 Recetas</a>
+        {% endif %}
+
+        <a href="{{ url_for('insumo.lista') }}" class="{% if request.blueprint == 'insumo' %}active{% endif %}">🥬 Insumos</a>
+
+        {% if es_admin or rol in ['cajero', 'cocinero'] %}
+        <a href="{{ url_for('producto.lista') }}" class="{% if request.blueprint == 'producto' %}active{% endif %}">📦 Productos</a>
+        {% endif %}
+
+        {% if es_admin or rol == 'cajero' %}
+        <a href="{{ url_for('inventario.lista') }}" class="{% if request.blueprint == 'inventario' %}active{% endif %}">📊 Inventario</a>
+        <a href="{{ url_for('compra.lista') }}" class="{% if request.blueprint == 'compra' %}active{% endif %}">🛍 Compras</a>
+        <a href="{{ url_for('proveedor.lista') }}" class="{% if request.blueprint == 'proveedor' %}active{% endif %}">🚚 Proveedores</a>
+        {% endif %}
+
+        {% if es_admin %}
+        <a href="{{ url_for('reporte.index') }}" class="{% if request.blueprint == 'reporte' %}active{% endif %}">📈 Reportes</a>
+        <a href="{{ url_for('usuario.lista') }}" class="{% if request.blueprint == 'usuario' %}active{% endif %}">👥 Usuarios</a>
+        <a href="{{ url_for('sync.panel') }}" class="{% if request.blueprint == 'sync' %}active{% endif %}">🔄 Sincronización</a>
+        <a href="{{ url_for('auditoria.index') }}" class="{% if request.blueprint == 'auditoria' %}active{% endif %}">📋 Auditoría</a>
+        <a href="{{ url_for('configuracion.index') }}" class="{% if request.blueprint == 'configuracion' %}active{% endif %}">⚙ Configuración</a>
+        {% endif %}
+    </nav>
+
+    <a class="logout" href="{{ url_for('auth.logout') }}">🚪 Cerrar Sesión</a>
+
+</aside>

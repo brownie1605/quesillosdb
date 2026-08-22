@@ -1,0 +1,674 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Finalizar Pedido
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    
+    /* Estilos generales */
+    .finalizar-container {
+        padding: 0;
+        background-color: #f5f7fa;
+        min-height: calc(100vh - 60px);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .finalizar-container:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23f5f7fa"/><path d="M0,0 L100,100 M100,0 L0,100" stroke="%23e8eaed" stroke-width="1" opacity="0.3"/></svg>');
+        opacity: 0.5;
+        z-index: 0;
+    }
+    
+    .finalizar-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: calc(100vh - 60px);
+    }
+    
+    .header-section {
+        background-color: #1a365d;
+        color: #ffffff;
+        padding: 2rem;
+        position: relative;
+    }
+    
+    .header-section:after {
+        content: '';
+        position: absolute;
+        bottom: -20px;
+        left: 0;
+        width: 100%;
+        height: 40px;
+        background-color: #f5f7fa;
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 0 50%);
+    }
+    
+    .header-title {
+        font-family: 'Playfair Display', serif;
+        font-weight: 700;
+        letter-spacing: 2px;
+        font-size: 2rem;
+        text-align: center;
+        margin-bottom: 1rem;
+        color: #ffffff;
+    }
+    
+    .header-info {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.2rem;
+        color: #e2e8f0;
+    }
+    
+    .header-info span {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .btn-back {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-back:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .btn-back img {
+        filter: brightness(0) invert(1);
+    }
+    
+    .main-content {
+        flex: 1;
+        display: flex;
+        padding: 2rem;
+        gap: 2rem;
+    }
+    
+    .order-details {
+        flex: 2;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 2rem;
+        position: relative;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .order-details:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background-color: #1a365d;
+    }
+    
+    .order-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 1rem;
+    }
+    
+    .order-table th {
+        background-color: #1a365d;
+        color: #ffffff;
+        font-family: 'Playfair Display', serif;
+        font-weight: 600;
+        padding: 1rem;
+        text-transform: uppercase;
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+    }
+    
+    .order-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #e2e8f0;
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.1rem;
+        color: #2d3748;
+    }
+    
+    .order-table tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .order-table tr:hover td {
+        background-color: #f8fafc;
+    }
+    
+    .summary-section {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .summary-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 1.5rem;
+        position: relative;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .summary-card:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background-color: #1a365d;
+    }
+    
+    .summary-title {
+        font-family: 'Playfair Display', serif;
+        font-weight: 600;
+        font-size: 1.2rem;
+        color: #1a365d;
+        margin-bottom: 1rem;
+        letter-spacing: 1px;
+    }
+    
+    .summary-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 1.1rem;
+        color: #2d3748;
+    }
+    
+    .summary-total {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 2px solid #e2e8f0;
+        font-weight: 700;
+        font-size: 1.3rem;
+        color: #1a365d;
+    }
+    
+    .form-check {
+        margin: 1rem 0;
+        padding: 1.5rem;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+    }
+    
+    .form-check-input {
+        margin-right: 0.5rem;
+    }
+    
+    .form-check-input:checked {
+        background-color: #1a365d;
+        border-color: #1a365d;
+    }
+    
+    .form-check-label {
+        color: #2d3748;
+        font-family: 'Cormorant Garamond', serif;
+        font-weight: 600;
+        font-size: 1.1rem;
+        letter-spacing: 1px;
+        margin: 0;
+    }
+
+    .invalid-amount {
+        color: #dc3545;
+        border-color: #dc3545 !important;
+    }
+
+    .invalid-amount:focus {
+        box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+    }
+
+    .invalid-feedback {
+        display: none;
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .invalid-feedback.show {
+        display: block;
+    }
+    
+    .btn-finalizar {
+        background-color: #1a365d;
+        border: none;
+        padding: 1.2rem;
+        font-family: 'Playfair Display', serif;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        transition: all 0.3s ease;
+        margin-top: auto;
+        color: #ffffff;
+    }
+    
+    .btn-finalizar:hover {
+        background-color: #2c5282;
+        transform: translateY(-2px);
+    }
+    
+    /* Estilos responsivos */
+    @media (max-width: 991.98px) {
+        .main-content {
+            flex-direction: column;
+            padding: 1.5rem;
+        }
+        
+        .header-section {
+            padding: 1.5rem;
+        }
+        
+        .header-info {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .order-details, .summary-card {
+            width: 100%;
+        }
+
+        .form-check {
+            flex-direction: column;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .form-check-label {
+            margin-top: 0.5rem;
+        }
+
+        .input-group {
+            flex-direction: column;
+        }
+
+        .input-group-text {
+            border-radius: 0.375rem 0.375rem 0 0 !important;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .input-group .form-control {
+            border-radius: 0 0 0.375rem 0.375rem !important;
+            width: 100%;
+        }
+
+        .d-flex.gap-2 {
+            flex-direction: column;
+            gap: 0.5rem !important;
+        }
+
+        .form-check.flex-grow-1 {
+            margin: 0;
+            padding: 0.5rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+        }
+    }
+    
+    @media (max-width: 767.98px) {
+        .main-content {
+            padding: 1rem;
+        }
+        
+        .header-title {
+            font-size: 1.6rem;
+        }
+        
+        .header-info {
+            font-size: 1rem;
+        }
+        
+        .order-details, .summary-card {
+            padding: 1rem;
+        }
+        
+        .order-table th, .order-table td {
+            padding: 0.8rem;
+            font-size: 1rem;
+        }
+
+        .order-table {
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .summary-title {
+            font-size: 1.1rem;
+        }
+
+        .summary-item {
+            font-size: 1rem;
+        }
+
+        .btn-finalizar {
+            padding: 1rem;
+            font-size: 1rem;
+        }
+
+        .form-check-label {
+            font-size: 1rem;
+        }
+
+        .invalid-feedback {
+            font-size: 0.8rem;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .header-section {
+            padding: 1rem;
+        }
+
+        .header-title {
+            font-size: 1.4rem;
+        }
+
+        .btn-back {
+            width: 35px;
+            height: 35px;
+        }
+
+        .btn-back img {
+            height: 16px;
+            width: 16px;
+        }
+
+        .order-table th, .order-table td {
+            padding: 0.6rem;
+            font-size: 0.9rem;
+        }
+
+        .summary-item {
+            font-size: 0.9rem;
+        }
+
+        .summary-total {
+            font-size: 1.1rem;
+        }
+
+        .form-check {
+            padding: 0.8rem;
+        }
+
+        .form-check-label {
+            font-size: 0.9rem;
+        }
+
+        .btn-finalizar {
+            padding: 0.8rem;
+            font-size: 0.9rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block main %}
+  <div class="finalizar-container">
+    <div class="finalizar-content">
+        <div class="header-section">
+            <a href="{{ url_for('orders.editar_pedido', pedido_id=info[0]['pedido_id']) }}" class="btn btn-back">
+                <img style="height: 20px; width: 20px;" src="../static/images/logos/editar.png" alt="Editar">
+            </a>
+            <h1 class="header-title">Detalles del Pedido</h1>
+            <div class="header-info">
+                <span>Fecha: {{ info[0]['fecha'] }}</span>
+                <span>Mesa: {{ info[0]['mesa_id'] }}</span>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="order-details">
+                <h2 class="summary-title">Productos Ordenados</h2>
+                <div class="table-responsive">
+                    <table class="order-table">
+                        <thead>
+                            <tr> 
+                                <th>Producto</th>
+                                <th>Precio Unitario</th>
+                                <th>Cantidad</th>
+                                <th>Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for i in info %}
+                                <tr>        
+                                    <td>{{ i['producto_nombre'] }}</td>
+                                    <td>C$ {{ "%.2f"|format(i['producto_precio']) }}</td>
+                                    <td>{{ i['cantidad'] }}</td>
+                                    <td>C$ {{ "%.2f"|format(i['cantidad'] * i['producto_precio']) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="summary-section">
+                <div class="summary-card">
+                    <h2 class="summary-title">Resumen del Pedido</h2>
+                    <div class="summary-item">
+                        <span>Subtotal:</span>
+                        <span>C$ <span id="subtotal">{{ "%.2f"|format(info[0]['total_monto']) }}</span></span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Propina (10%):</span>
+                        <span>C$ <span id="propina">{{ "%.2f"|format(info[0]['total_monto'] * 0.10) }}</span></span>
+                    </div>
+                    <div class="summary-item summary-total">
+                        <span>Total:</span>
+                        <span>C$ <span id="total">{{ "%.2f"|format(info[0]['total_monto']) }}</span></span>
+                    </div>
+                </div>
+
+                <form action="{{ url_for('orders.finalizar', mesa_id=info[0]['mesa_id']) }}" method="POST">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="propinaSwitch" name="propina" value="1" checked>
+                        <label class="form-check-label" for="propinaSwitch">¿Incluir propina (10%)?</label>
+                        <input type="hidden" id="propinaValue" name="propina_value" value="{{ "%.2f"|format(info[0]['total_monto'] * 0.10) }}">
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="form-label">Tipo de Pago:</label>
+                        <div class="d-flex gap-2">
+                            <div class="form-check flex-grow-1">
+                                <input class="form-check-input" type="radio" name="tipo_pago" id="efectivo" value="efectivo" required>
+                                <label class="form-check-label d-flex align-items-center justify-content-center gap-2" for="efectivo">
+                                    <i class="bi bi-cash-coin"></i>
+                                    Efectivo
+                                </label>
+                            </div>
+                            <div class="form-check flex-grow-1">
+                                <input class="form-check-input" type="radio" name="tipo_pago" id="tarjeta" value="tarjeta" required>
+                                <label class="form-check-label d-flex align-items-center justify-content-center gap-2" for="tarjeta">
+                                    <i class="bi bi-credit-card"></i>
+                                    Tarjeta
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group mb-3" id="efectivoGroup" style="display: none;">
+                        <label class="form-label">Monto Recibido:</label>
+                        <div class="input-group">
+                            <span class="input-group-text">C$</span>
+                            <input type="number" class="form-control" id="montoRecibido" name="monto_recibido" step="0.01" min="0">
+                        </div>
+                        <div class="invalid-feedback" id="montoError">
+                            El monto recibido debe ser mayor o igual al total del pedido
+                        </div>
+                        <div class="mt-2">
+                            <label class="form-label">Cambio:</label>
+                            <div class="input-group">
+                                <span class="input-group-text">C$</span>
+                                <input type="text" class="form-control" id="cambio" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group mb-3" id="tipoTarjetaGroup" style="display: none;">
+                        <label class="form-label">Tipo de Tarjeta:</label>
+                        <div class="d-flex gap-2">
+                            <div class="form-check flex-grow-1">
+                                <input class="form-check-input" type="radio" name="tipo_tarjeta" id="bac" value="bac">
+                                <label class="form-check-label d-flex align-items-center justify-content-center gap-2" for="bac">
+                                    <i class="bi bi-bank"></i>
+                                    BAC
+                                </label>
+                            </div>
+                            <div class="form-check flex-grow-1">
+                                <input class="form-check-input" type="radio" name="tipo_tarjeta" id="banpro" value="banpro">
+                                <label class="form-check-label d-flex align-items-center justify-content-center gap-2" for="banpro">
+                                    <i class="bi bi-bank"></i>
+                                    Banpro
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-finalizar w-100">
+                        Finalizar Pedido
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- JavaScript exclusivo para manejo de propina y tipo de tarjeta -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const propinaSwitch = document.getElementById("propinaSwitch");
+        const propinaValue = document.getElementById("propinaValue");
+        const subtotal = parseFloat(document.getElementById("subtotal").innerText);
+        const propinaElement = document.getElementById("propina");
+        const totalElement = document.getElementById("total");
+        const propinaBase = parseFloat(propinaElement.innerText);
+        const tipoTarjetaGroup = document.getElementById("tipoTarjetaGroup");
+        const tarjetaInputs = document.querySelectorAll('input[name="tipo_tarjeta"]');
+        const efectivoGroup = document.getElementById("efectivoGroup");
+        const montoRecibido = document.getElementById("montoRecibido");
+        const cambioInput = document.getElementById("cambio");
+        const form = document.querySelector('form');
+
+        // Manejo de propina
+        propinaSwitch.addEventListener("change", function() {
+            if (this.checked) {
+                totalElement.innerText = (subtotal + propinaBase).toFixed(2);
+                propinaValue.value = propinaBase.toFixed(2);
+            } else {
+                totalElement.innerText = subtotal.toFixed(2);
+                propinaValue.value = "0.00";
+            }
+        });
+
+        // Manejo de tipo de pago
+        document.querySelectorAll('input[name="tipo_pago"]').forEach(input => {
+            input.addEventListener('change', function() {
+                if (this.value === 'tarjeta') {
+                    tipoTarjetaGroup.style.display = 'block';
+                    efectivoGroup.style.display = 'none';
+                    tarjetaInputs.forEach(input => input.required = true);
+                    montoRecibido.required = false;
+                } else if (this.value === 'efectivo') {
+                    tipoTarjetaGroup.style.display = 'none';
+                    efectivoGroup.style.display = 'block';
+                    tarjetaInputs.forEach(input => {
+                        input.required = false;
+                        input.checked = false;
+                    });
+                    montoRecibido.required = true;
+                }
+            });
+        });
+
+        // Cálculo del cambio
+        montoRecibido.addEventListener('input', function() {
+            const total = parseFloat(totalElement.innerText);
+            const recibido = parseFloat(this.value) || 0;
+            const cambio = recibido - total;
+            const montoError = document.getElementById('montoError');
+            
+            if (recibido < total) {
+                this.classList.add('invalid-amount');
+                montoError.classList.add('show');
+                cambioInput.value = '0.00';
+            } else {
+                this.classList.remove('invalid-amount');
+                montoError.classList.remove('show');
+                cambioInput.value = cambio.toFixed(2);
+            }
+        });
+
+        // Manejo del envío del formulario
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const total = parseFloat(totalElement.innerText);
+            const recibido = parseFloat(montoRecibido.value) || 0;
+            
+            if (document.getElementById('efectivo').checked && recibido < total) {
+                montoRecibido.classList.add('invalid-amount');
+                document.getElementById('montoError').classList.add('show');
+                return;
+            }
+
+            // Crear FormData del formulario
+            const formData = new FormData(form);
+            
+            // Enviar el formulario
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error al finalizar el pedido');
+                }
+                // Disparar evento de nueva notificación
+                document.dispatchEvent(new Event('nueva_notificacion'));
+                // Redirigir a la página de mesas
+                window.location.href = '/mesas';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al finalizar el pedido');
+            });
+        });
+
+        // Inicializar con propina activada por defecto
+        propinaSwitch.dispatchEvent(new Event('change'));
+    });
+  </script>
+{% endblock %}

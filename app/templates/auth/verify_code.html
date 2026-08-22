@@ -1,0 +1,27 @@
+{% extends 'auth/_recovery_base.html' %}
+{% set paso = 2 %}
+{% block title %}Verificar código{% endblock %}
+
+{% block contenido %}
+<h2>Ingresa tu código</h2>
+<p class="ayuda">Enviamos un código de 6 dígitos a <strong>{{ email }}</strong>.
+   Es válido por 15 minutos.</p>
+
+<form method="POST">
+    <label for="codigo">Código de verificación</label>
+    <input type="text" id="codigo" name="codigo" class="codigo" required autofocus
+           maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="000000"
+           autocomplete="one-time-code">
+    <button type="submit">Verificar</button>
+</form>
+
+<a class="volver" href="{{ url_for('auth.forgot_password') }}">¿No te llegó? Solicitar otro código</a>
+
+<script>
+const campo = document.getElementById('codigo');
+campo.addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '').slice(0, 6);
+    if (this.value.length === 6) this.form.submit();
+});
+</script>
+{% endblock %}

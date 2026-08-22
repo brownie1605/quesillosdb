@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+
+{% block title %}Gestión de Respaldos{% endblock %}
+
+{% block main %}
+<div class="container-fluid py-4">
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0">
+            <i class="bi bi-database-fill-gear"></i>
+            Gestión de Respaldos
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info d-flex align-items-center">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            Los respaldos automáticos se realizan cada 8 horas y se conservan los últimos 10 archivos.
+          </div>
+
+          <div class="d-flex justify-content-end mb-3">
+            <form action="{{ url_for('admin.crear_respaldo') }}" method="POST">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i>
+                Crear Respaldo Manual
+              </button>
+            </form>
+          </div>
+
+          {% if respaldos %}
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Archivo</th>
+                    <th>Fecha</th>
+                    <th>Tamaño</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in respaldos %}
+                  <tr>
+                    <td>{{ r.nombre }}</td>
+                    <td>{{ r.fecha }}</td>
+                    <td>{{ r.tamano }}</td>
+                    <td>
+                      <a href="{{ url_for('admin.descargar_respaldo', nombre=r.nombre) }}"
+                         class="btn btn-sm btn-primary">
+                        <i class="bi bi-download"></i>
+                        Descargar
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="text-center py-5 text-muted">
+              <i class="bi bi-database-slash display-1"></i>
+              <p class="mt-3">No hay respaldos disponibles</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

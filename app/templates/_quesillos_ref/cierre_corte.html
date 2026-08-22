@@ -1,0 +1,182 @@
+{% extends "layout.html" %}
+
+{% block main %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-cash-stack"></i>
+                        Cierre de Corte
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title">Ventas del Sistema</h5>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td>Venta Total:</td>
+                                            <td class="text-end">C${{ "%.2f"|format(ventas.venta_total or 0) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Venta Efectivo:</td>
+                                            <td class="text-end">C${{ "%.2f"|format(ventas.venta_efectivo or 0) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Venta BAC:</td>
+                                            <td class="text-end">C${{ "%.2f"|format(ventas.venta_bac or 0) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Venta Banpro:</td>
+                                            <td class="text-end">C${{ "%.2f"|format(ventas.venta_banpro or 0) }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="POST" class="needs-validation" novalidate>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="efectivo" class="form-label">Efectivo en Caja:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">C$</span>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="efectivo" 
+                                           name="efectivo" 
+                                           step="0.01" 
+                                           required>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="gastos" class="form-label">Gastos (automático):</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">C$</span>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="gastos" 
+                                           name="gastos" 
+                                           step="0.01" 
+                                           value="{{ '%.2f'|format(gastos) }}" 
+                                           readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="entradas" class="form-label">Entradas (automático):</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">C$</span>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="entradas" 
+                                           name="entradas" 
+                                           step="0.01" 
+                                           value="{{ '%.2f'|format(entradas) }}" 
+                                           readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                Registrar Cierre
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card shadow">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history"></i>
+                        Historial de Cierres de Corte
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover table-sm align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th># Cierre Día</th>
+                                    <th>Fecha</th>
+                                    <th>Usuario</th>
+                                    <th>Total Ventas</th>
+                                    <th>Efectivo</th>
+                                    <th>BAC</th>
+                                    <th>Banpro</th>
+                                    <th>Efectivo Real</th>
+                                    <th>Diferencia</th>
+                                    <th>Gastos</th>
+                                    <th>Entradas</th>
+                                    <th># Facturas Pagadas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for corte in historial_cortes %}
+                                <tr>
+                                    <td>{{ corte['numero_cierre_dia'] }}</td>
+                                    <td>{{ corte['fecha'] }}</td>
+                                    <td>{{ corte['usuario'] }}</td>
+                                    <td>C${{ '%.2f'|format(corte['venta_total']) }}</td>
+                                    <td>C${{ '%.2f'|format(corte['venta_efectivo']) }}</td>
+                                    <td>C${{ '%.2f'|format(corte['venta_bac']) }}</td>
+                                    <td>C${{ '%.2f'|format(corte['venta_banpro']) }}</td>
+                                    <td>C${{ '%.2f'|format(corte['efectivo_real']) }}</td>
+                                    <td>C${{ '%.2f'|format(corte['diferencia_efectivo']) }}</td>
+                                    <td>C${{ '%.2f'|format(corte['gastos']) }}</td>
+                                    <td>C${{ '%.2f'|format(corte['entradas']) }}</td>
+                                    <td>{{ corte['facturas_pagadas'] or 0 }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="12" class="text-center">No hay cierres registrados.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Elimina o comenta este bloque para que el botón siempre esté habilitado
+// document.addEventListener('DOMContentLoaded', function() {
+//     const btn = document.querySelector('button[type="submit"]');
+//     const gastos = parseFloat(document.getElementById('gastos').value);
+//     const entradas = parseFloat(document.getElementById('entradas').value);
+//     if (gastos === 0 && entradas === 0) {
+//         btn.disabled = true;
+//         btn.classList.add('btn-secondary');
+//         btn.classList.remove('btn-primary');
+//         btn.innerHTML = '<i class="bi bi-x-circle"></i> No hay movimientos para cerrar';
+//     }
+// });
+</script>
+{% endblock %}

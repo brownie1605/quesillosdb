@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Factura de Venta {{ venta.numero_venta }}</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: #000;
+            background: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .ticket {
+            width: 300px;
+            max-width: 100%;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .bold { font-weight: bold; }
+        .divider {
+            border-bottom: 1px dashed #000;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 4px 0;
+        }
+        th {
+            border-bottom: 1px dashed #000;
+            text-align: left;
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 0 0 5px 0;
+        }
+        .header p {
+            margin: 2px 0;
+        }
+        @media print {
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body onload="window.print();">
+    <div class="ticket">
+        <div class="header text-center">
+            <h1>SISTEMA POS PYMES</h1>
+            <p>Factura de Venta</p>
+            <p>Ticket: {{ venta.numero_venta }}</p>
+            <p>Fecha: {{ venta.fecha_venta.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+            <p>Cajero: {{ venta.usuario.usuario if venta.usuario else 'Admin' }}</p>
+            <p>Cliente: {{ venta.cliente.nombre if venta.cliente else 'Público General' }}</p>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>CANT</th>
+                    <th>PRODUCTO</th>
+                    <th class="text-right">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in detalles %}
+                <tr>
+                    <td>{{ d.cantidad }}</td>
+                    <td>{{ d.producto.nombre if d.producto else 'Producto' }}<br><small>C$ {{ d.precio_unitario }} c/u</small></td>
+                    <td class="text-right">C$ {{ d.subtotal }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="divider"></div>
+        
+        <table>
+            <tr>
+                <td class="bold">Subtotal:</td>
+                <td class="text-right">C$ {{ venta.subtotal }}</td>
+            </tr>
+            <tr>
+                <td class="bold">Descuento:</td>
+                <td class="text-right">- C$ {{ venta.descuento }}</td>
+            </tr>
+            <tr>
+                <td colspan="2"><div class="divider" style="margin: 5px 0;"></div></td>
+            </tr>
+            <tr>
+                <td class="bold" style="font-size: 14px;">TOTAL A PAGAR:</td>
+                <td class="text-right bold" style="font-size: 14px;">C$ {{ venta.total }}</td>
+            </tr>
+        </table>
+        
+        <div class="divider"></div>
+        
+        <div class="text-center">
+            <p>Método de pago: {{ venta.metodo_pago }}</p>
+            <p>¡Gracias por su compra!</p>
+        </div>
+    </div>
+</body>
+</html>

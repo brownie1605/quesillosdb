@@ -1,0 +1,819 @@
+{% extends "layout.html" %}
+
+{% block title %}
+ Historial
+{% endblock %}
+
+{% block main %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2a6496;
+            --secondary-color: #f8f9fa;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        .dashboard-header {
+            background: white;
+            padding: 1.5rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-title {
+            font-weight: 600;
+            color: var(--primary-color);
+            font-size: 1.1rem;
+        }
+
+        .metric-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1rem 0;
+            overflow-x: auto;
+        }
+
+        .progress {
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        .table {
+            font-size: 0.9rem;
+        }
+
+        .table th {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .badge {
+            padding: 0.5em 0.75em;
+            font-weight: 500;
+        }
+
+        .btn-export {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .btn-export:hover {
+            background-color: #1a4b75;
+            transform: translateY(-2px);
+        }
+
+        .section-title {
+            color: var(--primary-color);
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .table-responsive {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .table-responsive::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        .table th {
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 1;
+        }
+
+        .table tfoot th {
+            position: sticky;
+            bottom: 0;
+            background: #f8f9fa;
+            z-index: 1;
+        }
+
+        .metric-card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-card .card-body {
+            flex: 1;
+        }
+
+        @media (max-width: 991.98px) {
+            .chart-container {
+                height: 250px;
+            }
+
+            .metric-value {
+                font-size: 1.5rem;
+            }
+
+            .section-title {
+                font-size: 1.1rem;
+            }
+
+            .table th, .table td {
+                font-size: 0.9rem;
+                padding: 0.5rem;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .chart-container {
+                height: 200px;
+            }
+
+            .metric-value {
+                font-size: 1.3rem;
+            }
+
+            .section-title {
+                font-size: 1rem;
+            }
+
+            .table th, .table td {
+                font-size: 0.85rem;
+                padding: 0.4rem;
+            }
+
+            .card {
+                margin-bottom: 1rem;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .chart-container {
+                height: 180px;
+            }
+
+            .metric-value {
+                font-size: 1.2rem;
+            }
+
+            .section-title {
+                font-size: 0.95rem;
+            }
+
+            .table th, .table td {
+                font-size: 0.8rem;
+                padding: 0.3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <h2 class="mb-0">Dashboard del Restaurante Quesillos Lo Nuestro</h2>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Sección de Resumen -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-3">
+                <div class="card p-4">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="metric-label">Ventas de Hoy</h6>
+                            <h3 class="metric-value text-primary">C${{ ventas_dia }}</h3>
+                        </div>
+                        <i class="bi bi-graph-up text-primary fs-4"></i>
+                    </div>
+                    <div class="progress mt-3">
+                        <div class="progress-bar bg-primary" style="width: 75%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card p-4">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="metric-label">Órdenes Hoy</h6>
+                            <h3 class="metric-value text-success">{{ ordenes_dia }}</h3>
+                        </div>
+                        <i class="bi bi-cart-check text-success fs-4"></i>
+                    </div>
+                    <small class="text-muted">Promedio: {{ (ordenes_dia/24)|round(1) if ordenes_dia > 0 else 0 }} por hora</small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <a href="{{ url_for('admin.clientes') }}" class="text-decoration-none">
+                    <div class="card p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="metric-label">Clientes Hoy</h6>
+                                <h3 class="metric-value text-info">{{ clientes_dia }}</h3>
+                            </div>
+                            <i class="bi bi-people text-info fs-4"></i>
+                        </div>
+                        <small class="text-muted">
+                            {% if ordenes_dia > 0 and clientes_dia > 0 %}
+                                {{ ((clientes_dia / ordenes_dia) * 100) | round(1) }}% recurrentes
+                            {% else %}
+                                0% recurrentes
+                            {% endif %}
+                        </small>
+                    </div>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <a href="{{ url_for('admin.facturacion') }}" class="text-decoration-none">
+                    <div class="card p-4">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="metric-label">Ventas Totales</h6>
+                                <h3 class="metric-value text-warning">C${{ ventas_totales }}</h3>
+                            </div>
+                            <i class="bi bi-currency-dollar text-warning fs-4"></i>
+                        </div>
+                        <small class="text-muted">Promedio mensual: C${{ (ventas_totales/12)|round(2) if ventas_totales > 0 else 0 }}</small>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Sección de Gastos de Compras -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="section-title mb-0">
+                            <i class="bi bi-cart-plus"></i>
+                            Gastos en Compras de Productos
+                        </h5>
+                        
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="metric-label">Compras Hoy</h6>
+                                <h3 class="metric-value text-danger">C${{ gastos_compras_hoy }}</h3>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-danger" style="width: 60%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="metric-label">Total Compras</h6>
+                                <h3 class="metric-value text-danger">C${{ total_gastos_compras }}</h3>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-danger" style="width: 80%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="metric-label">Promedio Mensual</h6>
+                                <h3 class="metric-value text-danger">C${{ (total_gastos_compras/12)|round(2) if total_gastos_compras > 0 else 0 }}</h3>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-danger" style="width: 70%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="metric-label">% del Total Gastos</h6>
+                                <h3 class="metric-value text-danger">
+                                    {% set total_gastos = gastos_mensuales|sum %}
+                                    {% if total_gastos > 0 %}
+                                        {{ ((total_gastos_compras / total_gastos) * 100)|round(1) }}%
+                                    {% else %}
+                                        0%
+                                    {% endif %}
+                                </h3>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-danger" style="width: 65%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="chart-container">
+                            <canvas id="comprasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Propinas -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h5 class="section-title mb-0">
+                            <i class="bi bi-cash-coin"></i>
+                            Propinas Recibidas
+                        </h5>
+                        <a href="{{ url_for('admin.exportar_todas_metricas') }}" class="btn btn-export">
+                            <i class="bi bi-download me-1"></i> Exportar Métricas
+                        </a>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="metric-label">Propinas Hoy</h6>
+                                <h3 class="metric-value text-success">C${{ propinas_hoy }}</h3>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-success" style="width: 70%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="metric-label">Propinas Este Mes</h6>
+                                <h3 class="metric-value text-warning">C${{ propinas_mes }}</h3>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-warning" style="width: 85%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 bg-light">
+                                <h6 class="metric-label">Promedio Diario</h6>
+                                <h3 class="metric-value text-primary">C${{ (propinas_mes/30)|round(2) if propinas_mes > 0 else 0 }}</h3>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar bg-primary" style="width: 60%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="chart-container">
+                            <canvas id="propinasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Gráficos -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card p-4">
+                    <h5 class="section-title">
+                        <i class="bi bi-graph-up"></i>
+                        Desempeño Mensual
+                    </h5>
+                    <div class="chart-container">
+                        <canvas id="ventasChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card p-4">
+                    <h5 class="section-title">
+                        <i class="bi bi-table"></i>
+                        Resumen Mensual
+                    </h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Mes</th>
+                                    <th class="text-end">Ventas</th>
+                                    <th class="text-end">% Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set meses = ['Ene 2025', 'Feb 2025', 'Mar 2025', 'Abr 2025', 'May 2025', 'Jun 2025', 'Jul 2025', 'Ago 2025', 'Sep 2025', 'Oct 2025', 'Nov 2025', 'Dic 2025'] %}
+                                {% for i in range(12) %}
+                                <tr>
+                                    <td>{{ meses[i] }}</td>
+                                    <td class="text-end">C${{ ventas_mensuales[i] if i < ventas_mensuales|length else 0 }}</td>
+                                    <td class="text-end">{{ ((ventas_mensuales[i]/ventas_totales)*100)|round(1) if ventas_totales > 0 and i < ventas_mensuales|length else 0 }}%</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-active fw-bold">
+                                    <th>Total</th>
+                                    <th class="text-end">C${{ ventas_totales }}</th>
+                                    <th class="text-end">100%</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Productos -->
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card p-4">
+                    <h5 class="section-title">
+                        <i class="bi bi-star"></i>
+                        Productos Más Vendidos
+                    </h5>
+                    <ul class="list-group list-group-flush">
+                        {% for producto in productos_mas_vendidos %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ producto.nombre }}
+                            <span class="badge bg-success rounded-pill">{{ producto.ventas }} unidades</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-4">
+                    <h5 class="section-title">
+                        <i class="bi bi-table"></i>
+                        Mesas Más Usadas
+                    </h5>
+                    <ul class="list-group list-group-flush">
+                        {% for mesa in mesas_mas_usadas %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ mesa.mesa }}
+                            <span class="badge bg-primary rounded-pill">{{ mesa.uso }} usos</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-4">
+                    <h5 class="section-title">
+                        <i class="bi bi-pie-chart"></i>
+                        Mejores Meses
+                    </h5>
+                    <div class="chart-container">
+                        <canvas id="topMonthsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de Gastos Mensuales -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card p-4">
+                    <h5 class="section-title">
+                        <i class="bi bi-cash-stack"></i>
+                        Gastos Mensuales
+                    </h5>
+                    <div class="chart-container">
+                        <canvas id="gastosChart"></canvas>
+                    </div>
+                    <div class="table-responsive mt-4">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Mes</th>
+                                    <th class="text-end">Gastos</th>
+                                    <th class="text-end">Ventas</th>
+                                    <th class="text-end">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+                                {% for i in range(12) %}
+                                <tr>
+                                    <td>{{ meses[i] }}</td>
+                                    <td class="text-end">C${{ "%.2f"|format(gastos_mensuales[i]) }}</td>
+                                    <td class="text-end">C${{ "%.2f"|format(ventas_mensuales[i]) }}</td>
+                                    <td class="text-end {% if ventas_mensuales[i] - gastos_mensuales[i] >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                        C${{ "%.2f"|format(ventas_mensuales[i] - gastos_mensuales[i]) }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración común para los gráficos
+        Chart.defaults.font.family = "'Segoe UI', system-ui, -apple-system, sans-serif";
+        Chart.defaults.color = '#6c757d';
+        Chart.defaults.borderColor = '#e9ecef';
+
+        // Gráfico de ventas mensuales
+        const ventasCtx = document.getElementById('ventasChart');
+        const ventasChart = new Chart(ventasCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Ene 2025', 'Feb 2025', 'Mar 2025', 'Abr 2025', 'May 2025', 'Jun 2025', 'Jul 2025', 'Ago 2025', 'Sep 2025', 'Oct 2025', 'Nov 2025', 'Dic 2025'],
+                datasets: [{
+                    label: 'Ventas Mensuales (C$)',
+                    data: {{ ventas_mensuales|tojson }},
+                    backgroundColor: 'rgba(42, 100, 150, 0.7)',
+                    borderColor: 'rgba(42, 100, 150, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Córdobas (C$)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Meses'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                return 'C$' + context.raw.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Gráfico de mejores meses
+        const topMonthsCtx = document.getElementById('topMonthsChart');
+        const topMonthsChart = new Chart(topMonthsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ meses_top|tojson|safe }},
+                datasets: [{
+                    data: {{ ventas_top|tojson|safe }},
+                    backgroundColor: [
+                        'rgba(42, 100, 150, 0.7)',
+                        'rgba(40, 167, 69, 0.7)',
+                        'rgba(255, 193, 7, 0.7)',
+                        'rgba(23, 162, 184, 0.7)',
+                        'rgba(220, 53, 69, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': C$' + context.raw.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Gráfico de gastos mensuales
+        const gastosCtx = document.getElementById('gastosChart');
+        const gastosChart = new Chart(gastosCtx, {
+            type: 'line',
+            data: {
+                labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+                datasets: [{
+                    label: 'Gastos Mensuales (C$)',
+                    data: {{ gastos_mensuales|tojson }},
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Ventas Mensuales (C$)',
+                    data: {{ ventas_mensuales|tojson }},
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Córdobas (C$)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': C$' + context.raw.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Gráfico de compras de productos
+        const comprasCtx = document.getElementById('comprasChart');
+        const comprasChart = new Chart(comprasCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+                datasets: [{
+                    label: 'Compras de Productos (C$)',
+                    data: {{ gastos_compras_mensuales|tojson }},
+                    backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Córdobas (C$)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        title: {
+                            display: true,
+                            text: 'Meses'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        padding: 12,
+                        titleFont: {
+                            size: 14
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        callbacks: {
+                            label: function(context) {
+                                return 'C$' + context.raw.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Manejar migración de gastos históricos
+        document.getElementById('btnMigrarGastos').addEventListener('click', function() {
+            if (confirm('¿Estás seguro de que quieres migrar las entradas de productos históricas como gastos? Esta acción no se puede deshacer.')) {
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Migrando...';
+                
+                fetch('/migrar_gastos_compras')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Migración completada: ' + data.message);
+                            location.reload(); // Recargar para mostrar los nuevos datos
+                        } else {
+                            alert('Error: ' + (data.error || data.message));
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error en la migración: ' + error);
+                    })
+                    .finally(() => {
+                        this.disabled = false;
+                        this.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i> Migrar Histórico';
+                    });
+            }
+        });
+    </script>
+{% endblock %}

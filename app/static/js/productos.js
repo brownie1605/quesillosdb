@@ -1,0 +1,323 @@
+// productos.js
+let productosList = [];
+let categoriasList = [];
+let marcasList = [];
+let unidadesList = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    cargarSelects();
+    cargarProductos();
+
+    // Filtros
+    document.getElementById('searchInput').addEventListener('input', renderizarTabla);
+    document.getElementById('catFilter').addEventListener('change', renderizarTabla);
+    document.getElementById('estadoFilter').addEventListener('change', renderizarTabla);
+    document.getElementById('impuestoFilter').addEventListener('change', renderizarTabla);
+
+    // Botones de Modales
+    document.getElementById('btnNuevoProducto').addEventListener('click', abrirModalCrear);
+    document.getElementById('btnCerrarModalProducto').addEventListener('click', cerrarModalProducto);
+    document.getElementById('btnCerrarModalEntrada').addEventListener('click', cerrarModalEntrada);
+    document.getElementById('btnNuevaMarca').addEventListener('click', () => {
+        document.getElementById('formNuevaMarca').reset();
+        document.getElementById('modalNuevaMarca').style.display = 'flex';
+    });
+    document.getElementById('btnCerrarModalMarca').addEventListener('click', () => {
+        document.getElementById('modalNuevaMarca').style.display = 'none';
+    });
+
+    // Precio + IVA dinámico
+    document.getElementById('prod_precio_venta').addEventListener('input', calcularIvaEnModal);
+    document.getElementById('prod_aplica_impuesto').addEventListener('change', calcularIvaEnModal);
+
+    // Formularios
+    document.getElementById('formProducto').addEventListener('submit', guardarProducto);
+    document.getElementById('formEntrada').addEventListener('submit', guardarEntrada);
+    document.getElementById('formNuevaMarca').addEventListener('submit', guardarNuevaMarca);
+
+    // Preview de imagen al seleccionar archivo
+    document.getElementById('prod_imagen').addEventListener('change', function() {
+        const preview = document.getElementById('prod_imagen_preview');
+        if (this.files && this.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                preview.innerHTML = `<img src="${e.target.result}" style="max-width: 120px; max-height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #e1e7f0; margin-top: 4px;">`;
+            };
+            reader.readAsDataURL(this.files[0]);
+        }
+    });
+});
+
+async function cargarSelects() {
+    try {
+        const [catRes, marRes, uniRes] = await Promise.all([
+            fetch('/productos/api/categorias'),
+            fetch('/productos/api/marcas'),
+            fetch('/productos/api/unidades')
+        ]);
+        
+        categoriasList = await catRes.json();
+        marcasList = await marRes.json();
+        unidadesList = await uniRes.json();
+        
+        const catFilter = document.getElementById('catFilter');
+        const prodCategoria = document.getElementById('prod_categoria');
+        categoriasList.forEach(c => {
+            catFilter.innerHTML += `<option value="${c.id_categoria}">${c.nombre}</option>`;
+            prodCategoria.innerHTML += `<option value="${c.id_categoria}">${c.nombre}</option>`;
+        });
+        
+        const prodMarca = document.getElementById('prod_marca');
+        marcasList.forEach(m => {
+            prodMarca.innerHTML += `<option value="${m.id_marca}">${m.nombre}</option>`;
+        });
+        
+        const prodUnidad = document.getElementById('prod_unidad');
+        unidadesList.forEach(u => {
+            prodUnidad.innerHTML += `<option value="${u.id_unidad}">${u.nombre} (${u.abreviatura})</option>`;
+        });
+        
+    } catch (error) {
+        console.error("Error cargando selects:", error);
+    }
+}
+
+async function cargarProductos() {
+    try {
+        const response = await fetch('/productos/api/list');
+        productosList = await response.json();
+        renderizarTabla();
+    } catch (error) {
+        console.error("Error cargando productos:", error);
+    }
+}
+
+function renderizarTabla() {
+    const tbody = document.getElementById('productosTableBody');
+    tbody.innerHTML = '';
+    
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const cat = document.getElementById('catFilter').value;
+    const estado = document.getElementById('estadoFilter').value;
+    const impuesto = document.getElementById('impuestoFilter').value;
+    
+    let filtrados = productosList.filter(p => {
+        const matchSearch = p.nombre.toLowerCase().includes(search) || (p.codigo && p.codigo.toLowerCase().includes(search));
+        const matchCat = cat === '' || String(p.id_categoria) === cat;
+        const matchEstado = estado === '' || p.estado === estado;
+        const matchImpuesto = impuesto === '' || String(p.aplica_impuesto) === impuesto;
+        return matchSearch && matchCat && matchEstado && matchImpuesto;
+    });
+    
+    filtrados.forEach(p => {
+        const tr = document.createElement('tr');
+        
+        let badgeClass = p.estado === 'activo' ? 'badge-active' : 'badge-inactive';
+        let stockStyle = p.stock <= 0 ? 'color: red; font-weight: bold;' : '';
+        let imgHtml = p.imagen_url
+            ? `<img src="${p.imagen_url}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #e1e7f0;">`
+            : `<span style="font-size: 26px;">📦</span>`;
+        
+        tr.innerHTML = `
+            <td>${imgHtml}</td>
+            <td>${p.codigo || '-'}</td>
+            <td>${p.nombre}</td>
+            <td>${p.categoria_nombre}</td>
+            <td>C$ ${p.precio_compra.toFixed(2)}</td>
+            <td>C$ ${p.precio_venta.toFixed(2)}</td>
+            <td style="${stockStyle}">${p.stock}</td>
+            <td><span class="badge ${badgeClass}">${p.estado}</span></td>
+            <td>
+                <button class="btn-icon" onclick="abrirModalEditar(${p.id_producto})" title="Editar">✏️</button>
+                <button class="btn-icon" style="color: #28a745;" onclick="abrirModalEntrada(${p.id_producto}, '${p.nombre.replace(/'/g, "\\'")}')" title="Ingresar Stock">➕</button>
+                <button class="btn-icon delete" onclick="eliminarProducto(${p.id_producto})" title="Eliminar">🗑️</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// --- MODAL PRODUCTO (CREAR / EDITAR) ---
+
+function abrirModalCrear() {
+    document.getElementById('modalProductoTitle').textContent = 'Nuevo Producto';
+    document.getElementById('formProducto').reset();
+    document.getElementById('prod_id').value = '';
+    document.getElementById('prod_imagen_preview').innerHTML = '';
+    document.getElementById('modalProducto').style.display = 'flex';
+    calcularIvaEnModal();
+}
+
+function calcularIvaEnModal() {
+    let precioBase = parseFloat(document.getElementById('prod_precio_venta').value);
+    if (isNaN(precioBase)) precioBase = 0;
+    
+    // Calcula Precio Venta * 1.15 (sumándole el 15% de IVA)
+    let precioConIva = document.getElementById('prod_aplica_impuesto').checked ? (precioBase * 1.15) : precioBase;
+    
+    document.getElementById('prod_precio_iva').textContent = `C$ ${precioConIva.toFixed(2)}`;
+}
+
+function abrirModalEditar(id) {
+    const p = productosList.find(x => x.id_producto === id);
+    if (!p) return;
+    
+    document.getElementById('modalProductoTitle').textContent = 'Editar Producto';
+    document.getElementById('prod_id').value = p.id_producto;
+    document.getElementById('prod_codigo').value = p.codigo || '';
+    document.getElementById('prod_codigo_barra').value = p.codigo_barra || '';
+    document.getElementById('prod_nombre').value = p.nombre || '';
+    document.getElementById('prod_descripcion').value = p.descripcion || '';
+    document.getElementById('prod_categoria').value = p.id_categoria || '';
+    document.getElementById('prod_marca').value = p.id_marca || '';
+    document.getElementById('prod_unidad').value = p.id_unidad || '';
+    document.getElementById('prod_precio_compra').value = p.precio_compra.toFixed(2);
+    document.getElementById('prod_precio_venta').value = p.precio_venta.toFixed(2);
+    document.getElementById('prod_stock_minimo').value = p.stock_minimo || 0;
+    document.getElementById('prod_aplica_impuesto').checked = p.aplica_impuesto || false;
+    
+    // Mostrar imagen actual si existe
+    const preview = document.getElementById('prod_imagen_preview');
+    if (p.imagen_url) {
+        preview.innerHTML = `<img src="${p.imagen_url}" style="max-width: 120px; max-height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #e1e7f0; margin-top: 4px;">`;
+    } else {
+        preview.innerHTML = '';
+    }
+    document.getElementById('prod_imagen').value = '';
+    
+    document.getElementById('modalProducto').style.display = 'flex';
+    calcularIvaEnModal();
+}
+
+function cerrarModalProducto() {
+    document.getElementById('modalProducto').style.display = 'none';
+    document.getElementById('prod_imagen_preview').innerHTML = '';
+    document.getElementById('prod_imagen').value = '';
+}
+
+async function guardarProducto(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('prod_id').value;
+    const fileInput = document.getElementById('prod_imagen');
+    
+    const formData = new FormData();
+    formData.append('codigo', document.getElementById('prod_codigo').value);
+    formData.append('codigo_barra', document.getElementById('prod_codigo_barra').value);
+    formData.append('nombre', document.getElementById('prod_nombre').value);
+    formData.append('descripcion', document.getElementById('prod_descripcion').value);
+    formData.append('id_categoria', document.getElementById('prod_categoria').value);
+    formData.append('id_marca', document.getElementById('prod_marca').value);
+    formData.append('id_unidad', document.getElementById('prod_unidad').value);
+    formData.append('precio_compra', document.getElementById('prod_precio_compra').value);
+    formData.append('precio_venta', document.getElementById('prod_precio_venta').value);
+    formData.append('stock_minimo', document.getElementById('prod_stock_minimo').value);
+    formData.append('aplica_impuesto', document.getElementById('prod_aplica_impuesto').checked);
+    
+    if (fileInput.files.length > 0) {
+        formData.append('imagen', fileInput.files[0]);
+    }
+    
+    const isEdit = id !== '';
+    const url = isEdit ? `/productos/api/editar/${id}` : '/productos/api/crear';
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        if (result.success) {
+            cerrarModalProducto();
+            cargarProductos();
+        } else {
+            showCustomAlert('Error al guardar: ' + result.message);
+        }
+    } catch (error) {
+        console.error("Error al guardar producto:", error);
+        showCustomAlert('Ocurrió un error en el servidor');
+    }
+}
+
+// --- MODAL ENTRADA STOCK ---
+
+function abrirModalEntrada(id, nombre) {
+    document.getElementById('entrada_prod_id').value = id;
+    document.getElementById('entradaProductName').textContent = "Ingresando stock a: " + nombre;
+    document.getElementById('entrada_cantidad').value = '';
+    document.getElementById('modalEntrada').style.display = 'flex';
+}
+
+function cerrarModalEntrada() {
+    document.getElementById('modalEntrada').style.display = 'none';
+}
+
+async function guardarEntrada(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('entrada_prod_id').value;
+    const cantidad = document.getElementById('entrada_cantidad').value;
+    
+    try {
+        const response = await fetch(`/productos/api/entrada/${id}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({cantidad: cantidad})
+        });
+        const result = await response.json();
+        if (result.success) {
+            cerrarModalEntrada();
+            cargarProductos(); // Refrescar para ver el nuevo stock
+        } else {
+            showCustomAlert('Error al ingresar stock: ' + result.message);
+        }
+    } catch (error) {
+        console.error("Error en entrada de stock:", error);
+        showCustomAlert('Ocurrió un error en el servidor');
+    }
+}
+
+async function guardarNuevaMarca(e) {
+    e.preventDefault();
+    
+    const nombre = document.getElementById('nueva_marca_nombre').value;
+    
+    try {
+        const response = await fetch(`/productos/api/marcas/crear`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({nombre: nombre})
+        });
+        const result = await response.json();
+        if (result.success) {
+            document.getElementById('modalNuevaMarca').style.display = 'none';
+            cargarSelects(); // Reload selects to show the new brand
+        } else {
+            showCustomAlert('Error al crear marca: ' + result.message);
+        }
+    } catch (error) {
+        console.error("Error al crear marca:", error);
+        showCustomAlert('Ocurrió un error en el servidor');
+    }
+}
+
+// --- ELIMINAR ---
+
+async function eliminarProducto(id) {
+    showCustomConfirm('¿Está seguro de eliminar (desactivar) este producto?', async () => {
+        try {
+            const response = await fetch(`/productos/api/eliminar/${id}`, {
+                method: 'DELETE'
+            });
+            const result = await response.json();
+            if (result.success) {
+                cargarProductos();
+            } else {
+                showCustomAlert('Error al eliminar: ' + result.message);
+            }
+        } catch (error) {
+            console.error("Error al eliminar:", error);
+            showCustomAlert('Ocurrió un error en el servidor');
+        }
+    });
+}

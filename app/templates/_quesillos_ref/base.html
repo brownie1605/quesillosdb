@@ -1,0 +1,217 @@
+
+        
+        {% if current_user.is_authenticated %}
+            {% if current_user.is_admin %}
+            <div class="d-flex align-items-center">
+                <div class="dropdown me-3">
+                    <button class="btn btn-link position-relative" type="button" id="notificacionesDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-bell-fill fs-4"></i>
+                        <span id="notificaciones-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none;">
+                            0
+                        </span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end" aria-labelledby="notificacionesDropdown" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <h6 class="dropdown-header">Notificaciones</h6>
+                        <div id="notificaciones-lista">
+                            <!-- Las notificaciones se cargarán aquí dinámicamente -->
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item text-center" href="#" id="marcar-todas-leidas">
+                            Marcar todas como leídas
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="dropdown">
+                <button class="btn btn-link dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    {{ current_user.nombre }}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                    <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Cerrar sesión</a></li>
+                </ul>
+            </div>
+        {% endif %}
+    </div>
+</nav>
+
+{% if current_user.is_admin or current_user.rol == 'cocinero' %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let notificaciones = [];
+    const notificacionesLista = document.getElementById('notificaciones-lista');
+    const notificacionesBadge = document.getElementById('notificaciones-badge');
+    const marcarTodasLeidas = document.getElementById('marcar-todas-leidas');
+
+    function actualizarNotificaciones() {
+        fetch('/notificaciones')
+            .then(response => response.json())
+            .then(data => {
+                notificaciones = data;
+                actualizarInterfaz();
+            })
+            .catch(error => {
+                console.error('Error al obtener notificaciones:', error);
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Hubo un error al cargar las notificaciones.',
+                    icon: 'error',
+                    confirmButtonText: 'Aceptar'
+                });
+            });
+    }
+
+    function actualizarInterfaz() {
+        const noLeidas = notificaciones.filter(n => !n.leida).length;
+        notificacionesBadge.textContent = noLeidas;
+        notificacionesBadge.style.display = noLeidas > 0 ? 'block' : 'none';
+
+        notificacionesLista.innerHTML = notificaciones.length ? '' : '<div class="dropdown-item text-center">No hay notificaciones</div>';
+        
+        notificaciones.forEach(notif => {
+            const item = document.createElement('div');
+            item.className = `dropdown-item ${notif.leida ? '' : 'bg-light'}`;
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>${notif.mensaje}</strong>
+                        <p class="mb-0 small text-muted">${notif.fecha}</p>
+                        <p class="mb-0 small">
+                            Total: C$${notif.detalles.total_monto.toFixed(2)} | 
+                            Productos: ${notif.detalles.total_productos}
+                        </p>
+                    </div>
+                    ${!notif.leida ? `
+                        <button class="btn btn-sm btn-link text-primary marcar-leida" 
+                                data-id="${notif.id}">
+                            <i class="bi bi-check2"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+            notificacionesLista.appendChild(item);
+        });
+
+        // Agregar event listeners a los botones de marcar como leída
+        document.querySelectorAll('.marcar-leida').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+                marcarComoLeida(id);
+            });
+        });
+    }
+
+    function marcarComoLeida(id) {
+        fetch(`/marcar_notificacion_leida/${id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al marcar la notificación como leída');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            actualizarNotificaciones();
+        })
+        .catch(error => {
+            console.error('Error al marcar notificación como leída:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Hubo un error al marcar las notificaciones como leída.',
+                icon: 'error',
+                confirmButtonText: 'Aceptar'
+            });
+        });
+    }
+
+    // Asegurarse de que el elemento existe antes de agregar el event listener
+    if (marcarTodasLeidas) {
+        marcarTodasLeidas.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Obtener todas las notificaciones no leídas
+            const notificacionesNoLeidas = notificaciones.filter(n => !n.leida);
+            
+            if (notificacionesNoLeidas.length === 0) {
+                Swal.fire({
+                    title: 'Información',
+                    text: 'No hay notificaciones para marcar como leídas.',
+                    icon: 'info',
+                    confirmButtonText: 'Aceptar'
+                });
+                return;
+            }
+
+            // Mostrar confirmación
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: '¿Deseas marcar todas las notificaciones como leídas?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, marcar todas',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Marcar todas las notificaciones como leídas
+                    Promise.all(notificacionesNoLeidas.map(notif => 
+                        fetch(`/marcar_notificacion_leida/${notif.id}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        })
+                    ))
+                    .then(() => {
+                        actualizarNotificaciones();
+                        Swal.fire({
+                            title: '¡Listo!',
+                            text: 'Todas las notificaciones han sido marcadas como leídas.',
+                            icon: 'success',
+                            confirmButtonText: 'Aceptar'
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error al marcar todas las notificaciones como leídas:', error);
+                        Swal.fire({
+                            title: 'Error',
+                            text: 'Hubo un error al marcar las notificaciones como leídas.',
+                            icon: 'error',
+                            confirmButtonText: 'Aceptar'
+                        });
+                    });
+                }
+            });
+        });
+    }
+
+    // Actualizar notificaciones cada 30 segundos y también después de cualquier cambio en la página
+    actualizarNotificaciones();
+    setInterval(actualizarNotificaciones, 30000);
+
+    // Agregar un listener para actualizar las notificaciones cuando la página se vuelve visible
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            actualizarNotificaciones();
+        }
+    });
+});
+
+</script>
+{% endif %}
+
+<!-- Cargar scripts adicionales -->
+<script src="{{ url_for('static', filename='js/modals2.js') }}"></script>
+
+</body>
+</html> 

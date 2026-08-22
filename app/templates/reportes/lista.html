@@ -1,0 +1,68 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Reportes{% endblock %}
+
+{% block content %}
+<div class="page-header" style=" padding: 20px; border-radius: 14px; border: 1px solid #e1e7f0; margin-bottom: 24px;">
+    <div style="display: flex; gap: 16px; align-items: flex-end;">
+        <div>
+            <label style="font-size: 12px; color: #6a768d; display: block; margin-bottom: 4px;">Desde</label>
+            <input type="date" class="form-control" value="2024-05-01">
+        </div>
+        <div>
+            <label style="font-size: 12px; color: #6a768d; display: block; margin-bottom: 4px;">Hasta</label>
+            <input type="date" class="form-control" value="2024-05-25">
+        </div>
+        <button class="btn btn-primary">Generar</button>
+    </div>
+</div>
+
+<div class="dashboard-grid">
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+        <div class="kpi-card">
+            <p>Ventas Totales</p>
+            <h2>C$ 245,650.00</h2>
+        </div>
+        <div class="kpi-card">
+            <p>Ganancia Total</p>
+            <h2>C$ 98,750.00</h2>
+        </div>
+        <div class="kpi-card">
+            <p>Transacciones</p>
+            <h2>568</h2>
+        </div>
+        <div class="kpi-card">
+            <p>Ticket Promedio</p>
+            <h2>C$ 432.49</h2>
+        </div>
+    </div>
+
+    <div class="panel large-panel" style="grid-column: 2; height: 100%;">
+        <h3>Ventas por día</h3>
+        <div class="fake-chart" style="height: 380px;">
+            <div style="height:15%; background: #11a652;"></div>
+            <div style="height:25%; background: #11a652;"></div>
+            <div style="height:45%; background: #11a652;"></div>
+            <div style="height:35%; background: #11a652;"></div>
+            <div style="height:55%; background: #11a652;"></div>
+            <div style="height:85%; background: #11a652;"></div>
+            <div style="height:62%; background: #11a652;"></div>
+            <div style="height:68%; background: #11a652;"></div>
+            <div style="height:90%; background: #11a652;"></div>
+            <div style="height:50%; background: #11a652;"></div>
+            <div style="height:70%; background: #11a652;"></div>
+            <div style="height:40%; background: #11a652;"></div>
+            <div style="height:60%; background: #11a652;"></div>
+            <div style="height:80%; background: #11a652;"></div>
+        </div>
+        <div class="chart-labels">
+            <span>01/05</span>
+            <span>05/05</span>
+            <span>10/05</span>
+            <span>15/05</span>
+            <span>20/05</span>
+            <span>25/05</span>
+        </div>
+    </div>
+</div>
+{% endblock %}

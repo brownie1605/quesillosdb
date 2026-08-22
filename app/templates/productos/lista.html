@@ -1,0 +1,184 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Productos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="filter-group">
+        <div class="search-bar">
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar producto...">
+        </div>
+        <select id="catFilter" class="form-control" style="width: 150px;">
+            <option value="">Categoría: Todas</option>
+            <!-- Llenado por JS -->
+        </select>
+        <select id="estadoFilter" class="form-control" style="width: 150px;">
+            <option value="">Estado: Todos</option>
+            <option value="activo" selected>Activos</option>
+            <option value="inactivo">Inactivos</option>
+        </select>
+        <select id="impuestoFilter" class="form-control" style="width: 150px;">
+            <option value="">Impuesto: Todos</option>
+            <option value="true">Aplica IVA</option>
+            <option value="false">No Aplica IVA</option>
+        </select>
+    </div>
+    
+    <div style="display: flex; gap: 10px;">
+        <button id="btnNuevaMarca" class="btn btn-secondary" style="background: #e67e22; color: white;">+ Nueva Marca</button>
+        <button id="btnNuevoProducto" class="btn btn-primary">+ Nuevo Producto</button>
+    </div>
+</div>
+
+<div class="panel">
+    <table id="productosTable">
+        <thead>
+            <tr>
+                <th>Imagen</th>
+                <th>Código</th>
+                <th>Producto</th>
+                <th>Categoría</th>
+                <th>Precio Compra</th>
+                <th>Precio Venta</th>
+                <th>Stock</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="productosTableBody">
+            <!-- Cargado por JS -->
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal Producto (Crear / Editar) -->
+<div id="modalProducto" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style=" padding: 25px; border-radius: 8px; width: 450px; max-width: 90%;">
+        <h3 id="modalProductoTitle" style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Nuevo Producto</h3>
+        
+        <form id="formProducto">
+            <input type="hidden" id="prod_id">
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                    <label>Código</label>
+                    <input type="text" id="prod_codigo" class="form-control" style="width: 100%;" placeholder="Autogenerado si se deja en blanco">
+                </div>
+                <div style="flex: 1;">
+                    <label>Código de Barras</label>
+                    <input type="text" id="prod_codigo_barra" class="form-control" style="width: 100%;" placeholder="Opcional">
+                </div>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label>Nombre *</label>
+                <input type="text" id="prod_nombre" class="form-control" style="width: 100%;" required>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label>Descripción</label>
+                <textarea id="prod_descripcion" class="form-control" style="width: 100%; height: 50px;" placeholder="Opcional"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                    <label>Categoría</label>
+                    <select id="prod_categoria" class="form-control" style="width: 100%;">
+                        <option value="">Sin Categoría</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label>Marca</label>
+                    <select id="prod_marca" class="form-control" style="width: 100%;">
+                        <option value="">Sin Marca</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label>Unidad</label>
+                    <select id="prod_unidad" class="form-control" style="width: 100%;">
+                        <option value="">Sin Unidad</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                <div style="flex: 1;">
+                    <label>Precio Compra (C$)</label>
+                    <input type="number" id="prod_precio_compra" class="form-control" style="width: 100%;" min="0" step="0.01" value="0.00">
+                </div>
+                <div style="flex: 1;">
+                    <label>Precio Venta (C$) *</label>
+                    <input type="number" id="prod_precio_venta" class="form-control" style="width: 100%;" min="0" step="0.01" value="0.00" required>
+                </div>
+                <div style="flex: 1;">
+                    <label>Stock Mínimo</label>
+                    <input type="number" id="prod_stock_minimo" class="form-control" style="width: 100%;" min="0" step="1" value="0">
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+                <label>Imagen de Referencia</label>
+                <input type="file" id="prod_imagen" accept="image/*" class="form-control" style="width: 100%;">
+                <div id="prod_imagen_preview" style="margin-top: 8px;"></div>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                    <input type="checkbox" id="prod_aplica_impuesto">
+                    Aplica Impuesto (IVA)
+                </label>
+            </div>
+            
+            <!-- Espacio para el Precio + IVA -->
+            <div style="text-align: right; margin-bottom: 15px;">
+                <span style="font-size: 12px; color: #6a768d;">Precio + IVA (15%): </span>
+                <span id="prod_precio_iva" style="font-size: 14px; font-weight: bold; color: #1abc9c;">C$ 0.00</span>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 25px;">
+                <button type="button" id="btnCerrarModalProducto" class="btn" style="flex: 1; background: #e0e0e0; color: #333;">Cancelar</button>
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Entrada de Stock -->
+<div id="modalEntrada" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1010; align-items: center; justify-content: center;">
+    <div class="modal-content" style=" padding: 20px; border-radius: 8px; width: 300px;">
+        <h4 style="margin-top: 0;">Entrada de Producto</h4>
+        <p id="entradaProductName" style="font-size: 13px; color: #666; margin-bottom: 15px;"></p>
+        
+        <form id="formEntrada">
+            <input type="hidden" id="entrada_prod_id">
+            <label style="font-size: 13px;">Cantidad a ingresar:</label>
+            <input type="number" id="entrada_cantidad" class="form-control" style="width: 100%; margin-top: 5px; margin-bottom: 15px;" min="0.01" step="0.01" required>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="btnCerrarModalEntrada" class="btn" style="flex: 1; background: #e0e0e0; color: #333;">Cancelar</button>
+                <button type="submit" class="btn btn-success" style="flex: 1;">Agregar Stock</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Nueva Marca -->
+<div id="modalNuevaMarca" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1010; align-items: center; justify-content: center;">
+    <div class="modal-content" style=" padding: 20px; border-radius: 8px; width: 300px;">
+        <h4 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Crear Nueva Marca</h4>
+        
+        <form id="formNuevaMarca">
+            <div style="margin-bottom: 15px;">
+                <label style="font-size: 13px;">Nombre de la Marca *</label>
+                <input type="text" id="nueva_marca_nombre" class="form-control" style="width: 100%; margin-top: 5px;" required>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="btnCerrarModalMarca" class="btn" style="flex: 1; background: #e0e0e0; color: #333;">Cancelar</button>
+                <button type="submit" class="btn btn-success" style="flex: 1;">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/productos.js') }}"></script>
+{% endblock %}

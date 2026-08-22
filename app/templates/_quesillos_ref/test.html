@@ -1,0 +1,123 @@
+{% extends "layout.html" %}
+
+{% block title %}
+  test
+{% endblock %}
+
+
+
+
+{% block extra_head %}
+    <style>
+  .card {
+      color: white;
+      text-align: center;
+      border: none;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+  }
+  .card .card-icon {
+      font-size: 2.5rem;
+  }
+  .card-blue { background-color: #007bff; }
+  .card-orange { background-color: #ff9800; }
+  .card-purple { background-color: #9c27b0; }
+  .card-green { background-color: #4caf50; }
+  .card-red { background-color: #f44336; }
+  .card-teal { background-color: #00bcd4; }
+  .card-yellow { background-color: #ffc107; }
+  .card:hover {
+      transform: scale(1.05);
+      transition: 0.3s;
+  }
+</style>
+{% endblock %}
+
+
+{% block main %}
+<div class="container-fluid py-5">
+    <div class="row g-4">
+      <!-- Compras -->
+      <div class="col-md-3">
+        <a href="compras.html" class="card card-blue text-decoration-none">
+          <div class="card-body">
+            <div class="card-icon mb-3">🛒</div>
+            <h5 class="card-title">Compras</h5>
+            <p class="card-text fs-3">0</p>
+          </div>
+        </a>
+      </div>
+      <!-- Productos -->
+      <div class="col-md-3">
+        <a href="productos.html" class="card card-orange text-decoration-none">
+          <div class="card-body">
+            <div class="card-icon mb-3">📦</div>
+            <h5 class="card-title">Productos</h5>
+            <p class="card-text fs-3">3</p>
+          </div>
+        </a>
+      </div>
+      <!-- Clientes -->
+      <div class="col-md-3">
+        <a href="clientes.html" class="card card-purple text-decoration-none">
+          <div class="card-body">
+            <div class="card-icon mb-3">👥</div>
+            <h5 class="card-title">Clientes</h5>
+            <p class="card-text fs-3">1</p>
+          </div>
+        </a>
+      </div>
+      <!-- Proveedores -->
+      <div class="col-md-3">
+        <a href="proveedores.html" class="card card-green text-decoration-none">
+          <div class="card-body">
+            <div class="card-icon mb-3">🏬</div>
+            <h5 class="card-title">Proveedores</h5>
+            <p class="card-text fs-3">1</p>
+          </div>
+        </a>
+      </div>
+      <!-- Ventas -->
+      <div class="col-md-3">
+        <a href="ventas.html" class="card card-red text-decoration-none">
+          <div class="card-body">
+            <div class="card-icon mb-3">🤝</div>
+            <h5 class="card-title">Ventas</h5>
+            <p class="card-text fs-3">1</p>
+          </div>
+        </a>
+      </div>
+      <!-- Categorías -->
+      <div class="col-md-3">
+        <a href="categorias.html" class="card card-teal text-decoration-none">
+          <div class="card-body">
+            <div class="card-icon mb-3">📂</div>
+            <h5 class="card-title">Categorías</h5>
+            <p class="card-text fs-3">1</p>
+          </div>
+        </a>
+      </div>
+      <!-- Usuarios -->
+      <div class="col-md-3">
+        <a href="usuarios.html" class="card card-blue text-decoration-none">
+          <div class="card-body">
+            <div class="card-icon mb-3">👤</div>
+            <h5 class="card-title">Usuarios</h5>
+            <p class="card-text fs-3">4</p>
+          </div>
+        </a>
+      </div>
+      <!-- Configuración -->
+      <div class="col-md-3">
+        <a href="configuracion.html" class="card card-yellow text-decoration-none">
+          <div class="card-body">
+            <div class="card-icon mb-3">⚙</div>
+            <h5 class="card-title">Configuración</h5>
+            <p class="card-text fs-3">1</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endblock %}

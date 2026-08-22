@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Recuperar contraseña{% endblock %} · Quesillos Lo Nuestro</title>
+    <style>
+        :root { --q-rojo:#8B2E2E; --q-rojo-claro:#b04545; --q-crema:#FAF6F2; --q-maiz:#E8B84B; --q-borde:#e4d9cd; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+            font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #6d2323 0%, #8B2E2E 45%, #b04545 100%);
+            padding: 24px;
+        }
+        .caja {
+            background: var(--q-crema); width: 100%; max-width: 430px; border-radius: 18px;
+            padding: 36px 32px; box-shadow: 0 22px 60px rgba(0,0,0,.35);
+        }
+        .marca { text-align: center; margin-bottom: 22px; }
+        .marca .emoji { font-size: 42px; }
+        .marca h1 { margin: 6px 0 2px; font-size: 21px; color: var(--q-rojo); letter-spacing: .5px; }
+        .marca p { margin: 0; font-size: 12.5px; color: #8a7a6d; text-transform: uppercase; letter-spacing: 2px; }
+        h2 { font-size: 17px; margin: 0 0 6px; color: #33282400; color: #332824; }
+        .ayuda { font-size: 13.5px; color: #7a6a5e; margin: 0 0 20px; line-height: 1.5; }
+        label { display: block; font-size: 12.5px; font-weight: 600; color: #7a6a5e; margin-bottom: 5px; }
+        input, select {
+            width: 100%; padding: 12px 13px; border: 1px solid var(--q-borde); border-radius: 10px;
+            font-size: 15px; background: #fff; margin-bottom: 15px; color: #332824;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--q-rojo); box-shadow: 0 0 0 3px rgba(139,46,46,.12); }
+        input.codigo {
+            text-align: center; font-size: 30px; letter-spacing: 14px; font-weight: 700;
+            padding: 14px 10px; color: var(--q-rojo);
+        }
+        button {
+            width: 100%; padding: 13px; border: none; border-radius: 10px; background: var(--q-rojo);
+            color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .18s;
+        }
+        button:hover { background: var(--q-rojo-claro); }
+        .volver { display: block; text-align: center; margin-top: 18px; font-size: 13.5px; color: var(--q-rojo); text-decoration: none; }
+        .volver:hover { text-decoration: underline; }
+        .alerta { padding: 11px 14px; border-radius: 10px; font-size: 13.5px; margin-bottom: 16px; }
+        .alerta.success { background: #e6f4ec; color: #1f6b45; }
+        .alerta.danger  { background: #fbe7e7; color: #a72020; }
+        .alerta.warning { background: #fdf1dc; color: #8a6412; }
+        .alerta.info    { background: #e8f0fb; color: #23558f; }
+        .pasos { display: flex; gap: 6px; justify-content: center; margin-bottom: 20px; }
+        .paso { width: 34px; height: 4px; border-radius: 999px; background: var(--q-borde); }
+        .paso.activo { background: var(--q-maiz); }
+    </style>
+</head>
+<body>
+<div class="caja">
+    <div class="marca">
+        <div class="emoji">🫓</div>
+        <h1>QUESILLOS</h1>
+        <p>Lo Nuestro</p>
+    </div>
+
+    <div class="pasos">
+        <div class="paso {% if paso >= 1 %}activo{% endif %}"></div>
+        <div class="paso {% if paso >= 2 %}activo{% endif %}"></div>
+        <div class="paso {% if paso >= 3 %}activo{% endif %}"></div>
+    </div>
+
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% if mensajes %}
+        {% for categoria, mensaje in mensajes %}
+          <div class="alerta {{ categoria }}">{{ mensaje }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block contenido %}{% endblock %}
+
+    <a class="volver" href="{{ url_for('auth.login') }}">← Volver al inicio de sesión</a>
+</div>
+</body>
+</html>
