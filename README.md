@@ -68,10 +68,39 @@ Luego, con el entorno activo:
 
 ```bash
 set FLASK_APP=run.py
-flask init-local     # crea todas las tablas
-flask seed           # empresa, sucursal, roles y unidades de medida
-flask crear-admin    # pide la contraseña del administrador
+flask init-local       # crea todas las tablas
+flask bootstrap-nube   # copia el catálogo y el historial desde la nube
+flask crear-admin      # pide la contraseña del administrador
 ```
+
+> Si es una instalación nueva sin datos en la nube, usa `flask seed` en lugar
+> de `flask bootstrap-nube`.
+
+### 2.4a Rangos de ID: por qué importa
+
+`bootstrap-nube` termina reservando un **rango de IDs para esta máquina**
+(desde `LOCAL_ID_OFFSET`, por defecto **1 000 000**).
+
+Sin eso, la caja local crearía un producto con `id_producto = 1` mientras en la
+nube el `id_producto = 1` es otro producto distinto. Al sincronizar, el
+`INSERT ... ON DUPLICATE KEY UPDATE` **sobrescribiría el producto de la nube**.
+
+Con el offset:
+
+| | Rango de IDs |
+|---|---|
+| Registros creados en la nube | 1 – 999 999 |
+| Registros creados en esta caja | 1 000 000 en adelante |
+
+Comprueba en cualquier momento que no haya riesgo:
+
+```bash
+flask verificar-ids     # avisa si alguna tabla quedó fuera de rango
+flask aplicar-offset    # lo corrige
+```
+
+Si algún día se instala una **segunda caja**, dale otro rango en su `.env`
+(por ejemplo `LOCAL_ID_OFFSET=2000000`) y un `DEVICE_ID` distinto.
 
 ### 2.5 Actualizar la base de datos en la nube
 
@@ -83,6 +112,13 @@ mysql -h HOST -P PUERTO -u USUARIO -p pos_inventario_cloud < bd/02_cloud_upgrade
 ```
 
 El script es idempotente: puede ejecutarse varias veces sin dañar los datos.
+Solo agrega tablas y columnas; no borra nada.
+
+Para respaldar la nube antes de tocarla:
+
+```bash
+mysqldump -h HOST -P PUERTO -u USUARIO -p --single-transaction --routines --triggers pos_inventario_cloud > bd/respaldos/nube.sql
+```
 
 ### 2.6 Arrancar
 
@@ -202,11 +238,14 @@ El rol **Admin** pasa cualquier verificación.
 
 ```bash
 flask init-local       # crea las tablas locales desde los modelos
+flask bootstrap-nube   # copia la nube -> local y reserva el rango de IDs
 flask seed             # empresa, sucursal, 4 roles, unidades, categorías
 flask crear-admin      # crea/actualiza el usuario administrador
 flask demo-quesillo    # carga el ejemplo Quesillo + 4 insumos
 flask sync-now         # fuerza una sincronización completa
 flask sync-status      # muestra el estado de la conexión y pendientes
+flask verificar-ids    # revisa que los IDs locales no choquen con la nube
+flask aplicar-offset   # reserva/corrige el rango de IDs local
 ```
 
 ---

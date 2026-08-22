@@ -63,6 +63,12 @@ class Config:
     ID_SUCURSAL = int(os.getenv("ID_SUCURSAL", 1))
     DEVICE_ID = os.getenv("DEVICE_ID", "local-01")
 
+    # Rango de IDs reservado para los registros creados en ESTA maquina.
+    # La nube usa 1..999999; lo local empieza en LOCAL_ID_OFFSET.
+    # Evita que un INSERT local pise un registro distinto con el mismo id
+    # en la nube al sincronizar.
+    LOCAL_ID_OFFSET = int(os.getenv("LOCAL_ID_OFFSET", 1000000))
+
     # ------------------------------------------------------------------
     # Correo (recuperacion de contrasena con codigo de 6 digitos)
     # ------------------------------------------------------------------

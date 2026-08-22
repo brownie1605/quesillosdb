@@ -32,6 +32,9 @@ def registrar_comandos(app):
     app.cli.add_command(sync_now)
     app.cli.add_command(sync_status)
     app.cli.add_command(demo_quesillo)
+    app.cli.add_command(bootstrap_nube)
+    app.cli.add_command(aplicar_offset)
+    app.cli.add_command(verificar_ids)
 
 
 # ==================================================================
@@ -241,3 +244,67 @@ def demo_quesillo():
         click.echo("La receta ya existía.")
 
     click.echo("Máximo producible: %s" % RecetaService.maximo_producible(producto_final.id_producto))
+
+
+# ==================================================================
+@click.command("bootstrap-nube")
+@click.option("--offset/--sin-offset", default=True,
+              help="Aplicar el rango de IDs local al terminar (recomendado).")
+@with_appcontext
+def bootstrap_nube(offset):
+    """Copia el catalogo y el historial de la nube a la base local.
+
+    Es el primer paso tras instalar: deja ambas bases con los mismos IDs
+    y reserva el rango local para lo que se cree aqui.
+    """
+    from app.services.bootstrap_service import copiar_desde_nube, aplicar_offset_ids
+    from app.services.network_service import NetworkService
+
+    if not NetworkService.check_connectivity():
+        click.echo("Sin conexion con la nube. Intenta cuando haya internet.")
+        return
+
+    click.echo("Copiando datos desde la nube...")
+    resumen = copiar_desde_nube()
+    for tabla, n in resumen["por_tabla"].items():
+        if n:
+            click.echo("  %-24s %s filas" % (tabla, n))
+    click.echo("Total copiado: %s filas" % resumen["copiados"])
+
+    for e in resumen["errores"]:
+        click.echo("  ! %s: %s" % (e["tabla"], e["error"]))
+
+    if offset:
+        r = aplicar_offset_ids()
+        click.echo("Rango de IDs local desde %s aplicado a %s tablas."
+                   % (r["offset"], len(r["aplicado"])))
+
+
+@click.command("aplicar-offset")
+@click.option("--offset", type=int, default=None)
+@with_appcontext
+def aplicar_offset(offset):
+    """Reserva el rango de IDs de esta maquina (evita choques con la nube)."""
+    from app.services.bootstrap_service import aplicar_offset_ids
+
+    r = aplicar_offset_ids(offset)
+    click.echo("Offset %s aplicado a: %s" % (r["offset"], ", ".join(r["aplicado"]) or "ninguna"))
+    if r["omitido"]:
+        click.echo("Ya estaban en rango: %s" % ", ".join(r["omitido"]))
+
+
+@click.command("verificar-ids")
+@with_appcontext
+def verificar_ids():
+    """Avisa si alguna tabla local puede colisionar con la nube."""
+    from app.services.bootstrap_service import verificar_rangos
+
+    r = verificar_rangos()
+    if r["ok"]:
+        click.echo("OK: todas las tablas locales estan en el rango >= %s" % r["offset"])
+    else:
+        click.echo("ATENCION: estas tablas pueden chocar con la nube:")
+        for x in r["en_riesgo"]:
+            click.echo("  %-24s proximo id = %s (esperado >= %s)"
+                       % (x["tabla"], x["proximo_id"], x["offset_esperado"]))
+        click.echo("Ejecuta: flask aplicar-offset")
