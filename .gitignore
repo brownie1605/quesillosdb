@@ -38,3 +38,4 @@ logs/
 *.swp
 .DS_Store
 Thumbs.db
+bd/respaldos/
