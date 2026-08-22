@@ -26,6 +26,9 @@ log = logging.getLogger("sync.service")
 # Cache de columnas remotas por tabla (se llena en el primer push).
 _COLUMNAS_REMOTAS = {}
 
+# Que tablas locales tienen columna estado_sync.
+_CON_ESTADO_SYNC = {}
+
 # Orden de sincronizacion: respeta dependencias de claves foraneas.
 TABLAS_SYNC = [
     "roles",
@@ -278,19 +281,39 @@ class SyncService:
 
     # -----------------------------------------------------------------
     @staticmethod
-    def _marcar_registro_sincronizado(op):
-        """Marca estado_sync='sinc_remoto' en la fila local original."""
+    def _tiene_estado_sync(tabla):
+        """Si la tabla local tiene columna estado_sync (con cache)."""
+        if tabla not in _CON_ESTADO_SYNC:
+            _CON_ESTADO_SYNC[tabla] = bool(
+                db.session.execute(
+                    text(
+                        "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t "
+                        "AND COLUMN_NAME = 'estado_sync'"
+                    ),
+                    {"t": tabla},
+                ).scalar()
+            )
+        return _CON_ESTADO_SYNC[tabla]
+
+    # -----------------------------------------------------------------
+    @classmethod
+    def _marcar_registro_sincronizado(cls, op):
+        """Marca estado_sync='sinc_remoto' en la fila local original.
+
+        No todas las tablas tienen esa columna (receta_ingredientes, por
+        ejemplo). Antes se intentaba igual y el rollback del error deshacia
+        tambien el cambio de estado de la propia cola, dejando la operacion
+        como pendiente aunque ya se hubiera subido.
+        """
         tabla = op.tabla_afectada
         pk = PK_POR_TABLA.get(tabla)
-        if not pk:
+        if not pk or not cls._tiene_estado_sync(tabla):
             return
-        try:
-            db.session.execute(
-                text("UPDATE " + tabla + " SET estado_sync = 'sinc_remoto' WHERE " + pk + " = :pk"),
-                {"pk": op.registro_id},
-            )
-        except Exception:  # la tabla puede no tener columna estado_sync
-            db.session.rollback()
+        db.session.execute(
+            text("UPDATE " + tabla + " SET estado_sync = 'sinc_remoto' WHERE " + pk + " = :pk"),
+            {"pk": op.registro_id},
+        )
 
     # =================================================================
     # PULL  (nube -> local)
