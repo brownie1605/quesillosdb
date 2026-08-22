@@ -1,4 +1,10 @@
+from sqlalchemy import LargeBinary
+from sqlalchemy.dialects.mysql import LONGBLOB
+
 from app.extensions import db
+
+# Las imagenes superan los 64 KB de un BLOB normal.
+LONGBLOB_MYSQL = LargeBinary().with_variant(LONGBLOB(), "mysql")
 from app.utils.date_utils import nicaragua_now
 
 
@@ -25,7 +31,7 @@ class Producto(db.Model):
     precio_compra = db.Column(db.Numeric(12, 2))
     precio_venta = db.Column(db.Numeric(12, 2), nullable=False)
     imagen_url = db.Column(db.String(255))
-    imagen_datos = db.Column(db.LargeBinary)
+    imagen_datos = db.Column(LONGBLOB_MYSQL)
     imagen_mimetype = db.Column(db.String(50))
     aplica_impuesto = db.Column(db.Boolean, default=False)
 

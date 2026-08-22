@@ -1,5 +1,11 @@
 from flask_login import UserMixin
+from sqlalchemy import LargeBinary
+from sqlalchemy.dialects.mysql import LONGBLOB
+
 from app.extensions import db
+
+# Las imagenes superan los 64 KB de un BLOB normal.
+LONGBLOB_MYSQL = LargeBinary().with_variant(LONGBLOB(), "mysql")
 
 
 class Usuario(UserMixin, db.Model):
@@ -17,7 +23,7 @@ class Usuario(UserMixin, db.Model):
     telefono = db.Column(db.String(30))
     password_hash = db.Column(db.String(255), nullable=False)
     imagen_url = db.Column(db.String(255))
-    imagen_datos = db.Column(db.LargeBinary)
+    imagen_datos = db.Column(LONGBLOB_MYSQL)
     imagen_mimetype = db.Column(db.String(50))
     estado = db.Column(db.Enum("activo", "inactivo", "bloqueado"), default="activo")
     ultimo_acceso = db.Column(db.DateTime)

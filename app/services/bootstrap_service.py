@@ -93,6 +93,24 @@ def _tabla_existe_local(tabla):
     )
 
 
+def _upsert(tabla, datos, clave):
+    columnas = ", ".join("`" + c + "`" for c in datos)
+    binds = ", ".join(":" + c for c in datos)
+    updates = ", ".join("`" + c + "` = VALUES(`" + c + "`)" for c in datos if c != clave)
+    consulta = "INSERT INTO " + tabla + " (" + columnas + ") VALUES (" + binds + ")"
+    if updates:
+        consulta += " ON DUPLICATE KEY UPDATE " + updates
+    return consulta
+
+
+def _sin_binarios(datos):
+    """Misma fila pero sin columnas binarias (imagenes)."""
+    return {
+        k: v for k, v in datos.items()
+        if not isinstance(v, (bytes, bytearray))
+    }
+
+
 # ---------------------------------------------------------------------------
 def copiar_desde_nube(tablas=None, limite_por_tabla=None):
     """Copia la nube -> local. No borra nada: usa upsert por clave primaria."""
@@ -102,8 +120,6 @@ def copiar_desde_nube(tablas=None, limite_por_tabla=None):
 
     tablas = tablas or ORDEN_COPIA
     resumen = {"copiados": 0, "por_tabla": {}, "errores": []}
-
-    db.session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
 
     for tabla in tablas:
         if not _tabla_existe_local(tabla):
@@ -119,6 +135,7 @@ def copiar_desde_nube(tablas=None, limite_por_tabla=None):
                 filas = conn.execute(text(sql)).mappings().all()
 
             insertados = 0
+            fallidas = 0
             for fila in filas:
                 datos = {
                     k: v for k, v in dict(fila).items()
@@ -129,23 +146,33 @@ def copiar_desde_nube(tablas=None, limite_por_tabla=None):
                 if "estado_sync" in columnas_ok:
                     datos["estado_sync"] = "sinc_remoto"
 
-                columnas = ", ".join("`" + c + "`" for c in datos)
-                binds = ", ".join(":" + c for c in datos)
                 clave = pk or next(iter(datos))
-                updates = ", ".join(
-                    "`" + c + "` = VALUES(`" + c + "`)" for c in datos if c != clave
-                )
-                consulta = (
-                    "INSERT INTO " + tabla + " (" + columnas + ") VALUES (" + binds + ")"
-                )
-                if updates:
-                    consulta += " ON DUPLICATE KEY UPDATE " + updates
-                db.session.execute(text(consulta), datos)
-                insertados += 1
+                ultimo_error = None
+                # Una fila mala (p. ej. una imagen enorme) no debe tumbar la tabla:
+                # se reintenta sin las columnas binarias antes de darla por perdida.
+                for intento in (datos, _sin_binarios(datos)):
+                    try:
+                        # El commit por fila devuelve la conexion al pool, asi que
+                        # la variable de sesion hay que reafirmarla cada vez.
+                        db.session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+                        db.session.execute(text(_upsert(tabla, intento, clave)), intento)
+                        db.session.commit()
+                        insertados += 1
+                        break
+                    except Exception as exc:  # noqa: BLE001
+                        db.session.rollback()
+                        ultimo_error = exc
+                else:
+                    fallidas += 1
+                    log.warning("Fila %s de %s omitida: %s",
+                                datos.get(clave), tabla, str(ultimo_error)[:150])
 
-            db.session.commit()
             resumen["copiados"] += insertados
             resumen["por_tabla"][tabla] = insertados
+            if fallidas:
+                resumen["errores"].append(
+                    {"tabla": tabla, "error": str(fallidas) + " fila(s) omitida(s)"}
+                )
             log.info("Copiadas %s filas de %s", insertados, tabla)
         except Exception as exc:  # noqa: BLE001
             db.session.rollback()
