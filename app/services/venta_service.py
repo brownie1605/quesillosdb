@@ -104,52 +104,7 @@ class VentaService:
         )
         venta.cambio = max(Decimal("0"), Decimal(str(monto_recibido or 0)) - venta.total)
 
-        # 3. Encola para la nube.
-        SyncService.encolar(
-            "ventas",
-            venta.id_venta,
-            "INSERT",
-            payload={
-                "id_venta": venta.id_venta,
-                "id_empresa": venta.id_empresa,
-                "id_sucursal": venta.id_sucursal,
-                "id_usuario": venta.id_usuario,
-                "id_cliente": venta.id_cliente,
-                "numero_venta": venta.numero_venta,
-                "subtotal": float(venta.subtotal),
-                "descuento": float(venta.descuento or 0),
-                "impuesto": float(venta.impuesto or 0),
-                "propina": float(venta.propina or 0),
-                "total": float(venta.total),
-                "monto_recibido": float(venta.monto_recibido or 0),
-                "cambio": float(venta.cambio or 0),
-                "estado": venta.estado,
-                "metodo_pago": venta.metodo_pago,
-                "fecha_venta": venta.fecha_venta.strftime("%Y-%m-%d %H:%M:%S"),
-            },
-            usuario_id=usuario.id_usuario,
-            timestamp=ahora,
-            commit=False,
-        )
-        for det in detalles_payload:
-            SyncService.encolar(
-                "detalle_ventas",
-                det.id_detalle_venta,
-                "INSERT",
-                payload={
-                    "id_detalle_venta": det.id_detalle_venta,
-                    "id_venta": det.id_venta,
-                    "id_producto": det.id_producto,
-                    "cantidad": float(det.cantidad),
-                    "precio_unitario": float(det.precio_unitario),
-                    "descuento": float(det.descuento or 0),
-                    "subtotal": float(det.subtotal),
-                },
-                usuario_id=usuario.id_usuario,
-                timestamp=ahora,
-                commit=False,
-            )
-
+        # 3. Se encola solo (ver app/services/sync_events.py).
         db.session.commit()
 
         # 4. Si hay internet intenta subirla de inmediato (no bloquea la venta).
@@ -164,8 +119,6 @@ class VentaService:
     # -----------------------------------------------------------------
     @staticmethod
     def anular_venta(id_venta, usuario, motivo="Anulada por el usuario"):
-        from app.services.sync_service import SyncService
-
         venta = Venta.query.get(id_venta)
         if not venta:
             raise ValueError("Venta no encontrada")
@@ -179,17 +132,5 @@ class VentaService:
 
         InventarioService.revertir_venta(venta, motivo=motivo)
 
-        SyncService.encolar(
-            "ventas",
-            venta.id_venta,
-            "UPDATE",
-            payload={
-                "id_venta": venta.id_venta,
-                "estado": "anulada",
-                "motivo_anulacion": motivo,
-            },
-            usuario_id=usuario.id_usuario,
-            commit=False,
-        )
         db.session.commit()
         return venta

@@ -72,9 +72,11 @@ class InventarioService:
     @staticmethod
     def mover(id_producto, cantidad, tipo_movimiento, usuario_id,
               referencia=None, observacion=None, encolar=True, commit=False):
-        """Aplica un movimiento de stock. `cantidad` positiva = entrada."""
-        from app.services.sync_service import SyncService
+        """Aplica un movimiento de stock. `cantidad` positiva = entrada.
 
+        El encolado para la nube lo hace solo `sync_events`; aqui no hace
+        falta llamarlo.
+        """
         inv = InventarioService.obtener_o_crear(id_producto)
         anterior = Decimal(str(inv.stock_actual or 0))
         delta = Decimal(str(cantidad))
@@ -100,44 +102,6 @@ class InventarioService:
         )
         db.session.add(mov)
         db.session.flush()
-
-        if encolar:
-            SyncService.encolar(
-                "movimientos_inventario",
-                mov.id_movimiento,
-                "INSERT",
-                payload={
-                    "id_movimiento": mov.id_movimiento,
-                    "id_empresa": mov.id_empresa,
-                    "id_sucursal": mov.id_sucursal,
-                    "id_producto": mov.id_producto,
-                    "id_usuario": mov.id_usuario,
-                    "tipo_movimiento": mov.tipo_movimiento,
-                    "cantidad": float(mov.cantidad),
-                    "stock_anterior": float(mov.stock_anterior),
-                    "stock_nuevo": float(mov.stock_nuevo),
-                    "referencia": mov.referencia,
-                    "observacion": mov.observacion,
-                    "fecha_movimiento": mov.fecha_movimiento.strftime("%Y-%m-%d %H:%M:%S"),
-                },
-                usuario_id=usuario_id,
-                commit=False,
-            )
-            SyncService.encolar(
-                "inventario",
-                inv.id_inventario,
-                "UPDATE",
-                payload={
-                    "id_inventario": inv.id_inventario,
-                    "id_producto": inv.id_producto,
-                    "id_sucursal": inv.id_sucursal,
-                    "stock_actual": float(inv.stock_actual),
-                    "stock_minimo": float(inv.stock_minimo or 0),
-                    "stock_maximo": float(inv.stock_maximo or 0),
-                },
-                usuario_id=usuario_id,
-                commit=False,
-            )
 
         if commit:
             db.session.commit()

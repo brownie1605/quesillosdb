@@ -1,4 +1,7 @@
-from sqlalchemy import LargeBinary
+import re
+import secrets
+
+from sqlalchemy import LargeBinary, event
 from sqlalchemy.dialects.mysql import LONGBLOB
 
 from app.extensions import db
@@ -88,3 +91,16 @@ class Producto(db.Model):
             "estado": self.estado,
             "imagen_url": self.imagen_url or None,
         }
+
+
+def _codigo_automatico(nombre):
+    """Codigo legible a partir del nombre: 'Cebolla encurtida' -> 'CEB-40318'."""
+    letras = re.sub(r"[^A-Za-z]", "", nombre or "")[:3].upper() or "PRD"
+    return letras + "-" + str(secrets.randbelow(90000) + 10000)
+
+
+@event.listens_for(Producto, "before_insert")
+def _asignar_codigo(mapper, connection, target):
+    """`codigo` es NOT NULL en la nube: nunca debe salir vacio de aqui."""
+    if not (target.codigo or "").strip():
+        target.codigo = _codigo_automatico(target.nombre)

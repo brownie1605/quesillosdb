@@ -23,6 +23,9 @@ from app.utils.date_utils import nicaragua_now
 
 log = logging.getLogger("sync.service")
 
+# Cache de columnas remotas por tabla (se llena en el primer push).
+_COLUMNAS_REMOTAS = {}
+
 # Orden de sincronizacion: respeta dependencias de claves foraneas.
 TABLAS_SYNC = [
     "roles",
@@ -192,19 +195,77 @@ class SyncService:
 
     # -----------------------------------------------------------------
     @staticmethod
-    def _aplicar_en_remoto(conn, op):
+    def _columnas_remotas(conn, tabla):
+        """{columna: admite_null} de la tabla remota (cache por proceso)."""
+        if tabla not in _COLUMNAS_REMOTAS:
+            filas = conn.execute(
+                text(
+                    "SELECT COLUMN_NAME, IS_NULLABLE FROM information_schema.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t"
+                ),
+                {"t": tabla},
+            ).mappings().all()
+            _COLUMNAS_REMOTAS[tabla] = {
+                f["COLUMN_NAME"]: f["IS_NULLABLE"] == "YES" for f in filas
+            }
+        return _COLUMNAS_REMOTAS[tabla]
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _fila_local_actual(tabla, registro_id):
+        """Estado actual completo de la fila en la base local.
+
+        El payload encolado puede ser parcial (p. ej. un UPDATE que solo toca
+        un campo). Si esa fila todavia no existe en la nube, un INSERT parcial
+        falla por columnas NOT NULL. Por eso se sube siempre la fila completa.
+        """
+        pk = PK_POR_TABLA.get(tabla)
+        if not pk:
+            return None
+        try:
+            fila = db.session.execute(
+                text("SELECT * FROM " + tabla + " WHERE " + pk + " = :pk"),
+                {"pk": registro_id},
+            ).mappings().first()
+        except Exception:  # noqa: BLE001
+            db.session.rollback()
+            return None
+        if not fila:
+            return None
+        # Las imagenes no viajan en la sincronizacion: pesan cientos de KB y
+        # la conexion del local es intermitente.
+        return {
+            k: _json_safe(v) for k, v in dict(fila).items()
+            if not isinstance(v, (bytes, bytearray))
+        }
+
+    # -----------------------------------------------------------------
+    @classmethod
+    def _aplicar_en_remoto(cls, conn, op):
         """Ejecuta la operacion de `op` sobre la conexion remota."""
         tabla = op.tabla_afectada
         pk = PK_POR_TABLA.get(tabla, "id")
-        payload = dict(op.payload or {})
 
         if op.operation_type == "DELETE":
             conn.execute(text("DELETE FROM " + tabla + " WHERE " + pk + " = :pk"),
                          {"pk": op.registro_id})
             return
 
+        payload = cls._fila_local_actual(tabla, op.registro_id) or dict(op.payload or {})
         payload.setdefault(pk, op.registro_id)
-        payload = {k: v for k, v in payload.items() if v is not None or k == pk}
+
+        # Solo columnas que la nube realmente tiene.
+        columnas_remotas = cls._columnas_remotas(conn, tabla)
+        if columnas_remotas:
+            payload = {k: v for k, v in payload.items() if k in columnas_remotas}
+
+        # Un NULL se envia tal cual si la columna remota lo admite (asi se
+        # propaga el borrado de un campo). Si es NOT NULL se omite para que
+        # actue el valor por defecto de la nube en vez de fallar.
+        payload = {
+            k: v for k, v in payload.items()
+            if v is not None or k == pk or columnas_remotas.get(k, True)
+        }
 
         columnas = ", ".join("`" + c + "`" for c in payload)
         binds = ", ".join(":" + c for c in payload)

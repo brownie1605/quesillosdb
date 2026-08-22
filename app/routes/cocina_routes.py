@@ -52,17 +52,10 @@ def api_pendientes():
 @cocina_bp.route("/api/<int:id_venta>/listo", methods=["POST"])
 @login_required
 def api_marcar_listo(id_venta):
-    from app.services.sync_service import SyncService
-
     venta = Venta.query.get_or_404(id_venta)
     venta.estado = "completada"
     venta.timestamp_local_actualizacion = nicaragua_now()
     venta.estado_sync = "pendiente"
-    SyncService.encolar(
-        "ventas", venta.id_venta, "UPDATE",
-        payload={"id_venta": venta.id_venta, "estado": "completada"},
-        usuario_id=current_user.id_usuario, commit=False,
-    )
     db.session.commit()
 
     try:

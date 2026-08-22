@@ -33,8 +33,6 @@ class RecetaService:
     @staticmethod
     def crear_receta(id_producto, datos, ingredientes, usuario_id):
         """ingredientes: lista de dicts {id_producto, cantidad_necesaria, id_unidad, opcional}."""
-        from app.services.sync_service import SyncService
-
         producto = Producto.query.get(id_producto)
         if not producto:
             raise RecetaError("El producto no existe")
@@ -66,7 +64,6 @@ class RecetaService:
         receta.costo_total = RecetaService.calcular_costo_receta(receta)
         db.session.flush()
 
-        RecetaService._encolar(receta, usuario_id, "INSERT")
         db.session.commit()
         log.info("Receta creada para producto %s", id_producto)
         return receta
@@ -74,8 +71,6 @@ class RecetaService:
     # -----------------------------------------------------------------
     @staticmethod
     def actualizar_receta(id_receta, datos, ingredientes, usuario_id):
-        from app.services.sync_service import SyncService
-
         receta = Receta.query.get(id_receta)
         if not receta:
             raise RecetaError("Receta no encontrada")
@@ -97,15 +92,12 @@ class RecetaService:
         receta.costo_total = RecetaService.calcular_costo_receta(receta)
         db.session.flush()
 
-        RecetaService._encolar(receta, usuario_id, "UPDATE")
         db.session.commit()
         return receta
 
     # -----------------------------------------------------------------
     @staticmethod
     def eliminar_receta(id_receta, usuario_id):
-        from app.services.sync_service import SyncService
-
         receta = Receta.query.get(id_receta)
         if not receta:
             raise RecetaError("Receta no encontrada")
@@ -117,7 +109,6 @@ class RecetaService:
             producto.es_receta = False
             producto.estado_sync = "pendiente"
 
-        SyncService.encolar("recetas", id_receta, "DELETE", usuario_id=usuario_id, commit=False)
         db.session.commit()
         return True
 
@@ -278,55 +269,3 @@ class RecetaService:
             cuantos = (disponible * rendimiento) / necesaria
             posibles = cuantos if posibles is None else min(posibles, cuantos)
         return float(posibles or 0)
-
-    # -----------------------------------------------------------------
-    @staticmethod
-    def _encolar(receta, usuario_id, operacion):
-        from app.services.sync_service import SyncService
-
-        SyncService.encolar(
-            "recetas",
-            receta.id_receta,
-            operacion,
-            payload={
-                "id_receta": receta.id_receta,
-                "id_producto": receta.id_producto,
-                "nombre": receta.nombre,
-                "descripcion": receta.descripcion,
-                "modo_preparacion": receta.modo_preparacion,
-                "tiempo_preparacion": receta.tiempo_preparacion,
-                "rendimiento": float(receta.rendimiento or 1),
-                "id_unidad_rendimiento": receta.id_unidad_rendimiento,
-                "costo_total": float(receta.costo_total or 0),
-                "estado": receta.estado,
-                "creado_por": receta.creado_por,
-            },
-            usuario_id=usuario_id,
-            commit=False,
-        )
-        for ing in receta.ingredientes:
-            SyncService.encolar(
-                "receta_ingredientes",
-                ing.id_ingrediente,
-                "INSERT",
-                payload={
-                    "id_ingrediente": ing.id_ingrediente,
-                    "id_receta": ing.id_receta,
-                    "id_producto": ing.id_producto,
-                    "cantidad_necesaria": float(ing.cantidad_necesaria),
-                    "id_unidad": ing.id_unidad,
-                    "costo_estimado": float(ing.costo_estimado or 0),
-                    "opcional": bool(ing.opcional),
-                },
-                usuario_id=usuario_id,
-                commit=False,
-            )
-
-        SyncService.encolar(
-            "productos",
-            receta.id_producto,
-            "UPDATE",
-            payload={"id_producto": receta.id_producto, "es_receta": True},
-            usuario_id=usuario_id,
-            commit=False,
-        )

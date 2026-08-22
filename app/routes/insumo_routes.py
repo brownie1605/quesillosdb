@@ -106,25 +106,6 @@ def api_crear():
         db.session.add(inv)
         db.session.flush()
 
-        from app.services.sync_service import SyncService
-
-        SyncService.encolar(
-            "productos", producto.id_producto, "INSERT",
-            payload=_payload_producto(producto),
-            usuario_id=current_user.id_usuario, commit=False,
-        )
-        SyncService.encolar(
-            "inventario", inv.id_inventario, "INSERT",
-            payload={
-                "id_inventario": inv.id_inventario,
-                "id_producto": inv.id_producto,
-                "id_sucursal": inv.id_sucursal,
-                "stock_actual": float(inv.stock_actual or 0),
-                "stock_minimo": float(inv.stock_minimo or 0),
-                "stock_maximo": float(inv.stock_maximo or 0),
-            },
-            usuario_id=current_user.id_usuario, commit=False,
-        )
         db.session.commit()
         registrar_auditoria("crear", "insumos", {"id_producto": producto.id_producto})
         return jsonify({"success": True, "message": "Insumo creado", "producto": producto.to_dict()})
@@ -170,13 +151,6 @@ def api_actualizar(id_producto):
             if "stock_maximo" in data:
                 inv.stock_maximo = data["stock_maximo"] or 0
 
-        from app.services.sync_service import SyncService
-
-        SyncService.encolar(
-            "productos", producto.id_producto, "UPDATE",
-            payload=_payload_producto(producto),
-            usuario_id=current_user.id_usuario, commit=False,
-        )
         db.session.commit()
 
         # Recalcula el costo de las recetas que usan este insumo.
@@ -239,24 +213,6 @@ def api_recetas_que_lo_usan(id_producto):
 
 
 # ---------------------------------------------------------------- helpers
-def _payload_producto(p):
-    return {
-        "id_producto": p.id_producto,
-        "id_empresa": p.id_empresa,
-        "id_categoria": p.id_categoria,
-        "id_unidad": p.id_unidad,
-        "codigo": p.codigo,
-        "nombre": p.nombre,
-        "descripcion": p.descripcion,
-        "precio_compra": float(p.precio_compra or 0),
-        "precio_venta": float(p.precio_venta or 0),
-        "tipo_producto": p.tipo_producto,
-        "es_receta": bool(p.es_receta),
-        "es_ingrediente_receta": bool(p.es_ingrediente_receta),
-        "estado": p.estado,
-    }
-
-
 def _recalcular_recetas_de(id_producto):
     from app.services.receta_service import RecetaService
 

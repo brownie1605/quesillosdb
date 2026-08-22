@@ -94,6 +94,11 @@ def create_app(config_class=Config, iniciar_jobs=True):
     ):
         app.register_blueprint(bp)
 
+    # ------------------------------------- encolado automatico para la nube
+    from app.services import sync_events
+
+    sync_events.configurar(app)
+
     # ---------------------------------------------------------- CLI + jobs
     from app.cli import registrar_comandos
 

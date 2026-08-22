@@ -62,7 +62,13 @@ class ConflictService:
                     ),
                     {"p": id_producto},
                 ).mappings().first()
-                stock_remoto = Decimal(str(fila["stock_actual"])) if fila else Decimal("0")
+
+                # Sin fila de inventario remota el producto todavia no se ha
+                # subido. Eso no es un conflicto: la propia cola lo creara.
+                if fila is None:
+                    continue
+
+                stock_remoto = Decimal(str(fila["stock_actual"]))
                 if stock_remoto < Decimal(str(cantidad)):
                     faltantes.append(
                         {
