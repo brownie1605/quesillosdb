@@ -89,12 +89,13 @@
                 <label>Tipo de producto</label>
                 <select id="prod_tipo_producto" class="form-control" style="width: 100%;">
                     <option value="final">Producto final (se vende al cliente)</option>
-                    <option value="insumo">Insumo (se vende Y se usa en recetas)</option>
+                    <option value="insumo">Insumo (solo para recetas, no se vende)</option>
                     <option value="material">Material (solo control de costo, no se vende)</option>
                 </select>
+                <p id="prod_tipo_ayuda" style="display: none; font-size: 12px; color: #6a768d; margin: 6px 0 0;">Un insumo/material no se vende directamente ni lleva categoría o impuesto: solo se usa para costear recetas.</p>
             </div>
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <div style="flex: 1;">
+                <div id="campo_categoria" style="flex: 1;">
                     <label>Categoría</label>
                     <select id="prod_categoria" class="form-control" style="width: 100%;">
                         <option value="">Sin Categoría</option>
@@ -118,7 +119,7 @@
                     <label>Precio Compra (C$)</label>
                     <input type="number" id="prod_precio_compra" class="form-control" style="width: 100%;" min="0" step="0.01" value="0.00">
                 </div>
-                <div style="flex: 1;">
+                <div id="campo_precio_venta" style="flex: 1;">
                     <label>Precio Venta (C$) *</label>
                     <input type="number" id="prod_precio_venta" class="form-control" style="width: 100%;" min="0" step="0.01" value="0.00" required>
                 </div>
@@ -127,26 +128,28 @@
                     <input type="number" id="prod_stock_minimo" class="form-control" style="width: 100%;" min="0" step="1" value="0">
                 </div>
             </div>
-            
+
             <div style="margin-bottom: 10px;">
                 <label>Imagen de Referencia</label>
                 <input type="file" id="prod_imagen" accept="image/*" class="form-control" style="width: 100%;">
                 <div id="prod_imagen_preview" style="margin-top: 8px;"></div>
             </div>
 
-            <div style="margin-bottom: 10px;">
-                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                    <input type="checkbox" id="prod_aplica_impuesto">
-                    Aplica Impuesto (IVA)
-                </label>
+            <div id="campo_iva">
+                <div style="margin-bottom: 10px;">
+                    <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                        <input type="checkbox" id="prod_aplica_impuesto">
+                        Aplica Impuesto (IVA)
+                    </label>
+                </div>
+
+                <!-- Espacio para el Precio + IVA -->
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <span style="font-size: 12px; color: #6a768d;">Precio + IVA (15%): </span>
+                    <span id="prod_precio_iva" style="font-size: 14px; font-weight: bold; color: #1abc9c;">C$ 0.00</span>
+                </div>
             </div>
-            
-            <!-- Espacio para el Precio + IVA -->
-            <div style="text-align: right; margin-bottom: 15px;">
-                <span style="font-size: 12px; color: #6a768d;">Precio + IVA (15%): </span>
-                <span id="prod_precio_iva" style="font-size: 14px; font-weight: bold; color: #1abc9c;">C$ 0.00</span>
-            </div>
-            
+
             <div style="display: flex; gap: 10px; margin-top: 25px;">
                 <button type="button" id="btnCerrarModalProducto" class="btn" style="flex: 1; background: #e0e0e0; color: #333;">Cancelar</button>
                 <button type="submit" class="btn btn-primary" style="flex: 1;">Guardar</button>

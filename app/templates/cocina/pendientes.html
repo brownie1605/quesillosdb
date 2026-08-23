@@ -41,7 +41,7 @@ async function cargarOrdenes() {
         <div class="orden">
             <h4>${o.numero_venta}</h4>
             <div class="hora">${o.fecha_venta}${o.mesero ? ' · ' + o.mesero : ''}</div>
-            <ul>${o.items.map(i => `<li>${i.cantidad} × ${i.producto}${i.consumio_receta ? ' 📖' : ''}</li>`).join('')}</ul>
+            <ul>${o.items.map(i => `<li>${i.cantidad} × ${i.producto}${i.consumio_receta ? ' 📖' : ''}${i.comentario ? `<br><small style="color:var(--q-rojo);opacity:.85;">✎ ${i.comentario}</small>` : ''}</li>`).join('')}</ul>
             <button class="q-btn small verde" onclick="marcarListo(${o.id_venta})">✔ Marcar lista</button>
         </div>`).join('');
 }

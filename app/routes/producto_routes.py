@@ -133,14 +133,19 @@ def api_crear():
         imagen_url = None
         imagen_datos = None
         imagen_mimetype = None
-        
+
         if imagen_file and imagen_file.filename:
             imagen_datos = imagen_file.read()
             imagen_mimetype = imagen_file.mimetype
 
+        tipo_producto = request.form.get("tipo_producto") or "final"
+        # Insumo/material son solo para costear recetas: no se venden, no
+        # llevan categoria propia ni impuesto. Solo "final" es vendible.
+        vendible = tipo_producto == "final"
+
         nuevo_prod = Producto(
             id_empresa=current_user.id_empresa,
-            id_categoria=request.form.get("id_categoria") or None,
+            id_categoria=(request.form.get("id_categoria") or None) if vendible else None,
             id_marca=request.form.get("id_marca") or None,
             id_unidad=request.form.get("id_unidad") or None,
             codigo=request.form.get("codigo", ""),
@@ -148,9 +153,10 @@ def api_crear():
             nombre=request.form.get("nombre"),
             descripcion=request.form.get("descripcion", ""),
             precio_compra=float(request.form.get("precio_compra", 0.0)),
-            precio_venta=float(request.form.get("precio_venta", 0.0)),
-            aplica_impuesto=request.form.get("aplica_impuesto") == 'true',
-            tipo_producto=request.form.get("tipo_producto") or "final",
+            precio_venta=float(request.form.get("precio_venta", 0.0)) if vendible else 0.0,
+            aplica_impuesto=(request.form.get("aplica_impuesto") == 'true') if vendible else False,
+            tipo_producto=tipo_producto,
+            se_vende=vendible,
             imagen_url=imagen_url,
             imagen_datos=imagen_datos,
             imagen_mimetype=imagen_mimetype,
@@ -205,15 +211,20 @@ def api_editar(id):
         prod.codigo_barra = request.form.get("codigo_barra", prod.codigo_barra)
         prod.nombre = request.form.get("nombre", prod.nombre)
         prod.descripcion = request.form.get("descripcion", prod.descripcion)
-        prod.id_categoria = request.form.get("id_categoria") or None
         prod.id_marca = request.form.get("id_marca") or None
         prod.id_unidad = request.form.get("id_unidad") or None
         prod.precio_compra = float(request.form.get("precio_compra", prod.precio_compra or 0.0))
-        prod.precio_venta = float(request.form.get("precio_venta", prod.precio_venta))
-        prod.aplica_impuesto = request.form.get("aplica_impuesto") == 'true'
         if request.form.get("tipo_producto"):
             prod.tipo_producto = request.form.get("tipo_producto")
-        
+
+        # Insumo/material son solo para costear recetas: no se venden, no
+        # llevan categoria propia ni impuesto. Solo "final" es vendible.
+        vendible = prod.tipo_producto == "final"
+        prod.id_categoria = (request.form.get("id_categoria") or None) if vendible else None
+        prod.precio_venta = float(request.form.get("precio_venta", prod.precio_venta)) if vendible else 0.0
+        prod.aplica_impuesto = (request.form.get("aplica_impuesto") == 'true') if vendible else False
+        prod.se_vende = vendible
+
         # Actualizar stock mínimo si existe el registro de inventario
         inv = Inventario.query.filter_by(id_producto=prod.id_producto).first()
         if inv:

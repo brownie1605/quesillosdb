@@ -68,18 +68,26 @@
     </div>
 </div>
 
-<!-- Modal personalización -->
+<!-- Modal personalización (paso a paso) -->
 <div class="modal fade" id="modalPersonalizar" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title" id="pzTitulo">Personalizar</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
-                <div id="pzGrupos"></div>
-                <div id="pzExcluibles"></div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <small class="fw-bold" style="color:#8d6e63;" id="pzProgreso"></small>
+                </div>
+                <div class="progress mb-3" style="height:6px;">
+                    <div class="progress-bar" id="pzProgresoBar" style="background:#8B2E2E;width:0%"></div>
+                </div>
+                <div id="pzStepContent"></div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn text-white" style="background:#8B2E2E;" id="pzAgregarBtn">Agregar</button>
+            <div class="modal-footer d-flex justify-content-between">
+                <button class="btn btn-outline-secondary" id="pzAtrasBtn" onclick="pzAtras()">← Atrás</button>
+                <div>
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button class="btn text-white" style="background:#8B2E2E;" id="pzAgregarBtn" onclick="pzSiguiente()">Continuar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -142,7 +150,6 @@ async function init() {
     document.getElementById('buscar').addEventListener('input', renderProductos);
     document.getElementById('btnEnviar').addEventListener('click', enviarCarrito);
     document.getElementById('btnCobrar').addEventListener('click', abrirCobrar);
-    document.getElementById('pzAgregarBtn').addEventListener('click', confirmarPersonalizacion);
     document.getElementById('btnConfirmarCobro').addEventListener('click', confirmarCobro);
     ['cbDescuento', 'cbPropina', 'cbRecibido'].forEach(id =>
         document.getElementById(id).addEventListener('input', recalcularCobro));
@@ -269,47 +276,117 @@ async function quitarDeLaCuenta(idDetalle) {
     else Swal.fire({icon:'error', title:'No se pudo quitar', text:r.message});
 }
 
-// ---- personalización ----
+// ---- personalización: modal paso a paso ----
+// Cada grupo de la receta (ej. "Gallopinto o frijoles", "Huevo", "Acompañamiento",
+// "Tortilla o maduro") es un paso independiente. El mesero elige una opción y le
+// da Continuar, o le da Continuar sin elegir nada para OMITIR ese ingrediente
+// por completo (no sale en la comanda de cocina). Al final, si la receta tiene
+// ingredientes que se pueden quitar (ej. cebolla, crema), se muestra un último
+// paso tipo checklist.
+let pzPasos = [];
+let pzIndice = 0;
+let pzSeleccion = {};       // id_grupo -> id_item elegido (o undefined si se omitió)
+let pzExcluidosSet = new Set(); // ids de ingredientes desmarcados (se quitan)
+
 async function abrirPersonalizar(p) {
     pzProducto = p;
     document.getElementById('pzTitulo').textContent = 'Personalizar: ' + p.nombre;
     const datos = await fetch(`/ventas/api/personalizacion/${p.id_producto}`).then(r => r.json());
     pzDatos = datos;
-    document.getElementById('pzGrupos').innerHTML = (datos.grupos||[]).map(g => `
-        <div class="mb-3">
-            <label class="fw-bold">${g.nombre}${g.obligatorio?' *':' (opcional)'}</label>
-            ${g.items.map((it,idx) => `
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="pz-g-${g.id_grupo}" value="${it.id_item}" ${(it.es_default||idx===0)&&it.disponible?'checked':''} ${!it.disponible?'disabled':''}>
-                    <label class="form-check-label">${it.nombre}${!it.disponible?' (sin stock)':''}</label>
-                </div>`).join('')}
-        </div>`).join('');
+
+    pzPasos = (datos.grupos || []).map(g => ({ tipo: 'grupo', grupo: g }));
     const exc = datos.ingredientes_excluibles || [];
-    document.getElementById('pzExcluibles').innerHTML = exc.length ? `
-        <label class="fw-bold">Ingredientes</label>
-        ${exc.map(i => `<div class="form-check"><input class="form-check-input pz-exc" type="checkbox" value="${i.id_producto}" checked><label class="form-check-label">${i.nombre}</label></div>`).join('')}
-    ` : '';
+    if (exc.length) pzPasos.push({ tipo: 'exc', items: exc });
+
+    if (!pzPasos.length) { agregarAlCarritoNuevo(p, [], [], null); return; }
+
+    pzIndice = 0;
+    pzSeleccion = {};
+    pzExcluidosSet = new Set(); // vacio = no se quita nada por defecto
+
+    pzRenderPaso();
     new bootstrap.Modal(document.getElementById('modalPersonalizar')).show();
 }
 
-function confirmarPersonalizacion() {
-    for (const g of (pzDatos.grupos||[])) {
-        if (!g.obligatorio) continue;
-        if (!document.querySelector(`input[name="pz-g-${g.id_grupo}"]:checked`)) {
-            Swal.fire({icon:'warning', title:`Elige una opción de "${g.nombre}"`}); return;
-        }
+function pzRenderPaso() {
+    const paso = pzPasos[pzIndice];
+    const total = pzPasos.length;
+    const esUltimo = pzIndice === total - 1;
+
+    document.getElementById('pzProgreso').textContent = `Paso ${pzIndice + 1} de ${total}`;
+    document.getElementById('pzProgresoBar').style.width = `${((pzIndice + 1) / total) * 100}%`;
+    document.getElementById('pzAtrasBtn').style.display = pzIndice === 0 ? 'none' : 'inline-block';
+    document.getElementById('pzAgregarBtn').textContent = esUltimo ? 'Agregar al pedido' : 'Continuar';
+
+    const cont = document.getElementById('pzStepContent');
+    if (paso.tipo === 'grupo') {
+        const g = paso.grupo;
+        const elegido = pzSeleccion[g.id_grupo];
+        cont.innerHTML = `
+            <label class="fw-bold d-block mb-2">${g.nombre}</label>
+            <div class="d-grid gap-2">
+                ${g.items.map(it => `
+                    <button type="button" class="btn ${elegido === it.id_item ? 'text-white' : 'btn-outline-secondary'}"
+                        style="text-align:left;${elegido === it.id_item ? 'background:#8B2E2E;border-color:#8B2E2E;' : ''}"
+                        ${!it.disponible ? 'disabled' : ''}
+                        onclick="pzElegir(${g.id_grupo}, ${it.id_item})">
+                        ${elegido === it.id_item ? '✓ ' : ''}${it.nombre}${!it.disponible ? ' (sin stock)' : ''}
+                    </button>`).join('')}
+            </div>
+            <p class="text-muted small mt-2 mb-0">Toca una opción, o dale "${esUltimo ? 'Agregar al pedido' : 'Continuar'}" para omitirla.</p>
+        `;
+    } else {
+        cont.innerHTML = `
+            <label class="fw-bold d-block mb-2">¿Qué lleva?</label>
+            ${paso.items.map(i => `
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="pz-exc-${i.id_producto}"
+                        ${pzExcluidosSet.has(i.id_producto) ? '' : 'checked'}
+                        onchange="pzToggleExc(${i.id_producto}, this.checked)">
+                    <label class="form-check-label" for="pz-exc-${i.id_producto}">${i.nombre}</label>
+                </div>`).join('')}
+        `;
     }
+}
+
+function pzElegir(idGrupo, idItem) {
+    // Tocar la opción ya elegida la deselecciona (queda omitida de nuevo).
+    pzSeleccion[idGrupo] = pzSeleccion[idGrupo] === idItem ? undefined : idItem;
+    pzRenderPaso();
+}
+
+function pzToggleExc(idProducto, marcado) {
+    if (marcado) pzExcluidosSet.delete(idProducto);
+    else pzExcluidosSet.add(idProducto);
+}
+
+function pzAtras() {
+    if (pzIndice > 0) { pzIndice--; pzRenderPaso(); }
+}
+
+function pzSiguiente() {
+    if (pzIndice < pzPasos.length - 1) { pzIndice++; pzRenderPaso(); }
+    else pzFinalizarPersonalizacion();
+}
+
+function pzFinalizarPersonalizacion() {
     const opciones = [], nombresOp = [];
-    (pzDatos.grupos||[]).forEach(g => {
-        const m = document.querySelector(`input[name="pz-g-${g.id_grupo}"]:checked`);
-        if (m) { opciones.push(parseInt(m.value)); const it=g.items.find(i=>i.id_item===parseInt(m.value)); if(it) nombresOp.push(it.nombre); }
+    (pzDatos.grupos || []).forEach(g => {
+        const idItem = pzSeleccion[g.id_grupo];
+        if (idItem === undefined) return; // se omitió este grupo
+        opciones.push(idItem);
+        const it = g.items.find(i => i.id_item === idItem);
+        if (it) nombresOp.push(it.nombre);
     });
-    const excluidos = [], nombresExc = [];
-    document.querySelectorAll('.pz-exc').forEach(c => { if (!c.checked) { excluidos.push(parseInt(c.value));
-        const ing=(pzDatos.ingredientes_excluibles||[]).find(i=>i.id_producto===parseInt(c.value)); if(ing) nombresExc.push(ing.nombre); } });
+    const excluidos = [...pzExcluidosSet], nombresExc = [];
+    excluidos.forEach(idProd => {
+        const ing = (pzDatos.ingredientes_excluibles || []).find(i => i.id_producto === idProd);
+        if (ing) nombresExc.push(ing.nombre);
+    });
     let comentario = '';
-    if (nombresExc.length) comentario += 'Sin ' + nombresExc.join(', ');
-    if (nombresOp.length) comentario += (comentario?' · ':'') + nombresOp.join(' · ');
+    if (nombresOp.length) comentario += nombresOp.join(' · ');
+    if (nombresExc.length) comentario += (comentario ? ' · ' : '') + 'Sin ' + nombresExc.join(', ');
+
     bootstrap.Modal.getInstance(document.getElementById('modalPersonalizar')).hide();
     agregarAlCarritoNuevo(pzProducto, excluidos, opciones, comentario || null);
 }

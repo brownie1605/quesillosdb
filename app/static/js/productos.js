@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prod_precio_venta').addEventListener('input', calcularIvaEnModal);
     document.getElementById('prod_aplica_impuesto').addEventListener('change', calcularIvaEnModal);
 
+    // Insumo/material: sin precio de venta, sin categoría, sin IVA
+    document.getElementById('prod_tipo_producto').addEventListener('change', actualizarCamposPorTipo);
+
     // Formularios
     document.getElementById('formProducto').addEventListener('submit', guardarProducto);
     document.getElementById('formEntrada').addEventListener('submit', guardarEntrada);
@@ -163,7 +166,26 @@ function abrirModalCrear() {
     document.getElementById('prod_tipo_producto').value = 'final';
     document.getElementById('prod_imagen_preview').innerHTML = '';
     document.getElementById('modalProducto').style.display = 'flex';
+    actualizarCamposPorTipo();
     calcularIvaEnModal();
+}
+
+// Insumo/material: no se venden -> ocultamos Precio Venta, Categoría e IVA.
+// Solo "final" se vende al cliente y usa esos campos.
+function actualizarCamposPorTipo() {
+    const tipo = document.getElementById('prod_tipo_producto').value;
+    const esVendible = tipo === 'final';
+
+    document.getElementById('campo_categoria').style.display = esVendible ? '' : 'none';
+    document.getElementById('campo_precio_venta').style.display = esVendible ? '' : 'none';
+    document.getElementById('campo_iva').style.display = esVendible ? '' : 'none';
+    document.getElementById('prod_tipo_ayuda').style.display = esVendible ? 'none' : 'block';
+
+    if (!esVendible) {
+        document.getElementById('prod_categoria').value = '';
+        document.getElementById('prod_precio_venta').value = '0.00';
+        document.getElementById('prod_aplica_impuesto').checked = false;
+    }
 }
 
 function calcularIvaEnModal() {
@@ -203,8 +225,9 @@ function abrirModalEditar(id) {
         preview.innerHTML = '';
     }
     document.getElementById('prod_imagen').value = '';
-    
+
     document.getElementById('modalProducto').style.display = 'flex';
+    actualizarCamposPorTipo();
     calcularIvaEnModal();
 }
 
