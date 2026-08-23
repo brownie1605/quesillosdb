@@ -45,12 +45,12 @@
 
         {% if es_admin or rol == 'cajero' %}
         <a href="{{ url_for('inventario.lista') }}" class="{% if request.blueprint == 'inventario' %}active{% endif %}">📊 Inventario</a>
-        <a href="{{ url_for('compra.lista') }}" class="{% if request.blueprint == 'compra' %}active{% endif %}">🛍 Compras</a>
+        <a href="{{ url_for('compra.lista') }}" class="{% if request.blueprint == 'compra' %}active{% endif %}">🛍 Compras <small>(y proveedores)</small></a>
         {% endif %}
 
         {% if es_admin or rol == 'cajero' %}
         <div class="menu-label">🧾 CAJA</div>
-        <a href="{{ url_for('caja.index') }}" class="{% if request.blueprint == 'caja' %}active{% endif %}">🧾 Caja <small>(y proveedores)</small></a>
+        <a href="{{ url_for('caja.index') }}" class="{% if request.blueprint == 'caja' %}active{% endif %}">🧾 Caja</a>
         {% endif %}
 
         {% if es_admin %}

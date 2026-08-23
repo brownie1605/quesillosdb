@@ -77,19 +77,77 @@ def api_resumen_ventas():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
+@reporte_bp.route("/api/resumen_financiero", methods=["GET"])
+@login_required
+def api_resumen_financiero():
+    """Resumen financiero de un rango (o de los ultimos 7 dias por defecto).
+    Usa la misma logica que el CSV de exportar_ventas: ganancia bruta =
+    ventas - costo de productos vendidos; ganancia neta = bruta - gastos
+    varios (compras tipo_compra='varios')."""
+    try:
+        inicio = request.args.get('inicio')
+        fin = request.args.get('fin')
+        if inicio and fin:
+            fecha_inicio, fecha_fin = inicio, fin
+        else:
+            hoy = nicaragua_now().date()
+            fecha_inicio = str(hoy - timedelta(days=6))
+            fecha_fin = str(hoy)
+
+        query_ventas = text("""
+            SELECT COALESCE(SUM(v.total), 0) as total_vendido,
+                   COALESCE(SUM((SELECT SUM(dv.cantidad * p.precio_compra) FROM detalle_ventas dv JOIN productos p ON dv.id_producto = p.id_producto WHERE dv.id_venta = v.id_venta)), 0) as costo_total,
+                   COUNT(*) as cantidad_ventas
+            FROM ventas v
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada'
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+        """)
+        fila = db.session.execute(query_ventas, {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}).fetchone()
+        total_vendido = float(fila.total_vendido or 0)
+        costo_total = float(fila.costo_total or 0)
+        cantidad_ventas = int(fila.cantidad_ventas or 0)
+
+        query_gastos = text("""
+            SELECT COALESCE(SUM(total), 0) FROM compras
+            WHERE id_empresa = :empresa AND estado = 'completada' AND tipo_compra = 'varios'
+            AND DATE(fecha_compra) >= :inicio AND DATE(fecha_compra) <= :fin
+        """)
+        total_gastos = float(db.session.execute(query_gastos, {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}).scalar() or 0)
+
+        ganancia_bruta = total_vendido - costo_total
+        ganancia_neta = ganancia_bruta - total_gastos
+
+        return jsonify({
+            "success": True,
+            "inicio": fecha_inicio,
+            "fin": fecha_fin,
+            "total_vendido": total_vendido,
+            "cantidad_ventas": cantidad_ventas,
+            "ticket_promedio": (total_vendido / cantidad_ventas) if cantidad_ventas else 0.0,
+            "costo_productos": costo_total,
+            "ganancia_bruta": ganancia_bruta,
+            "gastos_varios": total_gastos,
+            "ganancia_neta": ganancia_neta,
+            "margen_pct": (ganancia_neta / total_vendido * 100) if total_vendido else 0.0
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @reporte_bp.route("/api/productos_top", methods=["GET"])
 @login_required
 def api_productos_top():
     try:
         inicio = request.args.get('inicio')
         fin = request.args.get('fin')
-        
-        date_filter = ""
-        params = {"empresa": current_user.id_empresa}
-        if inicio and fin:
-            date_filter = "AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin"
-            params["inicio"] = inicio
-            params["fin"] = fin
+
+        if not inicio or not fin:
+            hoy = nicaragua_now().date()
+            inicio = str(hoy - timedelta(days=6))
+            fin = str(hoy)
+
+        date_filter = "AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin"
+        params = {"empresa": current_user.id_empresa, "inicio": inicio, "fin": fin}
 
         # Consultar productos más vendidos
         query = text(f"""

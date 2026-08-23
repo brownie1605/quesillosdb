@@ -50,6 +50,43 @@
     <button id="btnQuitarFiltroDashboard" class="btn btn-secondary" title="Quitar Filtro">❌</button>
 </div>
 
+<!-- Resumen financiero del rango seleccionado (mismo calculo que el reporte CSV) -->
+<div class="panel" style="padding: 20px; margin-bottom: 20px;">
+    <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">💰 Resumen financiero <small id="rangoFinancieroLabel" style="font-weight: 400; opacity: .6; font-size: 13px;"></small></h3>
+    <div class="cards-grid" id="cardsFinanciero" style="margin-top: 10px;">
+        <div class="kpi-card">
+            <p>Total vendido</p>
+            <h2 id="fVentas">C$ 0.00</h2>
+            <span id="fCantVentas">0 ventas</span>
+        </div>
+        <div class="kpi-card">
+            <p>Ticket promedio</p>
+            <h2 id="fTicket">C$ 0.00</h2>
+            <span>Por venta</span>
+        </div>
+        <div class="kpi-card">
+            <p>Costo de productos</p>
+            <h2 style="color: var(--danger-color, #e74c3c);" id="fCosto">C$ 0.00</h2>
+            <span>Costo de lo vendido</span>
+        </div>
+        <div class="kpi-card">
+            <p>Ganancia bruta</p>
+            <h2 id="fBruta">C$ 0.00</h2>
+            <span class="positive">Vendido − Costo</span>
+        </div>
+        <div class="kpi-card">
+            <p>Gastos varios</p>
+            <h2 style="color: var(--danger-color, #e74c3c);" id="fGastos">C$ 0.00</h2>
+            <span class="danger" style="color: var(--danger-color, #e74c3c); font-size: 0.9em;">Compras/gastos</span>
+        </div>
+        <div class="kpi-card">
+            <p>Ganancia neta</p>
+            <h2 id="fNeta">C$ 0.00</h2>
+            <span id="fMargen">0% margen</span>
+        </div>
+    </div>
+</div>
+
 <div class="dashboard-grid">
 
     <div class="panel large-panel">
@@ -60,26 +97,20 @@
     </div>
 
     <div class="panel">
-        <h3>Productos más vendidos</h3>
+        <h3>Top productos vendidos</h3>
 
         <table>
             <thead>
                 <tr>
                     <th>Producto</th>
-                    <th>Vendidos</th>
+                    <th>Cant.</th>
+                    <th>Ingresos</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for prod_nombre, total_v in mas_vendidos %}
+            <tbody id="tbodyTopProductos">
                 <tr>
-                    <td>{{ loop.index }}. {{ prod_nombre }}</td>
-                    <td>{{ total_v }}</td>
+                    <td colspan="3" style="text-align: center;">Cargando…</td>
                 </tr>
-                {% else %}
-                <tr>
-                    <td colspan="2" style="text-align: center;">Sin ventas aún</td>
-                </tr>
-                {% endfor %}
             </tbody>
         </table>
     </div>
