@@ -1,0 +1,94 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Mesas{% endblock %}
+{% block page_title %}Mesas{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css">
+<style>
+    .mesas-wrap { padding: 4px 4px 30px; }
+    .mesas-titulo { color: #5d4037; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+    .seccion-titulo { color: #5d4037; font-weight: 700; margin: 24px 0 14px; text-transform: uppercase; letter-spacing: .5px; font-size: 1.2rem; }
+    .mesa-card { border: 1px solid rgba(141,110,99,.15); border-radius: 12px; text-align: center; padding: 20px 14px; background: #fff;
+                 box-shadow: 0 6px 16px rgba(0,0,0,.06); transition: all .3s ease; position: relative; overflow: hidden; height: 100%; }
+    .mesa-card::before { content:''; position:absolute; top:0; left:0; width:100%; height:5px; background: linear-gradient(to right, #8d6e63, #d7ccc8); }
+    .mesa-card:hover { transform: translateY(-6px); box-shadow: 0 14px 26px rgba(0,0,0,.12); }
+    .mesa-emoji { font-size: 44px; margin-bottom: 10px; }
+    .mesa-status { padding: 4px 14px; border-radius: 40px; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; display: inline-block; margin-bottom: 10px; }
+    .mesa-status.libre { background: linear-gradient(45deg,#4caf50,#8bc34a); color: #fff; }
+    .mesa-status.ocupada { background: linear-gradient(45deg,#f44336,#ff5722); color: #fff; }
+    .mesa-nombre { font-weight: 700; color: #5d4037; margin-bottom: 12px; font-size: 1.05rem; }
+    .btn-mesa { border-radius: 40px; font-weight: 600; padding: 8px 18px; border: none; width: 100%; }
+    .btn-mesa.libre { background: linear-gradient(45deg,#8d6e63,#bcaaa4); color: #fff; }
+    .btn-mesa.ocupada { background: linear-gradient(45deg,#8B2E2E,#b04545); color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mesas-wrap">
+    <h3 class="mesas-titulo">🍽️ Mesas</h3>
+
+    <div class="seccion-titulo">Salón</div>
+    <div class="row g-3" id="mesas-salon">
+        {% for m in mesas %}
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="mesa-card" data-id="{{ m.id_mesa }}">
+                <div class="mesa-status {{ m.estado }}">{{ 'Ocupada' if m.estado == 'ocupada' else 'Libre' }}</div>
+                <div class="mesa-emoji">🍽️</div>
+                <div class="mesa-nombre">{{ m.nombre }}</div>
+                <button class="btn-mesa {{ m.estado }}" onclick="irAMesa({{ m.id_mesa }}, '{{ m.estado }}')">
+                    {{ 'Ver cuenta' if m.estado == 'ocupada' else 'Atender' }}
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if para_llevar %}
+    <div class="seccion-titulo">🥡 Para llevar</div>
+    <div class="row g-3">
+        {% for m in para_llevar %}
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="mesa-card" data-id="{{ m.id_mesa }}">
+                <div class="mesa-status {{ m.estado }}">{{ 'Ocupada' if m.estado == 'ocupada' else 'Libre' }}</div>
+                <div class="mesa-emoji">🥡</div>
+                <div class="mesa-nombre">{{ m.nombre }}</div>
+                <button class="btn-mesa {{ m.estado }}" onclick="irAMesa({{ m.id_mesa }}, '{{ m.estado }}')">
+                    {{ 'Ver cuenta' if m.estado == 'ocupada' else 'Atender' }}
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if barra %}
+    <div class="seccion-titulo">🍺 Barra</div>
+    <div class="row g-3">
+        {% for m in barra %}
+        <div class="col-6 col-md-3 col-lg-2">
+            <div class="mesa-card" data-id="{{ m.id_mesa }}">
+                <div class="mesa-status {{ m.estado }}">{{ 'Ocupada' if m.estado == 'ocupada' else 'Libre' }}</div>
+                <div class="mesa-emoji">🍺</div>
+                <div class="mesa-nombre">{{ m.nombre }}</div>
+                <button class="btn-mesa {{ m.estado }}" onclick="irAMesa({{ m.id_mesa }}, '{{ m.estado }}')">
+                    {{ 'Ver cuenta' if m.estado == 'ocupada' else 'Atender' }}
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+<script>
+function irAMesa(id, estado) {
+    window.location.href = '/mesas/' + id + '/pedido';
+}
+</script>
+{% endblock %}

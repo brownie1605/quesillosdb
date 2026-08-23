@@ -249,3 +249,35 @@
 
 .dark-theme .q-table td { border-bottom-color: #2f3742; }
 .dark-theme .q-input, .dark-theme .q-select { background: #171c23; border-color: #2f3742; color: #e6ebf2; }
+
+/* ------------------------------------------------------------------ */
+/* Chrome cafe/beige (inspirado en quesillosdb-main): sidebar y marca. */
+/* ------------------------------------------------------------------ */
+:root {
+    --q-cafe: #8d6e63;
+    --q-cafe-claro: #bcaaa4;
+}
+
+.sidebar {
+    background: linear-gradient(180deg, #4e342e, #3e2723) !important;
+}
+
+.brand-icon {
+    background: linear-gradient(135deg, var(--q-cafe), var(--q-cafe-claro)) !important;
+}
+
+.menu-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--q-cafe-claro);
+    opacity: 0.85;
+    margin: 16px 4px 4px;
+}
+
+.menu a.active {
+    background: linear-gradient(135deg, var(--q-cafe), var(--q-cafe-claro)) !important;
+}
+
+.dark-theme .sidebar { background: linear-gradient(180deg, #3e2723, #2b1a16) !important; }

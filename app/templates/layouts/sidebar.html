@@ -25,15 +25,20 @@
         {% endif %}
 
         {% if es_admin or rol in ['cajero', 'mesero'] %}
+        <div class="menu-label">🍽️ ATENCIÓN</div>
+        <a href="{{ url_for('mesa.lista') }}" class="{% if request.blueprint == 'mesa' %}active{% endif %}">🍽️ Mesas</a>
         <a href="{{ url_for('venta.pos') }}" class="{% if request.endpoint == 'venta.pos' %}active{% endif %}">💵 Punto de venta</a>
         <a href="{{ url_for('venta.historial') }}" class="{% if request.endpoint == 'venta.historial' %}active{% endif %}">🧾 Historial de ventas</a>
+        <a href="{{ url_for('cliente.lista') }}" class="{% if request.blueprint == 'cliente' %}active{% endif %}">🙂 Clientes</a>
         {% endif %}
 
         {% if es_admin or rol == 'cocinero' %}
+        <div class="menu-label">👨‍🍳 COCINA</div>
         <a href="{{ url_for('cocina.pendientes') }}" class="{% if request.blueprint == 'cocina' %}active{% endif %}">👨‍🍳 Cocina</a>
         <a href="{{ url_for('receta.lista') }}" class="{% if request.blueprint == 'receta' %}active{% endif %}">📖 Recetas</a>
         {% endif %}
 
+        <div class="menu-label">📦 INVENTARIO</div>
         <a href="{{ url_for('insumo.lista') }}" class="{% if request.blueprint == 'insumo' %}active{% endif %}">🥬 Insumos</a>
 
         {% if es_admin or rol in ['cajero', 'cocinero'] %}
@@ -46,7 +51,13 @@
         <a href="{{ url_for('proveedor.lista') }}" class="{% if request.blueprint == 'proveedor' %}active{% endif %}">🚚 Proveedores</a>
         {% endif %}
 
+        {% if es_admin or rol == 'cajero' %}
+        <div class="menu-label">🧾 CAJA</div>
+        <a href="{{ url_for('caja.index') }}" class="{% if request.blueprint == 'caja' %}active{% endif %}">🧾 Turno de caja</a>
+        {% endif %}
+
         {% if es_admin %}
+        <div class="menu-label">👥 ADMINISTRACIÓN</div>
         <a href="{{ url_for('reporte.index') }}" class="{% if request.blueprint == 'reporte' %}active{% endif %}">📈 Reportes</a>
         <a href="{{ url_for('usuario.lista') }}" class="{% if request.blueprint == 'usuario' %}active{% endif %}">👥 Usuarios</a>
         <a href="{{ url_for('sync.panel') }}" class="{% if request.blueprint == 'sync' %}active{% endif %}">🔄 Sincronización</a>

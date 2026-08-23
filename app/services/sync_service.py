@@ -38,6 +38,7 @@ TABLAS_SYNC = [
     "unidades_medida",
     "proveedores",
     "clientes",
+    "mesas",
     "productos",
     "recetas",
     "receta_ingredientes",
@@ -50,6 +51,10 @@ TABLAS_SYNC = [
     "compras",
     "detalle_compras",
     "notificaciones",
+    "cajas",
+    "aperturas_caja",
+    "movimientos_caja",
+    "cierres_caja",
 ]
 
 # Clave primaria de cada tabla sincronizable.
@@ -61,6 +66,7 @@ PK_POR_TABLA = {
     "unidades_medida": "id_unidad",
     "proveedores": "id_proveedor",
     "clientes": "id_cliente",
+    "mesas": "id_mesa",
     "productos": "id_producto",
     "recetas": "id_receta",
     "receta_ingredientes": "id_ingrediente",
@@ -73,6 +79,10 @@ PK_POR_TABLA = {
     "compras": "id_compra",
     "detalle_compras": "id_detalle_compra",
     "notificaciones": "id_notificacion",
+    "cajas": "id_caja",
+    "aperturas_caja": "id_apertura",
+    "movimientos_caja": "id_movimiento_caja",
+    "cierres_caja": "id_cierre",
 }
 
 # Columna de marca temporal usada por el PULL.

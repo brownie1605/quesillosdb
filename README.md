@@ -110,6 +110,7 @@ Aplica **una sola vez** el script de actualización sobre Railway
 ```bash
 mysql -h HOST -P PUERTO -u USUARIO -p pos_inventario_cloud < bd/02_cloud_upgrade.sql
 mysql -h HOST -P PUERTO -u USUARIO -p pos_inventario_cloud < bd/03_opciones_y_categorias.sql
+mysql -h HOST -P PUERTO -u USUARIO -p pos_inventario_cloud < bd/04_mesas_y_caja.sql
 ```
 
 Ambos scripts son idempotentes: pueden ejecutarse varias veces sin dañar los
@@ -249,13 +250,46 @@ Cuando la venta local no cabe en el stock de la nube:
 
 ---
 
+## 5a. Mesas (salón)
+
+El flujo de venta en salón es **Mesas → Pedido → Cobrar**, aparte de la venta
+directa de mostrador (`/ventas/pos`, para "Barra" o para llevar sin mesa):
+
+1. `/mesas` — cuadrícula de mesas (13 mesas + Para llevar + 5 puestos de
+   barra, sembrados por `bd/04_mesas_y_caja.sql`). Verde = libre, rojo = ocupada.
+2. Al tocar una mesa libre se abre una **cuenta** (`ventas.estado = 'pendiente'`,
+   ligada a la mesa) y se entra a `/mesas/<id>/pedido`: catálogo con pestañas
+   de categoría a la izquierda, cuenta de la mesa a la derecha.
+3. Se pueden seguir agregando o quitando productos mientras la mesa está
+   ocupada (esto es "editar el pedido en curso"); cada cambio descuenta o
+   devuelve inventario al instante.
+4. **Cobrar** cierra la cuenta (`estado = 'completada'`), pide método de pago,
+   descuento y propina, y libera la mesa.
+
+Administrar las mesas (crear/quitar) es solo de Admin, vía
+`POST /mesas/api/crear` y `POST /mesas/api/<id>/desactivar`.
+
+## 5b. Caja y clientes
+
+- **`/caja`** — Admin y Cajero. Abrir turno con un monto inicial, registrar
+  gastos/ingresos/retiros durante el día, y cerrar turno: compara el efectivo
+  contado contra lo esperado (inicial + ventas en efectivo + ingresos − egresos)
+  y guarda la diferencia en `cierres_caja`.
+- **`/clientes`** — alta rápida de clientes (nombre, cédula, teléfono,
+  dirección) para asociarlos a una venta o cuenta de mesa.
+
+---
+
 ## 6. Roles y permisos
 
 | Ruta | Admin | Cocinero | Cajero | Mesero |
 |---|:---:|:---:|:---:|:---:|
 | `/` Dashboard | ✅ | ❌ | ❌ | ❌ |
+| `/mesas` | ✅ | ❌ | ✅ | ✅ |
 | `/ventas/pos` | ✅ | ❌ | ✅ | ✅ |
 | `/ventas/historial` | ✅ | ❌ | ✅ | ✅ (solo suyas) |
+| `/clientes` | ✅ | ❌ | ✅ | ✅ |
+| `/caja` | ✅ | ❌ | ✅ | ❌ |
 | `/recetas` | ✅ CRUD | ✅ CRUD | ❌ | ❌ |
 | `/insumos` | ✅ CRUD | ✅ CRUD | 👁 lectura | 👁 lectura |
 | `/cocina` | ✅ | ✅ | ❌ | ❌ |

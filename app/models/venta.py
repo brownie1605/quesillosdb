@@ -10,6 +10,7 @@ class Venta(db.Model):
     id_sucursal = db.Column(db.Integer, nullable=True)
     id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id_usuario'), nullable=False)
     id_cliente = db.Column(db.Integer, db.ForeignKey('clientes.id_cliente'), nullable=True)
+    id_mesa = db.Column(db.Integer, db.ForeignKey('mesas.id_mesa'), nullable=True)
     numero_venta = db.Column(db.String(50), nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), default=0.0)
     descuento = db.Column(db.Numeric(12, 2), default=0.0)
@@ -38,6 +39,7 @@ class Venta(db.Model):
     def to_dict(self):
         return {
             "id_venta": self.id_venta,
+            "id_mesa": self.id_mesa,
             "numero_venta": self.numero_venta,
             "subtotal": float(self.subtotal) if self.subtotal else 0.0,
             "descuento": float(self.descuento) if self.descuento else 0.0,

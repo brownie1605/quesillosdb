@@ -1,0 +1,354 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}{{ mesa.nombre }}{% endblock %}
+{% block page_title %}{{ mesa.icono }} {{ mesa.nombre }}{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css">
+<style>
+    .pedido-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+    @media (max-width: 991px) { .pedido-layout { grid-template-columns: 1fr; } }
+    .cat-tabs { display:flex; gap:8px; overflow-x:auto; padding:4px 2px 10px; }
+    .cat-tab { flex:0 0 auto; padding:6px 16px; border-radius:20px; border:1px solid #d7ccc8; background:#fff; color:#5d4037; font-size:13px; font-weight:600; cursor:pointer; }
+    .cat-tab.active { background: linear-gradient(45deg,#8d6e63,#bcaaa4); color:#fff; border-color:transparent; }
+    .prod-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap:12px; max-height: 62vh; overflow-y:auto; padding-right:4px; }
+    .prod-card { background:#fff; border:1px solid #eee; border-radius:12px; padding:14px 10px; text-align:center; cursor:pointer; transition: all .2s; }
+    .prod-card:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,.08); border-color:#bcaaa4; }
+    .prod-card.agotado { opacity:.45; pointer-events:none; }
+    .prod-nombre { font-size: 13px; font-weight:600; color:#3e2723; margin: 6px 0 2px; }
+    .prod-precio { color:#8B2E2E; font-weight:700; font-size: 13px; }
+    .cuenta-panel { background:#fff; border-radius:14px; border:1px solid #eee; display:flex; flex-direction:column; box-shadow: 0 6px 20px rgba(0,0,0,.06); }
+    .cuenta-header { padding:16px 18px; border-bottom:1px solid #eee; font-weight:700; color:#5d4037; display:flex; justify-content:space-between; align-items:center; }
+    .cuenta-items { padding: 10px 16px; max-height: 30vh; overflow-y:auto; }
+    .cuenta-linea { display:flex; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px dashed #eee; font-size:13.5px; }
+    .cuenta-linea small { color:#e67e22; display:block; }
+    .carrito-nuevo { padding: 10px 16px; border-top: 1px solid #eee; }
+    .carrito-item { display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:5px 0; }
+    .totales { padding: 14px 18px; background:#faf5f2; border-radius:0 0 14px 14px; }
+    .totales .fila { display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px; color:#6d5f5a; }
+    .totales .fila.total { font-weight:800; font-size: 19px; color:#3e2723; border-top:1px solid #e0d5d0; padding-top:8px; margin-top:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pedido-layout">
+    <div>
+        <input type="text" class="form-control mb-2" id="buscar" placeholder="Buscar producto...">
+        <div class="cat-tabs" id="catTabs"></div>
+        <div class="prod-grid" id="prodGrid"></div>
+    </div>
+
+    <div class="cuenta-panel">
+        <div class="cuenta-header">
+            <span>Cuenta — {{ mesa.nombre }}</span>
+            <a href="/mesas/" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Mesas</a>
+        </div>
+
+        <div class="cuenta-items" id="cuentaItems">
+            <p class="text-muted small text-center py-3">Aún no hay productos en la cuenta.</p>
+        </div>
+
+        <div class="carrito-nuevo">
+            <div style="font-weight:600; font-size:13px; color:#5d4037; margin-bottom:6px;">Agregar a la cuenta</div>
+            <div id="carritoNuevo"><p class="text-muted small">Toca un producto para agregarlo.</p></div>
+            <button class="btn btn-sm w-100 mt-2" style="background: linear-gradient(45deg,#8d6e63,#bcaaa4); color:#fff;" id="btnEnviar" disabled>
+                <i class="bi bi-send"></i> Enviar a la cuenta
+            </button>
+        </div>
+
+        <div class="totales">
+            <div class="fila"><span>Subtotal</span><span id="totSubtotal">C$ 0.00</span></div>
+            <div class="fila total"><span>Total</span><span id="totTotal">C$ 0.00</span></div>
+            <button class="btn w-100 mt-2" style="background: linear-gradient(45deg,#8B2E2E,#b04545); color:#fff;" id="btnCobrar" disabled>
+                <i class="bi bi-cash-coin"></i> Cobrar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal personalización -->
+<div class="modal fade" id="modalPersonalizar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="pzTitulo">Personalizar</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div id="pzGrupos"></div>
+                <div id="pzExcluibles"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn text-white" style="background:#8B2E2E;" id="pzAgregarBtn">Agregar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal cobrar -->
+<div class="modal fade" id="modalCobrar" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Cobrar {{ mesa.nombre }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-2 d-flex justify-content-between"><span>Subtotal</span><strong id="cbSubtotal">C$ 0.00</strong></div>
+                <div class="mb-2">
+                    <label class="form-label">Descuento (C$)</label>
+                    <input type="number" class="form-control" id="cbDescuento" value="0" min="0" step="0.01">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Propina (C$)</label>
+                    <input type="number" class="form-control" id="cbPropina" value="0" min="0" step="0.01">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Método de pago</label>
+                    <select class="form-select" id="cbMetodo">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Tarjeta">Tarjeta</option>
+                        <option value="Transferencia">Transferencia</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Monto recibido (C$)</label>
+                    <input type="number" class="form-control" id="cbRecibido" value="0" min="0" step="0.01">
+                </div>
+                <div class="d-flex justify-content-between fs-5 fw-bold mt-3 pt-2 border-top">
+                    <span>Total</span><span id="cbTotal">C$ 0.00</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn text-white" style="background:#8B2E2E;" id="btnConfirmarCobro">Confirmar cobro</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
+<script>
+const ID_MESA = {{ mesa.id_mesa }};
+let productos = [];
+let categoriaActiva = '';
+let carritoNuevo = [];   // lo que se va a "enviar" a la cuenta
+let cuenta = { venta: null, detalles: [] };
+let pzProducto = null, pzDatos = null;
+
+async function init() {
+    await cargarProductos();
+    await cargarCuenta();
+    document.getElementById('buscar').addEventListener('input', renderProductos);
+    document.getElementById('btnEnviar').addEventListener('click', enviarCarrito);
+    document.getElementById('btnCobrar').addEventListener('click', abrirCobrar);
+    document.getElementById('pzAgregarBtn').addEventListener('click', confirmarPersonalizacion);
+    document.getElementById('btnConfirmarCobro').addEventListener('click', confirmarCobro);
+    ['cbDescuento', 'cbPropina', 'cbRecibido'].forEach(id =>
+        document.getElementById(id).addEventListener('input', recalcularCobro));
+}
+
+async function cargarProductos() {
+    productos = await fetch('/ventas/api/productos').then(r => r.json());
+    renderTabs();
+    renderProductos();
+}
+
+function renderTabs() {
+    const cats = [...new Set(productos.map(p => p.categoria_nombre || 'Sin categoría'))].sort();
+    const tabs = document.getElementById('catTabs');
+    const todas = [{l:'Todos', v:''}, ...cats.map(c => ({l:c, v:c}))];
+    tabs.innerHTML = todas.map(t => `<button class="cat-tab ${categoriaActiva===t.v?'active':''}" data-cat="${t.v}">${t.l}</button>`).join('');
+    tabs.querySelectorAll('.cat-tab').forEach(b => b.addEventListener('click', () => {
+        categoriaActiva = b.dataset.cat;
+        tabs.querySelectorAll('.cat-tab').forEach(x => x.classList.toggle('active', x===b));
+        renderProductos();
+    }));
+}
+
+function renderProductos() {
+    const texto = document.getElementById('buscar').value.toLowerCase();
+    let lista = productos;
+    if (categoriaActiva) lista = lista.filter(p => (p.categoria_nombre||'Sin categoría') === categoriaActiva);
+    if (texto) lista = lista.filter(p => p.nombre.toLowerCase().includes(texto));
+
+    document.getElementById('prodGrid').innerHTML = lista.map(p => `
+        <div class="prod-card ${p.stock<=0?'agotado':''}" onclick="onProdClick(${p.id_producto})">
+            <div style="font-size:28px;">🍽️</div>
+            <div class="prod-nombre">${p.nombre}</div>
+            <div class="prod-precio">C$ ${p.precio_venta.toFixed(2)}</div>
+            ${p.tiene_personalizacion ? '<div style="font-size:10px;color:#8d6e63;">✎ personalizable</div>' : ''}
+        </div>
+    `).join('');
+}
+
+function onProdClick(id) {
+    const p = productos.find(x => x.id_producto === id);
+    if (!p) return;
+    if (p.tiene_personalizacion) { abrirPersonalizar(p); return; }
+    agregarAlCarritoNuevo(p, [], [], null);
+}
+
+function agregarAlCarritoNuevo(p, excluidos, opciones, comentario) {
+    const key = p.id_producto + '|' + (comentario || '');
+    const existente = carritoNuevo.find(i => i.key === key);
+    if (existente) existente.cantidad += 1;
+    else carritoNuevo.push({key, id_producto:p.id_producto, nombre:p.nombre, precio:p.precio_venta, cantidad:1, excluidos, opciones, comentario});
+    renderCarritoNuevo();
+}
+
+function renderCarritoNuevo() {
+    const cont = document.getElementById('carritoNuevo');
+    if (!carritoNuevo.length) { cont.innerHTML = '<p class="text-muted small">Toca un producto para agregarlo.</p>'; }
+    else {
+        cont.innerHTML = carritoNuevo.map(i => `
+            <div class="carrito-item">
+                <span>${i.cantidad}x ${i.nombre}${i.comentario?`<br><small style="color:#e67e22">✎ ${i.comentario}</small>`:''}</span>
+                <span>
+                    C$ ${(i.cantidad*i.precio).toFixed(2)}
+                    <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="quitarDelCarritoNuevo('${i.key}')"><i class="bi bi-x-circle"></i></button>
+                </span>
+            </div>`).join('');
+    }
+    document.getElementById('btnEnviar').disabled = carritoNuevo.length === 0;
+}
+
+function quitarDelCarritoNuevo(key) {
+    carritoNuevo = carritoNuevo.filter(i => i.key !== key);
+    renderCarritoNuevo();
+}
+
+async function enviarCarrito() {
+    const items = carritoNuevo.map(i => ({id_producto:i.id_producto, cantidad:i.cantidad, precio:i.precio, excluidos:i.excluidos, opciones:i.opciones, comentario:i.comentario}));
+    const btn = document.getElementById('btnEnviar');
+    btn.disabled = true;
+    try {
+        const r = await fetch(`/mesas/api/${ID_MESA}/agregar`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({items})}).then(r=>r.json());
+        if (r.success) {
+            carritoNuevo = [];
+            renderCarritoNuevo();
+            await cargarCuenta();
+            await cargarProductos();
+            Swal.fire({icon:'success', title:'Agregado', timer:1200, showConfirmButton:false});
+        } else {
+            Swal.fire({icon:'error', title:'No se pudo agregar', text:r.message});
+        }
+    } finally { btn.disabled = false; }
+}
+
+async function cargarCuenta() {
+    cuenta = await fetch(`/mesas/api/${ID_MESA}/cuenta`).then(r => r.json());
+    renderCuenta();
+}
+
+function renderCuenta() {
+    const cont = document.getElementById('cuentaItems');
+    const detalles = cuenta.detalles || [];
+    if (!detalles.length) {
+        cont.innerHTML = '<p class="text-muted small text-center py-3">Aún no hay productos en la cuenta.</p>';
+    } else {
+        cont.innerHTML = detalles.map(d => `
+            <div class="cuenta-linea">
+                <span>${d.cantidad}x ${d.producto}${d.comentario?`<small>✎ ${d.comentario}</small>`:''}</span>
+                <span>
+                    C$ ${d.subtotal.toFixed(2)}
+                    <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="quitarDeLaCuenta(${d.id_detalle_venta})"><i class="bi bi-trash"></i></button>
+                </span>
+            </div>`).join('');
+    }
+    const venta = cuenta.venta;
+    const subtotal = venta ? venta.subtotal : 0;
+    document.getElementById('totSubtotal').textContent = 'C$ ' + subtotal.toFixed(2);
+    document.getElementById('totTotal').textContent = 'C$ ' + subtotal.toFixed(2);
+    document.getElementById('btnCobrar').disabled = !detalles.length;
+}
+
+async function quitarDeLaCuenta(idDetalle) {
+    const r = await fetch(`/mesas/api/${ID_MESA}/quitar/${idDetalle}`, {method:'POST'}).then(r=>r.json());
+    if (r.success) { await cargarCuenta(); await cargarProductos(); }
+    else Swal.fire({icon:'error', title:'No se pudo quitar', text:r.message});
+}
+
+// ---- personalización ----
+async function abrirPersonalizar(p) {
+    pzProducto = p;
+    document.getElementById('pzTitulo').textContent = 'Personalizar: ' + p.nombre;
+    const datos = await fetch(`/ventas/api/personalizacion/${p.id_producto}`).then(r => r.json());
+    pzDatos = datos;
+    document.getElementById('pzGrupos').innerHTML = (datos.grupos||[]).map(g => `
+        <div class="mb-3">
+            <label class="fw-bold">${g.nombre}${g.obligatorio?' *':' (opcional)'}</label>
+            ${g.items.map((it,idx) => `
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="pz-g-${g.id_grupo}" value="${it.id_item}" ${(it.es_default||idx===0)&&it.disponible?'checked':''} ${!it.disponible?'disabled':''}>
+                    <label class="form-check-label">${it.nombre}${!it.disponible?' (sin stock)':''}</label>
+                </div>`).join('')}
+        </div>`).join('');
+    const exc = datos.ingredientes_excluibles || [];
+    document.getElementById('pzExcluibles').innerHTML = exc.length ? `
+        <label class="fw-bold">Ingredientes</label>
+        ${exc.map(i => `<div class="form-check"><input class="form-check-input pz-exc" type="checkbox" value="${i.id_producto}" checked><label class="form-check-label">${i.nombre}</label></div>`).join('')}
+    ` : '';
+    new bootstrap.Modal(document.getElementById('modalPersonalizar')).show();
+}
+
+function confirmarPersonalizacion() {
+    for (const g of (pzDatos.grupos||[])) {
+        if (!g.obligatorio) continue;
+        if (!document.querySelector(`input[name="pz-g-${g.id_grupo}"]:checked`)) {
+            Swal.fire({icon:'warning', title:`Elige una opción de "${g.nombre}"`}); return;
+        }
+    }
+    const opciones = [], nombresOp = [];
+    (pzDatos.grupos||[]).forEach(g => {
+        const m = document.querySelector(`input[name="pz-g-${g.id_grupo}"]:checked`);
+        if (m) { opciones.push(parseInt(m.value)); const it=g.items.find(i=>i.id_item===parseInt(m.value)); if(it) nombresOp.push(it.nombre); }
+    });
+    const excluidos = [], nombresExc = [];
+    document.querySelectorAll('.pz-exc').forEach(c => { if (!c.checked) { excluidos.push(parseInt(c.value));
+        const ing=(pzDatos.ingredientes_excluibles||[]).find(i=>i.id_producto===parseInt(c.value)); if(ing) nombresExc.push(ing.nombre); } });
+    let comentario = '';
+    if (nombresExc.length) comentario += 'Sin ' + nombresExc.join(', ');
+    if (nombresOp.length) comentario += (comentario?' · ':'') + nombresOp.join(' · ');
+    bootstrap.Modal.getInstance(document.getElementById('modalPersonalizar')).hide();
+    agregarAlCarritoNuevo(pzProducto, excluidos, opciones, comentario || null);
+}
+
+// ---- cobrar ----
+function abrirCobrar() {
+    recalcularCobro();
+    new bootstrap.Modal(document.getElementById('modalCobrar')).show();
+}
+
+function recalcularCobro() {
+    const subtotal = (cuenta.venta && cuenta.venta.subtotal) || 0;
+    const desc = parseFloat(document.getElementById('cbDescuento').value) || 0;
+    const prop = parseFloat(document.getElementById('cbPropina').value) || 0;
+    const total = Math.max(0, subtotal - desc + prop);
+    document.getElementById('cbSubtotal').textContent = 'C$ ' + subtotal.toFixed(2);
+    document.getElementById('cbTotal').textContent = 'C$ ' + total.toFixed(2);
+}
+
+async function confirmarCobro() {
+    const payload = {
+        metodo_pago: document.getElementById('cbMetodo').value,
+        descuento: parseFloat(document.getElementById('cbDescuento').value) || 0,
+        propina: parseFloat(document.getElementById('cbPropina').value) || 0,
+        monto_recibido: parseFloat(document.getElementById('cbRecibido').value) || 0,
+    };
+    const btn = document.getElementById('btnConfirmarCobro');
+    btn.disabled = true;
+    try {
+        const r = await fetch(`/mesas/api/${ID_MESA}/cobrar`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}).then(r=>r.json());
+        if (r.success) {
+            await Swal.fire({icon:'success', title:'Cobrado', text:'Venta #'+r.numero_venta});
+            window.location.href = '/mesas/';
+        } else {
+            Swal.fire({icon:'error', title:'No se pudo cobrar', text:r.message});
+        }
+    } finally { btn.disabled = false; }
+}
+
+init();
+</script>
+{% endblock %}

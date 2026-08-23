@@ -16,7 +16,9 @@ body {
 }
 
 .brand-panel {
-    background: radial-gradient(circle at top, #063b8e, #001b49 45%, #001330);
+    background:
+        linear-gradient(rgba(139, 46, 46, .82), rgba(62, 20, 20, .88)),
+        url('../quesillos/images/logos/frente.jpg') center/cover;
     color: white;
     padding: 70px 60px;
     display: flex;
@@ -26,25 +28,36 @@ body {
 }
 
 .logo-box {
-    width: 95px;
-    height: 95px;
-    background: linear-gradient(135deg, #2979ff, #0047ff);
-    border-radius: 18px;
+    width: 110px;
+    height: 110px;
+    background: white;
+    border-radius: 50%;
     display: grid;
     place-items: center;
     font-size: 45px;
     margin-bottom: 25px;
+    padding: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+    overflow: hidden;
+}
+
+.logo-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
 }
 
 .brand-panel h1 {
-    font-size: 64px;
+    font-size: 52px;
     font-weight: 800;
+    text-align: center;
 }
 
 .brand-panel h1 span {
     display: block;
-    font-size: 26px;
-    color: #4d9cff;
+    font-size: 22px;
+    color: #f0c88a;
     letter-spacing: 3px;
 }
 
@@ -94,7 +107,7 @@ body {
     height: 82px;
     margin: 0 auto 20px;
     border-radius: 50%;
-    background: #dfe9ff;
+    background: #fbe7e7;
     display: grid;
     place-items: center;
     font-size: 36px;
@@ -131,8 +144,8 @@ input {
 }
 
 input:focus {
-    border-color: #0b5cff;
-    box-shadow: 0 0 0 4px rgba(11, 92, 255, .08);
+    border-color: #8B2E2E;
+    box-shadow: 0 0 0 4px rgba(139, 46, 46, .1);
 }
 
 .options {
@@ -143,7 +156,7 @@ input:focus {
 }
 
 .options a {
-    color: #0057ff;
+    color: #8B2E2E;
     text-decoration: none;
 }
 
@@ -152,11 +165,17 @@ button {
     height: 60px;
     border: none;
     border-radius: 8px;
-    background: linear-gradient(135deg, #1d66ff, #004bff);
+    background: linear-gradient(135deg, #b04545, #8B2E2E);
     color: white;
     font-size: 18px;
     font-weight: 600;
     cursor: pointer;
+    transition: transform .2s, box-shadow .2s;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(139, 46, 46, .35);
 }
 
 .divider {

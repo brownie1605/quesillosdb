@@ -22,6 +22,9 @@ from app.routes.insumo_routes import insumo_bp
 from app.routes.cocina_routes import cocina_bp
 from app.routes.sync_routes import sync_bp
 from app.routes.notificacion_routes import notificacion_bp
+from app.routes.mesa_routes import mesa_bp
+from app.routes.cliente_routes import cliente_bp
+from app.routes.caja_routes import caja_bp
 
 from app.models import Usuario
 
@@ -91,6 +94,7 @@ def create_app(config_class=Config, iniciar_jobs=True):
         auth_bp, dashboard_bp, producto_bp, venta_bp, compra_bp, inventario_bp,
         reporte_bp, proveedor_bp, usuario_bp, configuracion_bp, auditoria_bp,
         receta_bp, insumo_bp, cocina_bp, sync_bp, notificacion_bp,
+        mesa_bp, cliente_bp, caja_bp,
     ):
         app.register_blueprint(bp)
 

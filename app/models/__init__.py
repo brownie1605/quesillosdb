@@ -9,6 +9,7 @@ from .marca import Marca
 from .proveedor import Proveedor
 from .unidad_medida import UnidadMedida
 from app.models.cliente import Cliente
+from app.models.mesa import Mesa
 from app.models.venta import Venta
 from app.models.detalle_venta import DetalleVenta
 from app.models.inventario import Inventario
@@ -25,7 +26,7 @@ from app.models.caja import Caja, AperturaCaja, MovimientoCaja, CierreCaja
 __all__ = [
     "Empresa", "Sucursal", "Rol", "Permiso", "RolPermiso", "Usuario",
     "RecuperacionPassword", "Producto", "Categoria", "Marca", "Proveedor",
-    "UnidadMedida", "Cliente", "Venta", "DetalleVenta", "Inventario",
+    "UnidadMedida", "Cliente", "Mesa", "Venta", "DetalleVenta", "Inventario",
     "MovimientoInventario", "Compra", "DetalleCompra", "Auditoria",
     "Receta", "RecetaIngrediente", "RecetaOpcionGrupo", "RecetaOpcionItem",
     "SyncQueue", "ConflictLog", "SyncMetadata",

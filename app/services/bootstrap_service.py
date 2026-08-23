@@ -33,6 +33,7 @@ ORDEN_COPIA = [
     "unidades_medida",
     "proveedores",
     "clientes",
+    "mesas",
     "productos",
     "recetas",
     "receta_ingredientes",
@@ -40,13 +41,16 @@ ORDEN_COPIA = [
     "receta_opciones_item",
     "inventario",
     "cajas",
+    "aperturas_caja",
     "compras",
     "detalle_compras",
     "ventas",
     "detalle_ventas",
     "movimientos_inventario",
+    "movimientos_caja",
     "configuraciones",
     "notificaciones",
+    "cierres_caja",
 ]
 
 # Tablas cuyos IDs se generan en ambos lados y por tanto necesitan rango propio.
@@ -68,6 +72,7 @@ TABLAS_CON_OFFSET = [
     "marcas",
     "usuarios",
     "notificaciones",
+    "mesas",
     "movimientos_caja",
     "aperturas_caja",
     "cierres_caja",
