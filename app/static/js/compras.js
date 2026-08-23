@@ -20,6 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnCerrarDetalles').addEventListener('click', () => {
         document.getElementById('modalDetalles').style.display = 'none';
     });
+
+    // Modal Cargar compra masiva (Excel)
+    document.getElementById('btnImportarCompra').addEventListener('click', abrirModalImportarCompra);
+    document.getElementById('btnCerrarModalImportarCompra').addEventListener('click', () => {
+        document.getElementById('modalImportarCompra').style.display = 'none';
+    });
+    document.getElementById('btnDescargarPlantillaCompra').addEventListener('click', descargarPlantillaCompra);
+    document.getElementById('importarCompraArchivo').addEventListener('change', leerArchivoImportarCompra);
+    document.getElementById('btnConfirmarImportarCompra').addEventListener('click', confirmarImportarCompra);
 });
 
 async function cargarDatosIniciales() {
@@ -358,5 +367,137 @@ async function verDetalles(id) {
         }
     } catch(e) {
         console.error(e);
+    }
+}
+
+// --- CARGAR COMPRA MASIVA (Excel) ---
+// El stock solo se mueve comprando: cada fila del Excel es una linea de
+// compra real (producto + cantidad + costo + proveedor), no un ajuste
+// directo de inventario.
+
+let importarCompraFilasParseadas = [];
+
+function abrirModalImportarCompra() {
+    document.getElementById('importarCompraArchivo').value = '';
+    document.getElementById('importarCompraResumen').innerHTML = '';
+    document.getElementById('importarCompraResultado').innerHTML = '';
+    document.getElementById('btnConfirmarImportarCompra').disabled = true;
+    importarCompraFilasParseadas = [];
+    document.getElementById('modalImportarCompra').style.display = 'flex';
+}
+
+function descargarPlantillaCompra() {
+    const datos = [
+        { "Código": "", "Nombre": "Quesillo Lo Nuestro", "Tipo": "final", "Categoría": "Quesillos", "Marca": "", "Proveedor": "Distribuidora El Sol", "Unidad": "Unidad", "Precio Venta": 40, "Costo Unitario": 25, "Cantidad": 20, "Stock Mínimo": 5, "Aplica IVA": "No" },
+        { "Código": "", "Nombre": "Tortilla", "Tipo": "insumo", "Categoría": "", "Marca": "", "Proveedor": "Tortillería Doña Chepa", "Unidad": "Unidad", "Precio Venta": "", "Costo Unitario": 3, "Cantidad": 200, "Stock Mínimo": 20, "Aplica IVA": "" },
+    ];
+    const wsDatos = XLSX.utils.json_to_sheet(datos);
+    wsDatos['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 22 }, { wch: 10 }, { wch: 13 }, { wch: 13 }, { wch: 10 }, { wch: 13 }, { wch: 10 }];
+
+    const instrucciones = [
+        ["Cómo llenar esta plantilla"],
+        ["- Cada fila es una línea de compra: cuánto compraste de qué producto, a qué proveedor y a qué costo."],
+        ["- Proveedor: OBLIGATORIO por fila (a quién se le compró). Si no existe todavía, se crea automáticamente."],
+        ["  Excepción: si pones una Marca que ya tiene un proveedor asignado, puedes dejar Proveedor vacío y se usa el de esa Marca."],
+        ["- Cantidad y Costo Unitario: obligatorios. La Cantidad es lo que se SUMA al stock actual del producto (no lo reemplaza)."],
+        ["- Código: opcional. Si coincide con un producto que ya existe, se actualiza ese producto en vez de crear uno nuevo."],
+        ["- Nombre: obligatorio. Si no hay código y el nombre coincide con uno existente (sin importar mayúsculas), también se actualiza ese producto."],
+        ["- Tipo: final, insumo o material. Solo 'final' se vende al cliente."],
+        ["- Categoría, Precio Venta y Aplica IVA solo aplican si Tipo = final."],
+        ["- Categoría y Marca: si escribes un nombre que no existe todavía, se crea automáticamente."],
+        ["- Unidad: debe coincidir con una unidad ya existente en el sistema (nombre o abreviatura); si no coincide, se deja sin unidad."],
+        ["- Stock Mínimo: opcional, solo se actualiza si lo llenas."],
+        ["- Aplica IVA: escribe Sí o No."],
+        ["- Se genera una Compra por cada Proveedor distinto que aparezca en el archivo (con todas sus líneas adentro)."],
+        ["- No cambies los nombres de las columnas de la hoja 'Plantilla'."],
+    ];
+    const wsInstrucciones = XLSX.utils.aoa_to_sheet(instrucciones);
+    wsInstrucciones['!cols'] = [{ wch: 115 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsDatos, "Plantilla");
+    XLSX.utils.book_append_sheet(wb, wsInstrucciones, "Instrucciones");
+    XLSX.writeFile(wb, "Plantilla_Compra_Masiva.xlsx");
+}
+
+async function leerArchivoImportarCompra(e) {
+    const file = e.target.files[0];
+    const resumen = document.getElementById('importarCompraResumen');
+    const btn = document.getElementById('btnConfirmarImportarCompra');
+    document.getElementById('importarCompraResultado').innerHTML = '';
+    if (!file) { resumen.innerHTML = ''; btn.disabled = true; return; }
+
+    try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const hoja = wb.Sheets[wb.SheetNames[0]];
+        const filas = XLSX.utils.sheet_to_json(hoja, { defval: '' });
+
+        importarCompraFilasParseadas = filas.map(f => ({
+            codigo: String(f['Código'] ?? '').trim(),
+            nombre: String(f['Nombre'] ?? '').trim(),
+            tipo: String(f['Tipo'] ?? 'final').trim().toLowerCase(),
+            categoria: String(f['Categoría'] ?? '').trim(),
+            marca: String(f['Marca'] ?? '').trim(),
+            proveedor: String(f['Proveedor'] ?? '').trim(),
+            unidad: String(f['Unidad'] ?? '').trim(),
+            precio_venta: f['Precio Venta'],
+            costo_unitario: f['Costo Unitario'],
+            cantidad: f['Cantidad'],
+            stock_minimo: f['Stock Mínimo'],
+            aplica_impuesto: f['Aplica IVA'],
+        })).filter(f => f.nombre);
+
+        if (!importarCompraFilasParseadas.length) {
+            resumen.innerHTML = '<p style="color:#c0392b;">No se encontraron filas válidas. Revisa que la hoja tenga la columna "Nombre" llena.</p>';
+            btn.disabled = true;
+        } else {
+            resumen.innerHTML = `<p style="color:#1f6b45;">Se leyeron <strong>${importarCompraFilasParseadas.length}</strong> líneas de compra. Dale "Subir" para registrarlas.</p>`;
+            btn.disabled = false;
+        }
+    } catch (error) {
+        console.error(error);
+        resumen.innerHTML = '<p style="color:#c0392b;">No se pudo leer el archivo. ¿Es un Excel (.xlsx) válido?</p>';
+        importarCompraFilasParseadas = [];
+        btn.disabled = true;
+    }
+}
+
+async function confirmarImportarCompra() {
+    if (!importarCompraFilasParseadas.length) return;
+    const btn = document.getElementById('btnConfirmarImportarCompra');
+    const textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Subiendo…';
+    try {
+        const res = await fetch('/compras/api/importar_masivo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filas: importarCompraFilasParseadas })
+        });
+        const r = await res.json();
+        const resultado = document.getElementById('importarCompraResultado');
+        if (r.success) {
+            const listaCompras = (r.compras || []).map(c => `• ${c.proveedor}: ${c.lineas} línea(s), C$ ${c.total.toFixed(2)} (${c.numero_compra})`).join('<br>');
+            resultado.innerHTML = `
+                <div style="background:#e6f4ec;color:#1f6b45;padding:10px 12px;border-radius:8px;margin-top:10px;font-size:13px;">
+                    ✅ ${r.compras.length} compra(s) generadas · ${r.productos_creados} producto(s) nuevos, ${r.productos_actualizados} actualizados.
+                    ${listaCompras ? `<br><br>${listaCompras}` : ''}
+                </div>
+                ${r.errores.length ? `<div style="background:#fbe7e7;color:#a72020;padding:10px 12px;border-radius:8px;margin-top:8px;max-height:150px;overflow:auto;font-size:12.5px;">⚠️ ${r.errores.length} fila(s) con error:<br>${r.errores.map(e => `• ${e}`).join('<br>')}</div>` : ''}
+            `;
+            importarCompraFilasParseadas = [];
+            document.getElementById('importarCompraArchivo').value = '';
+            document.getElementById('importarCompraResumen').innerHTML = '';
+            cargarDatosIniciales();
+        } else {
+            resultado.innerHTML = `<div style="background:#fbe7e7;color:#a72020;padding:10px 12px;border-radius:8px;margin-top:10px;font-size:13px;">Error: ${r.message}${(r.errores||[]).length ? '<br>' + r.errores.map(e=>`• ${e}`).join('<br>') : ''}</div>`;
+        }
+    } catch (error) {
+        console.error(error);
+        showCustomAlert('Error en el servidor al importar');
+    } finally {
+        btn.disabled = importarCompraFilasParseadas.length === 0;
+        btn.textContent = textoOriginal;
     }
 }

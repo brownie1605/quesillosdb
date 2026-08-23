@@ -3,6 +3,7 @@ let productosList = [];
 let categoriasList = [];
 let marcasList = [];
 let unidadesList = [];
+let proveedoresList = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarSelects();
@@ -62,15 +63,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function cargarSelects() {
     try {
-        const [catRes, marRes, uniRes] = await Promise.all([
+        const [catRes, marRes, uniRes, provRes] = await Promise.all([
             fetch('/productos/api/categorias'),
             fetch('/productos/api/marcas'),
-            fetch('/productos/api/unidades')
+            fetch('/productos/api/unidades'),
+            fetch('/proveedores/api/list')
         ]);
-        
+
         categoriasList = await catRes.json();
         marcasList = await marRes.json();
         unidadesList = await uniRes.json();
+        proveedoresList = await provRes.json();
 
         const catFilter = document.getElementById('catFilter');
         const prodCategoria = document.getElementById('prod_categoria');
@@ -80,11 +83,14 @@ async function cargarSelects() {
             catFilter.innerHTML += `<option value="${c.id_categoria}">${c.nombre}</option>`;
             prodCategoria.innerHTML += `<option value="${c.id_categoria}">${c.nombre}</option>`;
         });
-        
+
+        // Marca va ligada a un Proveedor: mostramos "Marca — Proveedor" para
+        // que quede claro a quien comprarle cuando se repone stock.
         const prodMarca = document.getElementById('prod_marca');
         prodMarca.innerHTML = '<option value="">Sin Marca</option>';
         marcasList.forEach(m => {
-            prodMarca.innerHTML += `<option value="${m.id_marca}">${m.nombre}</option>`;
+            const etiqueta = m.proveedor_nombre ? `${m.nombre} — ${m.proveedor_nombre}` : m.nombre;
+            prodMarca.innerHTML += `<option value="${m.id_marca}">${etiqueta}</option>`;
         });
 
         const prodUnidad = document.getElementById('prod_unidad');
@@ -92,7 +98,15 @@ async function cargarSelects() {
         unidadesList.forEach(u => {
             prodUnidad.innerHTML += `<option value="${u.id_unidad}">${u.nombre} (${u.abreviatura})</option>`;
         });
-        
+
+        const nuevaMarcaProveedor = document.getElementById('nueva_marca_proveedor');
+        if (nuevaMarcaProveedor) {
+            nuevaMarcaProveedor.innerHTML = '<option value="">Sin proveedor</option>';
+            proveedoresList.forEach(p => {
+                nuevaMarcaProveedor.innerHTML += `<option value="${p.id_proveedor}">${p.nombre}</option>`;
+            });
+        }
+
     } catch (error) {
         console.error("Error cargando selects:", error);
     }
@@ -322,14 +336,15 @@ async function guardarEntrada(e) {
 
 async function guardarNuevaMarca(e) {
     e.preventDefault();
-    
+
     const nombre = document.getElementById('nueva_marca_nombre').value;
-    
+    const id_proveedor = document.getElementById('nueva_marca_proveedor').value || null;
+
     try {
         const response = await fetch(`/productos/api/marcas/crear`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({nombre: nombre})
+            body: JSON.stringify({nombre: nombre, id_proveedor: id_proveedor})
         });
         const result = await response.json();
         if (result.success) {
