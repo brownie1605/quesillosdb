@@ -26,6 +26,7 @@
         </select>
     </div>
     
+    <button id="btnSubirInventario" class="btn btn-primary">⬆️ Subir inventario</button>
     <button id="btnExportarExcel" class="btn btn-success">⬇️ Exportar Excel</button>
 </div>
 
@@ -75,6 +76,35 @@
                 <button type="submit" class="btn btn-primary" style="flex: 1;">Guardar</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Modal Subir Inventario (carga masiva por Excel) -->
+<div id="modalImportar" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="padding: 20px; border-radius: 8px; width: 480px; max-width: 92%;">
+        <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">⬆️ Subir inventario masivo</h3>
+
+        <div class="modal-section" style="border: 1px solid #e1e7f0; padding: 12px 14px; border-radius: 8px; margin-bottom: 14px;">
+            <p style="margin: 0 0 8px; font-size: 13px;"><strong>1.</strong> Descarga la plantilla, llénala con tus productos (una fila por producto) y guárdala.</p>
+            <button type="button" id="btnDescargarPlantilla" class="btn btn-secondary" style="width: 100%;">📥 Descargar plantilla Excel</button>
+        </div>
+
+        <div class="modal-section" style="border: 1px solid #e1e7f0; padding: 12px 14px; border-radius: 8px; margin-bottom: 10px;">
+            <p style="margin: 0 0 8px; font-size: 13px;"><strong>2.</strong> Sube el archivo ya lleno.</p>
+            <input type="file" id="importarArchivo" accept=".xlsx,.xls,.csv" class="form-control" style="width: 100%;">
+            <div id="importarResumen" style="font-size: 13px; margin-top: 8px;"></div>
+        </div>
+
+        <p style="font-size: 12px; color: #6a768d; margin: 0 0 14px;">
+            Si el <strong>Código</strong> o el <strong>Nombre</strong> coincide con un producto que ya existe, se actualiza en vez de crear uno nuevo. El Stock que pongas reemplaza el stock actual (no se suma).
+        </p>
+
+        <div id="importarResultado"></div>
+
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button type="button" id="btnCerrarModalImportar" class="btn" style="flex: 1; background: #e0e0e0; color: #333;">Cerrar</button>
+            <button type="button" id="btnConfirmarImportar" class="btn btn-primary" style="flex: 1;" disabled>Subir</button>
+        </div>
     </div>
 </div>
 

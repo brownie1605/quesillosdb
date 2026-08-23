@@ -282,6 +282,196 @@ def api_entrada(id):
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 
+def _num(valor):
+    """Convierte celdas de Excel (numero, texto o vacio) a float sin tronar."""
+    try:
+        if valor is None or valor == "":
+            return 0.0
+        return float(valor)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _si_no(valor):
+    return str(valor or "").strip().lower() in ("si", "sí", "s", "yes", "true", "1", "x")
+
+
+@producto_bp.route("/api/importar_masivo", methods=["POST"])
+@login_required
+def api_importar_masivo():
+    """Carga masiva de productos + inventario desde la plantilla de Excel
+    (parseada en el navegador con SheetJS y enviada aqui como JSON).
+
+    Empareja cada fila con un producto existente por Codigo, o si no, por
+    Nombre (sin importar mayusculas); si no encuentra nada, crea uno nuevo.
+    El Stock Actual/Minimo de la fila REEMPLAZA el que tenga el producto.
+    """
+    error = _solo_admin()
+    if error:
+        return error
+
+    data = request.json or {}
+    filas = data.get("filas") or []
+    if not filas:
+        return jsonify({"success": False, "message": "No se recibieron filas para importar"}), 400
+
+    TIPOS_VALIDOS = {"final", "insumo", "material"}
+
+    categorias_cache = {
+        c.nombre.strip().lower(): c
+        for c in Categoria.query.filter_by(id_empresa=current_user.id_empresa, estado="activo").all()
+    }
+    marcas_cache = {
+        m.nombre.strip().lower(): m
+        for m in Marca.query.filter_by(id_empresa=current_user.id_empresa, estado="activo").all()
+    }
+    unidades_cache = {}
+    for u in UnidadMedida.query.filter_by(estado="activo").all():
+        unidades_cache[u.nombre.strip().lower()] = u
+        if u.abreviatura:
+            unidades_cache[u.abreviatura.strip().lower()] = u
+
+    creados = 0
+    actualizados = 0
+    errores = []
+
+    for idx, fila in enumerate(filas, start=2):  # fila 1 = encabezados en el Excel
+        try:
+            nombre = (fila.get("nombre") or "").strip()
+            if not nombre:
+                errores.append(f"Fila {idx}: falta el nombre")
+                continue
+
+            tipo = (fila.get("tipo") or "final").strip().lower()
+            if tipo not in TIPOS_VALIDOS:
+                tipo = "final"
+            vendible = tipo == "final"
+
+            codigo = (fila.get("codigo") or "").strip()
+
+            prod = None
+            if codigo:
+                prod = Producto.query.filter_by(id_empresa=current_user.id_empresa, codigo=codigo).first()
+            if not prod:
+                prod = Producto.query.filter(
+                    Producto.id_empresa == current_user.id_empresa,
+                    db.func.lower(Producto.nombre) == nombre.lower(),
+                ).first()
+
+            id_categoria = None
+            if vendible:
+                cat_nombre = (fila.get("categoria") or "").strip()
+                if cat_nombre:
+                    cat = categorias_cache.get(cat_nombre.lower())
+                    if not cat:
+                        cat = Categoria(id_empresa=current_user.id_empresa, nombre=cat_nombre, estado="activo")
+                        db.session.add(cat)
+                        db.session.flush()
+                        categorias_cache[cat_nombre.lower()] = cat
+                    id_categoria = cat.id_categoria
+
+            id_marca = None
+            marca_nombre = (fila.get("marca") or "").strip()
+            if marca_nombre:
+                marca = marcas_cache.get(marca_nombre.lower())
+                if not marca:
+                    marca = Marca(id_empresa=current_user.id_empresa, nombre=marca_nombre, estado="activo")
+                    db.session.add(marca)
+                    db.session.flush()
+                    marcas_cache[marca_nombre.lower()] = marca
+                id_marca = marca.id_marca
+
+            id_unidad = None
+            unidad_nombre = (fila.get("unidad") or "").strip()
+            if unidad_nombre:
+                uni = unidades_cache.get(unidad_nombre.lower())
+                if uni:
+                    id_unidad = uni.id_unidad
+
+            precio_compra = _num(fila.get("precio_compra"))
+            precio_venta = _num(fila.get("precio_venta")) if vendible else 0.0
+            stock_actual = _num(fila.get("stock_actual"))
+            stock_minimo = _num(fila.get("stock_minimo"))
+            aplica_iva = vendible and _si_no(fila.get("aplica_impuesto"))
+
+            es_nuevo = prod is None
+            if prod:
+                prod.nombre = nombre
+                prod.tipo_producto = tipo
+                prod.id_categoria = id_categoria
+                if id_marca:
+                    prod.id_marca = id_marca
+                if id_unidad:
+                    prod.id_unidad = id_unidad
+                prod.precio_compra = precio_compra
+                prod.precio_venta = precio_venta
+                prod.aplica_impuesto = aplica_iva
+                prod.se_vende = vendible
+                prod.estado = "activo"
+            else:
+                prod = Producto(
+                    id_empresa=current_user.id_empresa,
+                    id_categoria=id_categoria,
+                    id_marca=id_marca,
+                    id_unidad=id_unidad,
+                    codigo=codigo,
+                    nombre=nombre,
+                    precio_compra=precio_compra,
+                    precio_venta=precio_venta,
+                    aplica_impuesto=aplica_iva,
+                    tipo_producto=tipo,
+                    se_vende=vendible,
+                    estado="activo",
+                )
+                db.session.add(prod)
+
+            db.session.flush()  # asegura id_producto para el inventario
+
+            inv = Inventario.query.filter_by(id_producto=prod.id_producto).first()
+            if not inv:
+                inv = Inventario(
+                    id_sucursal=current_user.id_sucursal,
+                    id_producto=prod.id_producto,
+                    stock_actual=0.0,
+                    stock_minimo=0.0,
+                )
+                db.session.add(inv)
+            inv.stock_actual = stock_actual
+            inv.stock_minimo = stock_minimo
+
+            # Se confirma fila por fila: si una fila falla al guardar (ej. un
+            # dato invalido para la BD), un rollback() deshace TODA la
+            # transaccion en SQLAlchemy, no solo esa fila. Comitear aqui
+            # evita perder las filas anteriores que sí estaban bien, y solo
+            # contamos la fila como creada/actualizada si el commit funciono.
+            db.session.commit()
+            if es_nuevo:
+                creados += 1
+            else:
+                actualizados += 1
+
+        except Exception as e:  # noqa: BLE001 - una fila mala no debe tumbar el resto
+            db.session.rollback()
+            errores.append(f"Fila {idx} ({fila.get('nombre', '?')}): {e}")
+
+    try:
+        from app.services.auditoria_service import registrar_auditoria
+        registrar_auditoria(
+            "IMPORTAR PRODUCTOS",
+            "Productos",
+            f"Importacion masiva: {creados} creados, {actualizados} actualizados, {len(errores)} con error",
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+    return jsonify({
+        "success": True,
+        "creados": creados,
+        "actualizados": actualizados,
+        "errores": errores,
+    })
+
+
 @producto_bp.route("/imagen/<int:id>", methods=["GET"])
 def obtener_imagen(id):
     prod = Producto.query.get_or_404(id)
