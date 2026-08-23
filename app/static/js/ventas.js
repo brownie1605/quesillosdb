@@ -4,13 +4,22 @@ let cart = [];
 let descuentoAplicado = 0.0;
 let propinaAplicada = 0.0;
 let propinaManual = null; // Si el usuario edita manualmente
+let categoriaActiva = '';
+let textoBusqueda = '';
+
+// Producto en espera de que el cajero/mesero termine el modal de personalización.
+let pzProductoActual = null;
+let pzDatosActuales = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarProductos();
     cargarClientes();
 
-    document.getElementById('searchInput').addEventListener('input', filtrarProductos);
-    
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        textoBusqueda = e.target.value.toLowerCase();
+        aplicarFiltros();
+    });
+
     // Método de pago selector de bancos
     document.getElementById('paymentMethod').addEventListener('change', (e) => {
         const bankSelection = document.getElementById('bankSelection');
@@ -29,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('closeCheckoutModalBtn').addEventListener('click', cerrarModalCheckout);
     document.getElementById('propinaSwitch').addEventListener('change', recalcularTotalesModal);
     document.getElementById('confirmCheckoutBtn').addEventListener('click', confirmarCobro);
-    
+
     // Eventos del Modal de Descuento
     document.getElementById('openDiscountModalBtn').addEventListener('click', abrirModalDescuento);
     document.getElementById('closeDiscountModalBtn').addEventListener('click', cerrarModalDescuento);
@@ -39,6 +48,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('openPropinaModalBtn').addEventListener('click', abrirModalPropina);
     document.getElementById('closePropinaModalBtn').addEventListener('click', cerrarModalPropina);
     document.getElementById('applyPropinaBtn').addEventListener('click', aplicarPropina);
+
+    // Eventos del Modal de Personalización
+    document.getElementById('pzCancelBtn').addEventListener('click', cerrarModalPersonalizacion);
+    document.getElementById('pzAgregarBtn').addEventListener('click', confirmarPersonalizacion);
 
     // Eventos del Modal de Éxito
     document.getElementById('successCloseBtn').addEventListener('click', () => {
@@ -55,7 +68,8 @@ async function cargarProductos() {
     try {
         const response = await fetch('/ventas/api/productos');
         productos = await response.json();
-        renderizarProductos(productos);
+        renderizarTabsCategorias();
+        aplicarFiltros();
     } catch (error) {
         console.error('Error cargando productos:', error);
     }
@@ -72,7 +86,7 @@ async function cargarClientes() {
             opt.textContent = `${c.nombre} - ${c.cedula || ''}`;
             select.appendChild(opt);
         });
-        
+
         if (window.Choices) {
             new Choices(select, {
                 searchEnabled: true,
@@ -87,10 +101,45 @@ async function cargarClientes() {
     }
 }
 
+// ---- CATEGORÍAS ----
+
+function renderizarTabsCategorias() {
+    const nombres = [...new Set(productos.map(p => p.categoria_nombre || 'Sin categoría'))].sort();
+    const tabs = document.getElementById('catTabs');
+    if (nombres.length <= 1) { tabs.innerHTML = ''; return; }
+
+    const todas = [{ label: 'Todos', value: '' }, ...nombres.map(n => ({ label: n, value: n }))];
+    tabs.innerHTML = todas.map(t => `
+        <button type="button" class="cat-tab ${categoriaActiva === t.value ? 'active' : ''}" data-cat="${t.value}">${t.label}</button>
+    `).join('');
+
+    tabs.querySelectorAll('.cat-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            categoriaActiva = btn.dataset.cat;
+            tabs.querySelectorAll('.cat-tab').forEach(b => b.classList.toggle('active', b === btn));
+            aplicarFiltros();
+        });
+    });
+}
+
+function aplicarFiltros() {
+    let lista = productos;
+    if (categoriaActiva) {
+        lista = lista.filter(p => (p.categoria_nombre || 'Sin categoría') === categoriaActiva);
+    }
+    if (textoBusqueda) {
+        lista = lista.filter(p =>
+            p.nombre.toLowerCase().includes(textoBusqueda) ||
+            (p.codigo && p.codigo.toLowerCase().includes(textoBusqueda))
+        );
+    }
+    renderizarProductos(lista);
+}
+
 function renderizarProductos(lista) {
     const grid = document.getElementById('productsGrid');
     grid.innerHTML = '';
-    
+
     lista.forEach(p => {
         const card = document.createElement('div');
         card.className = 'product-card';
@@ -102,33 +151,41 @@ function renderizarProductos(lista) {
         const emojis = ['🍎','🥩','🥤','🥦','🍞','🧀','🍺','🍫','🥫','🧼','🥛','🥕'];
         const emoji = emojis[p.id_producto % emojis.length];
         const imgDisplay = p.imagen_url ? `<img src="${p.imagen_url}" alt="${p.nombre}" style="max-width: 40px; max-height: 40px; display: block; margin: 0 auto 10px auto;">` : `<span class="product-img">${emoji}</span>`;
+        const badgePersonalizable = p.tiene_personalizacion ? '<div style="font-size:10px;color:#0b5cff;font-weight:600;">✎ Personalizable</div>' : '';
 
         card.innerHTML = `
             ${imgDisplay}
             <div class="product-title">${p.nombre}</div>
             <div class="product-price">C$ ${p.precio_venta.toFixed(2)}</div>
             ${p.stock <= 0 ? '<div style="color:red; font-size: 10px; text-align:center; font-weight:bold;">Agotado</div>' : `<div style="font-size: 10px; color: #6a768d; text-align:center;">Stock: ${p.stock}</div>`}
+            ${badgePersonalizable}
         `;
-        
+
         if (p.stock > 0) {
-            card.addEventListener('click', () => agregarAlCarrito(p));
+            card.addEventListener('click', () => onProductoClick(p));
         }
-        
+
         grid.appendChild(card);
     });
 }
 
-function filtrarProductos(e) {
-    const texto = e.target.value.toLowerCase();
-    const filtrados = productos.filter(p => 
-        p.nombre.toLowerCase().includes(texto) || 
-        (p.codigo && p.codigo.toLowerCase().includes(texto))
-    );
-    renderizarProductos(filtrados);
+// ---- CARRITO ----
+
+function onProductoClick(producto) {
+    if (producto.tiene_personalizacion) {
+        abrirModalPersonalizacion(producto);
+    } else {
+        agregarAlCarrito(producto, [], [], null);
+    }
 }
 
-function agregarAlCarrito(producto) {
-    const existente = cart.find(item => item.id_producto === producto.id_producto);
+function claveCarrito(id_producto, comentario) {
+    return id_producto + '|' + (comentario || '');
+}
+
+function agregarAlCarrito(producto, excluidos, opciones, comentario) {
+    const key = claveCarrito(producto.id_producto, comentario);
+    const existente = cart.find(item => item.key === key);
     if (existente) {
         if (existente.cantidad < producto.stock) {
             existente.cantidad += 1;
@@ -138,22 +195,26 @@ function agregarAlCarrito(producto) {
         }
     } else {
         cart.push({
+            key: key,
             id_producto: producto.id_producto,
             nombre: producto.nombre,
             precio: producto.precio_venta,
             cantidad: 1,
-            stock: producto.stock
+            stock: producto.stock,
+            excluidos: excluidos || [],
+            opciones: opciones || [],
+            comentario: comentario || null,
         });
     }
     renderizarCarrito();
 }
 
-function modificarCantidad(id_producto, delta) {
-    const item = cart.find(i => i.id_producto === id_producto);
+function modificarCantidad(key, delta) {
+    const item = cart.find(i => i.key === key);
     if (item) {
         item.cantidad += delta;
         if (item.cantidad <= 0) {
-            cart = cart.filter(i => i.id_producto !== id_producto);
+            cart = cart.filter(i => i.key !== key);
         } else if (item.cantidad > item.stock) {
             item.cantidad = item.stock;
             showCustomAlert('Stock insuficiente');
@@ -162,8 +223,8 @@ function modificarCantidad(id_producto, delta) {
     }
 }
 
-function eliminarDelCarrito(id_producto) {
-    cart = cart.filter(i => i.id_producto !== id_producto);
+function eliminarDelCarrito(key) {
+    cart = cart.filter(i => i.key !== key);
     renderizarCarrito();
 }
 
@@ -176,33 +237,36 @@ function getSubtotal() {
 function renderizarCarrito() {
     const cartItemsDiv = document.getElementById('cartItems');
     cartItemsDiv.innerHTML = '';
-    
+
     let subtotal = getSubtotal();
 
     cart.forEach(item => {
         const itemTotal = item.precio * item.cantidad;
         const div = document.createElement('div');
         div.className = 'cart-item';
+        const notaHtml = item.comentario
+            ? `<div class="cart-item-note">✎ ${item.comentario}</div>` : '';
         div.innerHTML = `
             <div>
                 <strong>${item.nombre}</strong><br>
                 <span style="color:#6a768d;">C$ ${item.precio.toFixed(2)}</span>
             </div>
             <div class="qty-control">
-                <button class="qty-btn" onclick="modificarCantidad(${item.id_producto}, -1)">-</button>
+                <button class="qty-btn" onclick="modificarCantidad('${item.key}', -1)">-</button>
                 <span>${item.cantidad}</span>
-                <button class="qty-btn" onclick="modificarCantidad(${item.id_producto}, 1)">+</button>
+                <button class="qty-btn" onclick="modificarCantidad('${item.key}', 1)">+</button>
             </div>
             <div style="text-align: right; font-weight: bold;">C$ ${itemTotal.toFixed(2)}</div>
             <div style="text-align: right;">
-                <button class="btn-icon delete" onclick="eliminarDelCarrito(${item.id_producto})">🗑️</button>
+                <button class="btn-icon delete" onclick="eliminarDelCarrito('${item.key}')">🗑️</button>
             </div>
+            ${notaHtml}
         `;
         cartItemsDiv.appendChild(div);
     });
 
     document.getElementById('subtotalDisplay').textContent = `C$ ${subtotal.toFixed(2)}`;
-    
+
     let total = subtotal - descuentoAplicado;
     if (total < 0) total = 0;
     document.getElementById('totalDisplay').textContent = `C$ ${total.toFixed(2)}`;
@@ -219,6 +283,106 @@ function cancelarVenta() {
     });
 }
 
+// ---- LOGICA DEL MODAL DE PERSONALIZACIÓN ----
+
+async function abrirModalPersonalizacion(producto) {
+    pzProductoActual = producto;
+    document.getElementById('pzTitulo').textContent = 'Personalizar: ' + producto.nombre;
+    document.getElementById('pzGrupos').innerHTML = '<p style="font-size:13px;color:#6a768d;">Cargando…</p>';
+    document.getElementById('pzExcluibles').innerHTML = '';
+    document.getElementById('personalizacionModal').style.display = 'flex';
+
+    try {
+        const datos = await fetch(`/ventas/api/personalizacion/${producto.id_producto}`).then(r => r.json());
+        pzDatosActuales = datos;
+        renderizarModalPersonalizacion(datos);
+    } catch (error) {
+        console.error('Error cargando personalización:', error);
+        cerrarModalPersonalizacion();
+        agregarAlCarrito(producto, [], [], null);
+    }
+}
+
+function renderizarModalPersonalizacion(datos) {
+    const gruposDiv = document.getElementById('pzGrupos');
+    gruposDiv.innerHTML = (datos.grupos || []).map(g => `
+        <div class="pz-group" data-grupo="${g.id_grupo}">
+            <h4>${g.nombre}${g.obligatorio ? ' <span style="color:#e74c3c;">*</span>' : ' <span style="opacity:.5;font-weight:400;">(opcional)</span>'}</h4>
+            ${g.items.map((it, idx) => `
+                <label class="pz-option ${!it.disponible ? 'disabled' : ''}">
+                    <input type="radio" name="pz-grupo-${g.id_grupo}" value="${it.id_item}"
+                        ${(it.es_default || (idx === 0 && !g.items.some(i => i.es_default))) && it.disponible ? 'checked' : ''}
+                        ${!it.disponible ? 'disabled' : ''}>
+                    ${it.nombre}${!it.disponible ? ' — sin stock' : ''}
+                </label>
+            `).join('')}
+        </div>
+    `).join('');
+
+    const excDiv = document.getElementById('pzExcluibles');
+    const excluibles = datos.ingredientes_excluibles || [];
+    excDiv.innerHTML = excluibles.length ? `
+        <div class="pz-group">
+            <h4>Ingredientes</h4>
+            ${excluibles.map(ing => `
+                <label class="pz-option">
+                    <input type="checkbox" class="pz-exc" value="${ing.id_producto}" checked>
+                    ${ing.nombre}
+                </label>
+            `).join('')}
+        </div>
+    ` : '';
+}
+
+function cerrarModalPersonalizacion() {
+    document.getElementById('personalizacionModal').style.display = 'none';
+    pzProductoActual = null;
+    pzDatosActuales = null;
+}
+
+function confirmarPersonalizacion() {
+    if (!pzProductoActual) return;
+
+    // Validar que cada grupo obligatorio tenga una opción elegida.
+    for (const g of (pzDatosActuales.grupos || [])) {
+        if (!g.obligatorio) continue;
+        const marcado = document.querySelector(`input[name="pz-grupo-${g.id_grupo}"]:checked`);
+        if (!marcado) {
+            showCustomAlert(`Elige una opción de "${g.nombre}"`);
+            return;
+        }
+    }
+
+    const opciones = [];
+    const nombresOpciones = [];
+    (pzDatosActuales.grupos || []).forEach(g => {
+        const marcado = document.querySelector(`input[name="pz-grupo-${g.id_grupo}"]:checked`);
+        if (marcado) {
+            opciones.push(parseInt(marcado.value));
+            const item = g.items.find(i => i.id_item === parseInt(marcado.value));
+            if (item) nombresOpciones.push(item.nombre);
+        }
+    });
+
+    const excluidos = [];
+    const nombresExcluidos = [];
+    document.querySelectorAll('.pz-exc').forEach(chk => {
+        if (!chk.checked) {
+            excluidos.push(parseInt(chk.value));
+            const ing = (pzDatosActuales.ingredientes_excluibles || []).find(i => i.id_producto === parseInt(chk.value));
+            if (ing) nombresExcluidos.push(ing.nombre);
+        }
+    });
+
+    let comentario = '';
+    if (nombresExcluidos.length) comentario += 'Sin ' + nombresExcluidos.join(', ');
+    if (nombresOpciones.length) comentario += (comentario ? ' · ' : '') + nombresOpciones.join(' · ');
+
+    const producto = pzProductoActual;
+    cerrarModalPersonalizacion();
+    agregarAlCarrito(producto, excluidos, opciones, comentario || null);
+}
+
 // ---- LOGICA DEL MODAL DE CHECKOUT ----
 
 function abrirModalCheckout() {
@@ -226,28 +390,27 @@ function abrirModalCheckout() {
         showCustomAlert('El carrito está vacío');
         return;
     }
-    
+
     // Fecha y Hora
     const now = new Date();
     document.getElementById('modalDate').textContent = now.toLocaleString();
-    
+
     // Llenar Items
     const modalItems = document.getElementById('modalItems');
     modalItems.innerHTML = '';
     cart.forEach(item => {
         const div = document.createElement('div');
-        div.style.display = 'flex';
-        div.style.justifyContent = 'space-between';
         div.style.marginBottom = '4px';
-        div.innerHTML = `<span>${item.cantidad}x ${item.nombre}</span> <span>C$ ${(item.precio * item.cantidad).toFixed(2)}</span>`;
+        const nota = item.comentario ? `<div style="font-size:11px;color:#e67e22;">✎ ${item.comentario}</div>` : '';
+        div.innerHTML = `<div style="display:flex;justify-content:space-between;"><span>${item.cantidad}x ${item.nombre}</span> <span>C$ ${(item.precio * item.cantidad).toFixed(2)}</span></div>${nota}`;
         modalItems.appendChild(div);
     });
-    
+
     // Reset Propina manual si el carrito cambió (opcional), aquí lo mantenemos
     document.getElementById('propinaSwitch').checked = true; // Por defecto activo como pidió el usuario
-    
+
     recalcularTotalesModal();
-    
+
     document.getElementById('checkoutModal').style.display = 'flex';
 }
 
@@ -259,9 +422,9 @@ function recalcularTotalesModal() {
     let subtotal = getSubtotal();
     let baseTotal = subtotal - descuentoAplicado;
     if (baseTotal < 0) baseTotal = 0;
-    
+
     const applyPropina = document.getElementById('propinaSwitch').checked;
-    
+
     if (applyPropina) {
         if (propinaManual !== null) {
             propinaAplicada = propinaManual;
@@ -271,9 +434,9 @@ function recalcularTotalesModal() {
     } else {
         propinaAplicada = 0.0;
     }
-    
+
     let finalTotal = baseTotal + propinaAplicada;
-    
+
     document.getElementById('modalSubtotal').textContent = `C$ ${subtotal.toFixed(2)}`;
     document.getElementById('modalDiscount').textContent = `- C$ ${descuentoAplicado.toFixed(2)}`;
     document.getElementById('modalPropina').textContent = `+ C$ ${propinaAplicada.toFixed(2)}`;
@@ -294,13 +457,13 @@ function cerrarModalDescuento() {
 function aplicarDescuento() {
     let val = parseFloat(document.getElementById('modalDiscountInput').value);
     if (isNaN(val) || val < 0) val = 0;
-    
+
     let subtotal = getSubtotal();
     if (val > subtotal) {
         showCustomAlert("El descuento no puede ser mayor al subtotal.");
         val = subtotal;
     }
-    
+
     descuentoAplicado = val;
     cerrarModalDescuento();
     recalcularTotalesModal();
@@ -321,7 +484,7 @@ function cerrarModalPropina() {
 function aplicarPropina() {
     let val = parseFloat(document.getElementById('modalPropinaInput').value);
     if (isNaN(val) || val < 0) val = 0;
-    
+
     propinaManual = val;
     document.getElementById('propinaSwitch').checked = true; // Activar switch si editó la propina
     cerrarModalPropina();
@@ -338,7 +501,14 @@ async function confirmarCobro() {
     }
 
     const payload = {
-        cart: cart,
+        cart: cart.map(item => ({
+            id_producto: item.id_producto,
+            cantidad: item.cantidad,
+            precio: item.precio,
+            excluidos: item.excluidos,
+            opciones: item.opciones,
+            comentario: item.comentario,
+        })),
         descuento: descuentoAplicado,
         propina: propinaAplicada,
         metodo_pago: methodValue,
@@ -355,9 +525,9 @@ async function confirmarCobro() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
             cerrarModalCheckout();
 

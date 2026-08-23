@@ -28,7 +28,9 @@ class VentaService:
                         propina=0.0, id_cliente=None, monto_recibido=0.0):
         """Registra la venta en la BD LOCAL y la encola para la nube.
 
-        cart: [{id_producto, cantidad, precio}]
+        cart: [{id_producto, cantidad, precio, excluidos?, opciones?}]
+        `excluidos`: ids de ingredientes de la receta que el cliente pidio quitar.
+        `opciones`: ids de RecetaOpcionItem elegidos (uno por grupo).
         Lanza StockInsuficiente si no alcanzan los insumos.
         """
         from app.services.sync_service import SyncService
@@ -77,6 +79,12 @@ class VentaService:
             subtotal += sub_item
 
             producto = Producto.query.get(id_producto)
+            excluidos = item.get("excluidos") or []
+            opciones = item.get("opciones") or []
+            comentario = item.get("comentario") or RecetaService.comentario_de_personalizacion(
+                id_producto, excluidos, opciones
+            )
+
             det = DetalleVenta(
                 id_venta=venta.id_venta,
                 id_producto=id_producto,
@@ -85,6 +93,9 @@ class VentaService:
                 descuento=Decimal("0"),
                 subtotal=sub_item,
                 consumio_receta=bool(producto and producto.es_receta),
+                personalizacion={"excluidos": excluidos, "opciones": opciones}
+                if (excluidos or opciones) else None,
+                comentario=comentario,
                 timestamp_local_creacion=ahora,
                 estado_sync="pendiente",
             )
@@ -96,6 +107,7 @@ class VentaService:
             RecetaService.descontar_ingredientes(
                 id_producto, cantidad, usuario.id_usuario,
                 referencia="VENTA-" + str(venta.id_venta),
+                excluidos=excluidos, opciones=opciones,
             )
 
         venta.subtotal = subtotal

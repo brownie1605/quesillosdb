@@ -109,10 +109,12 @@ Aplica **una sola vez** el script de actualización sobre Railway
 
 ```bash
 mysql -h HOST -P PUERTO -u USUARIO -p pos_inventario_cloud < bd/02_cloud_upgrade.sql
+mysql -h HOST -P PUERTO -u USUARIO -p pos_inventario_cloud < bd/03_opciones_y_categorias.sql
 ```
 
-El script es idempotente: puede ejecutarse varias veces sin dañar los datos.
-Solo agrega tablas y columnas; no borra nada.
+Ambos scripts son idempotentes: pueden ejecutarse varias veces sin dañar los
+datos. Solo agregan tablas y columnas; no borran nada. `03_opciones_y_categorias.sql`
+agrega los ingredientes "quitables" y los grupos de opciones del punto 4.1.
 
 Para respaldar la nube antes de tocarla:
 
@@ -186,6 +188,37 @@ Al vender **3 quesillos**, el sistema descuenta automáticamente 6 tortillas,
 alcanza, la venta se rechaza indicando cuál falta.
 
 Vender una **docena de tortillas** por separado descuenta solo las tortillas.
+
+### 4.1 Personalización en el punto de venta
+
+Al crear o editar una receta (Admin o Cocinero, todo en el mismo formulario
+de `/recetas`) se puede marcar:
+
+- **Ingredientes "quitables"**: se descuentan normalmente, pero el cajero o
+  mesero puede pedir quitarlos en una venta puntual (ej. *"quesillo sin
+  cebolla"*) sin tocar la receta ni cambiar el precio.
+- **Grupos de opciones**: una elección de una sola opción por grupo (ej.
+  *"Proteína: salsa ranchera / jamón / chorizo criollo"*, o *"Acompañante:
+  gallopinto o frijoles"*). Cada opción puede descontar su propio insumo del
+  inventario si aplica.
+
+Si un producto tiene algo que preguntar, al hacer clic en él dentro del POS
+se abre un modal antes de agregarlo al carrito. Lo elegido queda visible como
+un comentario bajo la línea del producto — en el carrito, en el historial de
+ventas y en la factura impresa.
+
+### 4.2 Categorías en el catálogo
+
+Los productos se agrupan por categoría (ej. *Asados, Extras, Quesillos,
+Insumos*) desde `/productos` → **+ Nueva Categoría**. En el punto de venta
+aparecen como pestañas sobre la cuadrícula de productos para filtrar rápido.
+
+### 4.3 Crear un producto y su receta en un solo paso
+
+Ya no hace falta crear el producto en `/productos` y luego ir a `/recetas` a
+enlazarlo: el formulario de "Nueva receta" tiene un botón **+ Crear producto
+nuevo** que da de alta el producto (nombre, categoría, precio) y la receta —
+ingredientes, quitables y grupos de opciones — en un solo guardado.
 
 ---
 

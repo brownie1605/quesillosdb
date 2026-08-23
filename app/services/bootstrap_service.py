@@ -36,6 +36,8 @@ ORDEN_COPIA = [
     "productos",
     "recetas",
     "receta_ingredientes",
+    "receta_opciones_grupo",
+    "receta_opciones_item",
     "inventario",
     "cajas",
     "compras",
@@ -52,6 +54,8 @@ TABLAS_CON_OFFSET = [
     "productos",
     "recetas",
     "receta_ingredientes",
+    "receta_opciones_grupo",
+    "receta_opciones_item",
     "inventario",
     "ventas",
     "detalle_ventas",
@@ -185,6 +189,23 @@ def copiar_desde_nube(tablas=None, limite_por_tabla=None):
 
 
 # ---------------------------------------------------------------------------
+def _proximo_auto_increment(tabla):
+    """AUTO_INCREMENT actual de la tabla.
+
+    `information_schema.TABLES` puede devolver un valor cacheado/desactualizado
+    justo despues de un ALTER o de borrar filas; `ANALYZE TABLE` fuerza a MySQL
+    a recalcularlo antes de leerlo, para no reportar falsos riesgos de colision.
+    """
+    db.session.execute(text("ANALYZE TABLE " + tabla))
+    return db.session.execute(
+        text(
+            "SELECT AUTO_INCREMENT FROM information_schema.TABLES "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t"
+        ),
+        {"t": tabla},
+    ).scalar()
+
+
 def aplicar_offset_ids(offset=None):
     """Mueve el AUTO_INCREMENT local al rango reservado para esta maquina."""
     offset = offset or current_app.config.get("LOCAL_ID_OFFSET", 1000000)
@@ -193,13 +214,7 @@ def aplicar_offset_ids(offset=None):
     for tabla in TABLAS_CON_OFFSET:
         if not _tabla_existe_local(tabla):
             continue
-        actual = db.session.execute(
-            text(
-                "SELECT AUTO_INCREMENT FROM information_schema.TABLES "
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t"
-            ),
-            {"t": tabla},
-        ).scalar()
+        actual = _proximo_auto_increment(tabla)
 
         if actual and actual >= offset:
             resumen["omitido"].append(tabla)   # ya esta en el rango local
@@ -225,13 +240,7 @@ def verificar_rangos():
         pk = PK_POR_TABLA.get(tabla)
         if not pk:
             continue
-        siguiente = db.session.execute(
-            text(
-                "SELECT AUTO_INCREMENT FROM information_schema.TABLES "
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t"
-            ),
-            {"t": tabla},
-        ).scalar()
+        siguiente = _proximo_auto_increment(tabla)
         if siguiente and siguiente < offset:
             riesgos.append(
                 {"tabla": tabla, "proximo_id": siguiente, "offset_esperado": offset}

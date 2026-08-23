@@ -7,7 +7,7 @@
     <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
         <div>
             <h3>📖 Recetas del menú</h3>
-            <p class="q-sub">Cada receta define los insumos que se descuentan del inventario al vender el producto.</p>
+            <p class="q-sub">Producto, ingredientes y opciones para el cliente, todo en un solo lugar.</p>
         </div>
         <button class="q-btn" onclick="abrirModal()">+ Nueva receta</button>
     </div>
@@ -41,11 +41,33 @@
 
     <input type="hidden" id="id_receta">
 
-    <div class="q-grid cols-2">
-        <div>
-            <label>Producto final</label>
-            <select id="id_producto" class="q-select"></select>
+    <!-- ------------------------------------------------- producto -->
+    <div>
+        <label>Producto final</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px" id="modo-producto-tabs">
+            <button type="button" class="q-btn small" id="btn-modo-existente" onclick="cambiarModoProducto('existente')">Producto existente</button>
+            <button type="button" class="q-btn small ghost" id="btn-modo-nuevo" onclick="cambiarModoProducto('nuevo')">+ Crear producto nuevo</button>
         </div>
+        <select id="id_producto" class="q-select"></select>
+        <div id="bloque-producto-nuevo" style="display:none;margin-top:8px;gap:8px;flex-direction:column">
+            <input id="np_nombre" class="q-input" placeholder="Nombre del producto (ej. Desayuno típico)">
+            <div style="display:flex;gap:8px;align-items:flex-end">
+                <div style="flex:1">
+                    <label>Categoría</label>
+                    <select id="np_categoria" class="q-select"></select>
+                </div>
+                <button type="button" class="q-btn small ghost" onclick="crearCategoriaRapida()">+ Categoría</button>
+            </div>
+            <div>
+                <label>Precio de venta (C$)</label>
+                <input id="np_precio_venta" class="q-input" type="number" step="0.01" min="0" placeholder="0.00">
+            </div>
+        </div>
+    </div>
+
+    <hr style="margin:16px 0;border:none;border-top:1px solid var(--q-borde)">
+
+    <div class="q-grid cols-2">
         <div>
             <label>Nombre de la receta</label>
             <input id="nombre" class="q-input" placeholder="Ej. Quesillo Lo Nuestro">
@@ -84,24 +106,40 @@
 
     <hr style="margin:18px 0;border:none;border-top:1px solid var(--q-borde)">
 
+    <!-- ------------------------------------------------- ingredientes -->
     <div style="display:flex;justify-content:space-between;align-items:center">
         <h4 style="margin:0;color:var(--q-rojo)">Ingredientes (insumos)</h4>
         <button class="q-btn small" onclick="agregarFila()">+ Agregar ingrediente</button>
     </div>
+    <p class="q-sub" style="margin-top:4px">Marca <strong>Quitable</strong> si el cliente puede pedir que se lo quiten
+        (ej. "sin cebolla") sin que eso cambie el precio.</p>
 
     <table class="q-table" style="margin-top:10px">
         <thead>
-            <tr><th style="width:40%">Insumo</th><th>Cantidad</th><th>Unidad</th><th>Stock</th><th>Costo</th><th></th></tr>
+            <tr><th style="width:34%">Insumo</th><th>Cantidad</th><th>Unidad</th><th>Quitable</th><th>Stock</th><th>Costo</th><th></th></tr>
         </thead>
         <tbody id="tbody-ingredientes"></tbody>
         <tfoot>
             <tr>
-                <th colspan="4" style="text-align:right">Costo total de la receta</th>
+                <th colspan="5" style="text-align:right">Costo total de la receta</th>
                 <th id="costo-total">0.00</th>
                 <th></th>
             </tr>
         </tfoot>
     </table>
+
+    <hr style="margin:18px 0;border:none;border-top:1px solid var(--q-borde)">
+
+    <!-- ------------------------------------------------- opciones -->
+    <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+            <h4 style="margin:0;color:var(--q-rojo)">Opciones para el cliente</h4>
+            <p class="q-sub" style="margin:2px 0 0">Ej. "Proteína: salsa ranchera, jamón o chorizo criollo" — el cajero
+                elige una al vender. Deja vacío si este producto no tiene opciones.</p>
+        </div>
+        <button class="q-btn small" onclick="agregarGrupoOpciones()">+ Agregar grupo</button>
+    </div>
+    <div id="grupos-opciones" style="margin-top:10px;display:flex;flex-direction:column;gap:12px"></div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
         <button class="q-btn ghost" onclick="cerrarModal()">Cancelar</button>
@@ -119,22 +157,30 @@
 .q-modal-head h3{margin:0;color:var(--q-rojo)}
 .q-modal label{display:block;font-size:12.5px;font-weight:600;margin-bottom:4px;opacity:.75}
 .dark-theme .q-modal-box{background:#1e242c;color:#e6ebf2}
+.grupo-opciones-box{border:1px solid var(--q-borde);border-radius:10px;padding:12px;background:rgba(0,0,0,.02)}
+.grupo-opciones-box .grupo-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.grupo-opciones-box .grupo-head input.q-input{flex:1}
+.item-opcion-row{display:grid;grid-template-columns:2fr 1.4fr 90px 60px 32px;gap:6px;align-items:center;margin-bottom:6px}
 </style>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let INSUMOS = [];
+let CATEGORIAS = [];
 let UNIDADES = [
     {% for u in unidades %}{id: {{ u.id_unidad }}, nombre: "{{ u.abreviatura }}"},{% endfor %}
 ];
+let modoProducto = 'existente';
 
 async function cargar() {
-    const [recetas, insumos] = await Promise.all([
+    const [recetas, insumos, categorias] = await Promise.all([
         fetch('/recetas/api/lista').then(r => r.json()),
         fetch('/recetas/api/insumos').then(r => r.json()),
+        fetch('/recetas/api/categorias').then(r => r.json()),
     ]);
     INSUMOS = insumos;
+    CATEGORIAS = categorias;
 
     const tb = document.querySelector('#tabla-recetas tbody');
     if (!recetas.length) {
@@ -143,8 +189,8 @@ async function cargar() {
     }
     tb.innerHTML = recetas.map(r => `
         <tr>
-            <td><strong>${r.producto_nombre || r.nombre}</strong><br><small style="opacity:.6">${r.ingredientes.length} ingredientes</small></td>
-            <td style="font-size:12.5px">${r.ingredientes.map(i => `${i.producto_nombre} ×${i.cantidad_necesaria}${i.unidad ? ' ' + i.unidad : ''}`).join('<br>')}</td>
+            <td><strong>${r.producto_nombre || r.nombre}</strong><br><small style="opacity:.6">${r.ingredientes.length} ingredientes${r.tiene_personalizacion ? ' · ✎ personalizable' : ''}</small></td>
+            <td style="font-size:12.5px">${r.ingredientes.map(i => `${i.producto_nombre} ×${i.cantidad_necesaria}${i.unidad ? ' ' + i.unidad : ''}${i.excluible ? ' <span class="q-chip ok" style="padding:1px 6px;font-size:10px">quitable</span>' : ''}`).join('<br>')}</td>
             <td>C$ ${r.costo_total.toFixed(2)}</td>
             <td>C$ ${r.precio_venta.toFixed(2)}</td>
             <td><span class="q-chip ${r.margen >= 0 ? 'ok' : 'bajo'}">C$ ${r.margen.toFixed(2)}</span></td>
@@ -157,12 +203,50 @@ async function cargar() {
         </tr>`).join('');
 }
 
+// ---------------------------------------------------------- modo producto
+
+function cambiarModoProducto(modo) {
+    modoProducto = modo;
+    document.getElementById('btn-modo-existente').className = 'q-btn small' + (modo === 'existente' ? '' : ' ghost');
+    document.getElementById('btn-modo-nuevo').className = 'q-btn small' + (modo === 'nuevo' ? '' : ' ghost');
+    document.getElementById('id_producto').style.display = modo === 'existente' ? 'block' : 'none';
+    document.getElementById('bloque-producto-nuevo').style.display = modo === 'nuevo' ? 'flex' : 'none';
+}
+
+function renderizarSelectCategorias() {
+    const sel = document.getElementById('np_categoria');
+    sel.innerHTML = '<option value="">Sin categoría</option>' +
+        CATEGORIAS.map(c => `<option value="${c.id_categoria}">${c.nombre}</option>`).join('');
+}
+
+async function crearCategoriaRapida() {
+    const nombre = prompt('Nombre de la nueva categoría (ej. Asados, Extras, Quesillos):');
+    if (!nombre) return;
+    const r = await fetch('/productos/api/categorias/crear', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({nombre}),
+    }).then(r => r.json());
+    if (r.success) {
+        CATEGORIAS.push(r.categoria);
+        renderizarSelectCategorias();
+        document.getElementById('np_categoria').value = r.categoria.id_categoria;
+        Q.toast('success', 'Categoría creada', nombre);
+    } else {
+        Q.toast('error', 'No se pudo crear', r.message);
+    }
+}
+
+// ---------------------------------------------------------- abrir/cerrar
+
 async function abrirModal() {
     document.getElementById('modal-titulo').textContent = 'Nueva receta';
     document.getElementById('id_receta').value = '';
-    ['nombre','rendimiento','tiempo_preparacion','modo_preparacion'].forEach(id => document.getElementById(id).value = '');
+    ['nombre','rendimiento','tiempo_preparacion','modo_preparacion','np_nombre','np_precio_venta'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('rendimiento').value = 1;
     document.getElementById('tbody-ingredientes').innerHTML = '';
+    document.getElementById('grupos-opciones').innerHTML = '';
+
+    renderizarSelectCategorias();
 
     const productos = await fetch('/recetas/api/productos-disponibles').then(r => r.json());
     const sel = document.getElementById('id_producto');
@@ -170,6 +254,7 @@ async function abrirModal() {
     sel.innerHTML = productos.map(p => `<option value="${p.id_producto}">${p.nombre} — C$ ${p.precio_venta.toFixed(2)}</option>`).join('')
         || '<option value="">No hay productos finales sin receta</option>';
 
+    cambiarModoProducto('existente');
     agregarFila();
     document.getElementById('modal-receta').style.display = 'flex';
 }
@@ -183,17 +268,29 @@ function editar(r) {
     document.getElementById('modo_preparacion').value = r.modo_preparacion || '';
     document.getElementById('estado').value = r.estado || 'activo';
 
+    renderizarSelectCategorias();
     const sel = document.getElementById('id_producto');
     sel.innerHTML = `<option value="${r.id_producto}">${r.producto_nombre}</option>`;
     sel.disabled = true;
+    cambiarModoProducto('existente');
+    document.getElementById('modo-producto-tabs').style.display = 'none'; // ya tiene producto, no se cambia
 
     document.getElementById('tbody-ingredientes').innerHTML = '';
     r.ingredientes.forEach(i => agregarFila(i));
     recalcular();
+
+    document.getElementById('grupos-opciones').innerHTML = '';
+    (r.grupos_opciones || []).forEach(g => agregarGrupoOpciones(g));
+
     document.getElementById('modal-receta').style.display = 'flex';
 }
 
-function cerrarModal() { document.getElementById('modal-receta').style.display = 'none'; }
+function cerrarModal() {
+    document.getElementById('modal-receta').style.display = 'none';
+    document.getElementById('modo-producto-tabs').style.display = 'flex';
+}
+
+// ---------------------------------------------------------- ingredientes
 
 function agregarFila(datos) {
     datos = datos || {};
@@ -214,6 +311,7 @@ function agregarFila(datos) {
                 ${UNIDADES.map(u => `<option value="${u.id}" ${datos.id_unidad == u.id ? 'selected' : ''}>${u.nombre}</option>`).join('')}
             </select>
         </td>
+        <td style="text-align:center"><input type="checkbox" class="ing-excluible" ${datos.excluible ? 'checked' : ''} title="El cliente puede pedir que se lo quiten"></td>
         <td class="ing-stock" style="font-size:12.5px;opacity:.7">—</td>
         <td class="ing-costo">0.00</td>
         <td><button class="q-btn small danger" onclick="this.closest('tr').remove();recalcular()">✕</button></td>`;
@@ -239,6 +337,81 @@ function recalcular() {
     document.getElementById('costo-total').textContent = 'C$ ' + total.toFixed(2);
 }
 
+// ---------------------------------------------------------- grupos de opciones
+
+let contadorGrupos = 0;
+
+function agregarGrupoOpciones(datos) {
+    datos = datos || {};
+    const gid = 'g' + (++contadorGrupos);
+    const box = document.createElement('div');
+    box.className = 'grupo-opciones-box';
+    box.dataset.gid = gid;
+    box.innerHTML = `
+        <div class="grupo-head">
+            <input class="q-input grupo-nombre" placeholder="Nombre del grupo (ej. Proteína, Acompañante)" value="${datos.nombre || ''}">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12.5px;white-space:nowrap;margin:0">
+                <input type="checkbox" class="grupo-obligatorio" ${datos.obligatorio !== false ? 'checked' : ''}> Obligatorio
+            </label>
+            <button type="button" class="q-btn small danger" onclick="this.closest('.grupo-opciones-box').remove()">✕</button>
+        </div>
+        <div class="grupo-items"></div>
+        <button type="button" class="q-btn small ghost" onclick="agregarItemOpcion(this)">+ Agregar opción</button>
+    `;
+    document.getElementById('grupos-opciones').appendChild(box);
+
+    (datos.items || []).forEach(it => agregarItemOpcion(box.querySelector('.q-btn.ghost'), it));
+    if (!datos.items || !datos.items.length) agregarItemOpcion(box.querySelector('.q-btn.ghost'));
+}
+
+function agregarItemOpcion(btn, datos) {
+    datos = datos || {};
+    const cont = btn.closest('.grupo-opciones-box').querySelector('.grupo-items');
+    const row = document.createElement('div');
+    row.className = 'item-opcion-row';
+    row.innerHTML = `
+        <input class="q-input item-nombre" placeholder="Ej. Chorizo criollo" value="${datos.nombre || ''}">
+        <select class="q-select item-insumo">
+            <option value="">Sin descuento de insumo</option>
+            ${INSUMOS.map(i => `<option value="${i.id_producto}" ${datos.id_producto_insumo == i.id_producto ? 'selected' : ''}>${i.nombre}</option>`).join('')}
+        </select>
+        <input type="number" step="0.0001" min="0" class="q-input item-cantidad" placeholder="Cant." value="${datos.cantidad || ''}">
+        <label style="display:flex;align-items:center;gap:3px;font-size:11.5px;margin:0">
+            <input type="checkbox" class="item-default" ${datos.es_default ? 'checked' : ''}> def.
+        </label>
+        <button type="button" class="q-btn small danger" onclick="this.closest('.item-opcion-row').remove()">✕</button>
+    `;
+    cont.appendChild(row);
+}
+
+function recolectarGruposOpciones() {
+    const grupos = [];
+    document.querySelectorAll('#grupos-opciones .grupo-opciones-box').forEach(box => {
+        const nombre = box.querySelector('.grupo-nombre').value.trim();
+        if (!nombre) return;
+        const items = [];
+        box.querySelectorAll('.item-opcion-row').forEach(row => {
+            const inombre = row.querySelector('.item-nombre').value.trim();
+            if (!inombre) return;
+            items.push({
+                nombre: inombre,
+                id_producto_insumo: row.querySelector('.item-insumo').value || null,
+                cantidad: parseFloat(row.querySelector('.item-cantidad').value) || 0,
+                es_default: row.querySelector('.item-default').checked,
+            });
+        });
+        if (!items.length) return;
+        grupos.push({
+            nombre,
+            obligatorio: box.querySelector('.grupo-obligatorio').checked,
+            items,
+        });
+    });
+    return grupos;
+}
+
+// ---------------------------------------------------------- guardar
+
 function recolectar() {
     const ingredientes = [];
     document.querySelectorAll('#tbody-ingredientes tr').forEach(tr => {
@@ -249,10 +422,11 @@ function recolectar() {
             id_producto: parseInt(id),
             cantidad_necesaria: cant,
             id_unidad: tr.querySelector('.ing-unidad').value || null,
+            excluible: tr.querySelector('.ing-excluible').checked,
         });
     });
-    return {
-        id_producto: parseInt(document.getElementById('id_producto').value),
+
+    const payload = {
         nombre: document.getElementById('nombre').value,
         rendimiento: parseFloat(document.getElementById('rendimiento').value) || 1,
         id_unidad_rendimiento: document.getElementById('id_unidad_rendimiento').value || null,
@@ -260,13 +434,30 @@ function recolectar() {
         modo_preparacion: document.getElementById('modo_preparacion').value,
         estado: document.getElementById('estado').value,
         ingredientes: ingredientes,
+        grupos_opciones: recolectarGruposOpciones(),
     };
+
+    const idReceta = document.getElementById('id_receta').value;
+    if (!idReceta && modoProducto === 'nuevo') {
+        payload.producto_nuevo = {
+            nombre: document.getElementById('np_nombre').value,
+            id_categoria: document.getElementById('np_categoria').value || null,
+            precio_venta: parseFloat(document.getElementById('np_precio_venta').value) || 0,
+        };
+    } else {
+        payload.id_producto = parseInt(document.getElementById('id_producto').value);
+    }
+    return payload;
 }
 
 async function guardar() {
     const datos = recolectar();
     if (!datos.ingredientes.length) {
         Q.toast('warning', 'Faltan ingredientes', 'Agrega al menos un insumo con su cantidad.');
+        return;
+    }
+    if (datos.producto_nuevo && !datos.producto_nuevo.nombre.trim()) {
+        Q.toast('warning', 'Falta el nombre', 'Escribe el nombre del producto nuevo.');
         return;
     }
     const id = document.getElementById('id_receta').value;

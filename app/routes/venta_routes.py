@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
 
 from app.extensions import db
-from app.models import Producto, Cliente, Venta, DetalleVenta, Inventario
+from app.models import Producto, Cliente, Venta, DetalleVenta, Inventario, Categoria
 from app.services.auditoria_service import registrar_auditoria
 from app.services.venta_service import VentaService
 from app.services.receta_service import RecetaService
@@ -70,6 +70,7 @@ def api_historial_detalles(id_venta):
                 "precio_unitario": float(d.precio_unitario),
                 "subtotal": float(d.subtotal),
                 "consumio_receta": bool(d.consumio_receta),
+                "comentario": d.comentario,
             }
         )
     return jsonify(resultado)
@@ -85,21 +86,40 @@ def api_productos():
         .order_by(Producto.nombre)
         .all()
     )
+    categorias = {c.id_categoria: c.nombre for c in Categoria.query.all()}
+
     resultado = []
     for p in productos:
         if p.se_vende is False:
             continue
         data = p.to_dict()
+        data["categoria_nombre"] = categorias.get(p.id_categoria) or "Sin categoría"
         if p.es_receta:
             # Un producto con receta no tiene stock propio: depende de sus insumos.
             data["stock"] = RecetaService.maximo_producible(p.id_producto)
             data["stock_tipo"] = "receta"
+            data["tiene_personalizacion"] = bool(
+                p.receta and p.receta.estado == "activo" and p.receta.tiene_personalizacion
+            )
         else:
             inv = Inventario.query.filter_by(id_producto=p.id_producto).first()
             data["stock"] = float(inv.stock_actual) if inv else 0.0
             data["stock_tipo"] = "directo"
+            data["tiene_personalizacion"] = False
         resultado.append(data)
     return jsonify(resultado)
+
+
+@venta_bp.route("/api/personalizacion/<int:id_producto>", methods=["GET"])
+@login_required
+def api_personalizacion(id_producto):
+    """Ingredientes que se pueden quitar y grupos de opciones (elige uno)
+    para mostrar en el modal del POS antes de agregar el producto al carrito."""
+    opciones = RecetaService.opciones_de_venta(id_producto)
+    if not opciones:
+        return jsonify({"tiene_personalizacion": False})
+    opciones["tiene_personalizacion"] = True
+    return jsonify(opciones)
 
 
 @venta_bp.route("/api/clientes", methods=["GET"])

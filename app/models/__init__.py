@@ -16,7 +16,7 @@ from app.models.movimiento_inventario import MovimientoInventario
 from app.models.compra import Compra
 from app.models.detalle_compra import DetalleCompra
 from app.models.auditoria import Auditoria
-from app.models.receta import Receta, RecetaIngrediente
+from app.models.receta import Receta, RecetaIngrediente, RecetaOpcionGrupo, RecetaOpcionItem
 from app.models.sync import SyncQueue, ConflictLog, SyncMetadata
 from app.models.notificacion import Notificacion
 from app.models.configuracion import Configuracion
@@ -27,7 +27,8 @@ __all__ = [
     "RecuperacionPassword", "Producto", "Categoria", "Marca", "Proveedor",
     "UnidadMedida", "Cliente", "Venta", "DetalleVenta", "Inventario",
     "MovimientoInventario", "Compra", "DetalleCompra", "Auditoria",
-    "Receta", "RecetaIngrediente", "SyncQueue", "ConflictLog", "SyncMetadata",
+    "Receta", "RecetaIngrediente", "RecetaOpcionGrupo", "RecetaOpcionItem",
+    "SyncQueue", "ConflictLog", "SyncMetadata",
     "Notificacion", "Configuracion", "Caja", "AperturaCaja", "MovimientoCaja",
     "CierreCaja",
 ]

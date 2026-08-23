@@ -143,8 +143,9 @@
             
             detalles.forEach(d => {
                 const tr = document.createElement('tr');
+                const nota = d.comentario ? `<br><small style="color:#e67e22;">✎ ${d.comentario}</small>` : '';
                 tr.innerHTML = `
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${d.producto}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${d.producto}${nota}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;">${d.cantidad}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;">C$ ${d.precio_unitario.toFixed(2)}</td>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>C$ ${d.subtotal.toFixed(2)}</strong></td>

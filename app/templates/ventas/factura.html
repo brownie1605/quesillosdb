@@ -74,7 +74,8 @@
                 {% for d in detalles %}
                 <tr>
                     <td>{{ d.cantidad }}</td>
-                    <td>{{ d.producto.nombre if d.producto else 'Producto' }}<br><small>C$ {{ d.precio_unitario }} c/u</small></td>
+                    <td>{{ d.producto.nombre if d.producto else 'Producto' }}<br><small>C$ {{ d.precio_unitario }} c/u</small>
+                        {% if d.comentario %}<br><small>✎ {{ d.comentario }}</small>{% endif %}</td>
                     <td class="text-right">C$ {{ d.subtotal }}</td>
                 </tr>
                 {% endfor %}

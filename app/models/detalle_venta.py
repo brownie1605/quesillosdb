@@ -13,6 +13,11 @@ class DetalleVenta(db.Model):
     subtotal = db.Column(db.Numeric(12, 2), nullable=False)
 
     consumio_receta = db.Column(db.Boolean, default=False)
+    # Personalizacion elegida por el cliente (ingredientes quitados, opciones
+    # de cada grupo) y su version en texto listo para mostrar en el carrito
+    # y el ticket. Ej: {"excluidos": [12], "opciones": [45, 51]}
+    personalizacion = db.Column(db.JSON)
+    comentario = db.Column(db.String(500))
     timestamp_local_creacion = db.Column(db.DateTime, default=nicaragua_now)
     estado_sync = db.Column(db.Enum('pendiente', 'sinc_local', 'sinc_remoto'), default='pendiente')
 
@@ -29,4 +34,5 @@ class DetalleVenta(db.Model):
             'descuento': float(self.descuento or 0),
             'subtotal': float(self.subtotal or 0),
             'consumio_receta': bool(self.consumio_receta),
+            'comentario': self.comentario,
         }

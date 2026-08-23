@@ -25,6 +25,7 @@
     </div>
     
     <div style="display: flex; gap: 10px;">
+        <button id="btnNuevaCategoria" class="btn btn-secondary" style="background: #1abc9c; color: white;">+ Nueva Categoría</button>
         <button id="btnNuevaMarca" class="btn btn-secondary" style="background: #e67e22; color: white;">+ Nueva Marca</button>
         <button id="btnNuevoProducto" class="btn btn-primary">+ Nuevo Producto</button>
     </div>
@@ -37,6 +38,7 @@
                 <th>Imagen</th>
                 <th>Código</th>
                 <th>Producto</th>
+                <th>Tipo</th>
                 <th>Categoría</th>
                 <th>Precio Compra</th>
                 <th>Precio Venta</th>
@@ -76,6 +78,14 @@
             <div style="margin-bottom: 10px;">
                 <label>Descripción</label>
                 <textarea id="prod_descripcion" class="form-control" style="width: 100%; height: 50px;" placeholder="Opcional"></textarea>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label>Tipo de producto</label>
+                <select id="prod_tipo_producto" class="form-control" style="width: 100%;">
+                    <option value="final">Producto final (se vende al cliente)</option>
+                    <option value="insumo">Insumo (se vende Y se usa en recetas)</option>
+                    <option value="material">Material (solo control de costo, no se vende)</option>
+                </select>
             </div>
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                 <div style="flex: 1;">
@@ -153,6 +163,25 @@
             <div style="display: flex; gap: 10px;">
                 <button type="button" id="btnCerrarModalEntrada" class="btn" style="flex: 1; background: #e0e0e0; color: #333;">Cancelar</button>
                 <button type="submit" class="btn btn-success" style="flex: 1;">Agregar Stock</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Nueva Categoría -->
+<div id="modalNuevaCategoria" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1010; align-items: center; justify-content: center;">
+    <div class="modal-content" style=" padding: 20px; border-radius: 8px; width: 300px;">
+        <h4 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Crear Nueva Categoría</h4>
+
+        <form id="formNuevaCategoria">
+            <div style="margin-bottom: 15px;">
+                <label style="font-size: 13px;">Nombre (ej. Asados, Extras, Quesillos, Insumos) *</label>
+                <input type="text" id="nueva_categoria_nombre" class="form-control" style="width: 100%; margin-top: 5px;" required>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="btnCerrarModalCategoria" class="btn" style="flex: 1; background: #e0e0e0; color: #333;">Cancelar</button>
+                <button type="submit" class="btn btn-success" style="flex: 1;">Guardar</button>
             </div>
         </form>
     </div>

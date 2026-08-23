@@ -8,13 +8,21 @@ import io
 from werkzeug.utils import secure_filename
 from flask import send_file
 
-from app.utils.decorators import require_roles
+from app.utils.decorators import require_roles, usuario_tiene_rol
 
 producto_bp = Blueprint("producto", __name__, url_prefix="/productos")
 
 @producto_bp.before_request
 def check_roles():
-    return require_roles('Administrador', 'Cajero', 'Inventario')
+    # Ver el catalogo: Admin, Cajero, Cocinero. Crear/editar/eliminar: solo Admin
+    # (se valida aparte en cada endpoint de escritura, ver `_solo_admin`).
+    return require_roles('Admin', 'Administrador', 'Cajero', 'Cocinero')
+
+
+def _solo_admin():
+    if not usuario_tiene_rol('Admin', 'Administrador'):
+        return jsonify({"success": False, "message": "Solo un administrador puede hacer esto"}), 403
+    return None
 
 
 @producto_bp.route("/")
@@ -60,6 +68,9 @@ def api_marcas():
 @producto_bp.route("/api/marcas/crear", methods=["POST"])
 @login_required
 def api_marcas_crear():
+    error = _solo_admin()
+    if error:
+        return error
     data = request.json
     try:
         nueva_marca = Marca(
@@ -74,6 +85,33 @@ def api_marcas_crear():
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 
+
+@producto_bp.route("/api/categorias/crear", methods=["POST"])
+@login_required
+def api_categorias_crear():
+    """Crea una categoria (ej. Asados, Extras, Quesillos, Insumos) para
+    agrupar productos en el panel de administracion y en el POS."""
+    error = _solo_admin()
+    if error:
+        return error
+    data = request.json or {}
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre:
+        return jsonify({"success": False, "message": "El nombre es obligatorio"}), 400
+    try:
+        nueva = Categoria(
+            id_empresa=current_user.id_empresa,
+            nombre=nombre,
+            descripcion=data.get("descripcion"),
+            estado="activo",
+        )
+        db.session.add(nueva)
+        db.session.commit()
+        return jsonify({"success": True, "categoria": nueva.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
 @producto_bp.route("/api/unidades", methods=["GET"])
 @login_required
 def api_unidades():
@@ -83,6 +121,9 @@ def api_unidades():
 @producto_bp.route("/api/crear", methods=["POST"])
 @login_required
 def api_crear():
+    error = _solo_admin()
+    if error:
+        return error
     UPLOAD_FOLDER = os.path.join('app', 'static', 'uploads', 'productos')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     try:
@@ -107,6 +148,7 @@ def api_crear():
             precio_compra=float(request.form.get("precio_compra", 0.0)),
             precio_venta=float(request.form.get("precio_venta", 0.0)),
             aplica_impuesto=request.form.get("aplica_impuesto") == 'true',
+            tipo_producto=request.form.get("tipo_producto") or "final",
             imagen_url=imagen_url,
             imagen_datos=imagen_datos,
             imagen_mimetype=imagen_mimetype,
@@ -141,6 +183,9 @@ def api_crear():
 @producto_bp.route("/api/editar/<int:id>", methods=["POST"])
 @login_required
 def api_editar(id):
+    error = _solo_admin()
+    if error:
+        return error
     UPLOAD_FOLDER = os.path.join('app', 'static', 'uploads', 'productos')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     try:
@@ -164,6 +209,8 @@ def api_editar(id):
         prod.precio_compra = float(request.form.get("precio_compra", prod.precio_compra or 0.0))
         prod.precio_venta = float(request.form.get("precio_venta", prod.precio_venta))
         prod.aplica_impuesto = request.form.get("aplica_impuesto") == 'true'
+        if request.form.get("tipo_producto"):
+            prod.tipo_producto = request.form.get("tipo_producto")
         
         # Actualizar stock mínimo si existe el registro de inventario
         inv = Inventario.query.filter_by(id_producto=prod.id_producto).first()
@@ -181,6 +228,9 @@ def api_editar(id):
 @producto_bp.route("/api/eliminar/<int:id>", methods=["DELETE"])
 @login_required
 def api_eliminar(id):
+    error = _solo_admin()
+    if error:
+        return error
     try:
         prod = Producto.query.get_or_404(id)
         if prod.id_empresa != current_user.id_empresa:

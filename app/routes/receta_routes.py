@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 
 from app.extensions import db
-from app.models import Producto, Receta, UnidadMedida
+from app.models import Producto, Receta, UnidadMedida, Categoria
 from app.services.receta_service import RecetaService, RecetaError
 from app.services.auditoria_service import registrar_auditoria
 from app.utils.decorators import require_roles
@@ -31,6 +31,14 @@ def detalle(id_receta):
     return render_template("recetas/detalle.html", receta=receta)
 
 
+@receta_bp.route("/api/categorias", methods=["GET"])
+@login_required
+def api_categorias():
+    """Para el selector de categoria al crear un producto nuevo desde aqui."""
+    categorias = Categoria.query.filter_by(estado="activo").order_by(Categoria.nombre).all()
+    return jsonify([c.to_dict() for c in categorias])
+
+
 # ---------------------------------------------------------------- API
 @receta_bp.route("/api/lista", methods=["GET"])
 @login_required
@@ -53,6 +61,14 @@ def api_detalle(id_receta):
     d = receta.to_dict()
     d["max_producible"] = RecetaService.maximo_producible(receta.id_producto)
     return jsonify(d)
+
+
+@receta_bp.route("/api/insumos-y-opciones/<int:id_producto>", methods=["GET"])
+@login_required
+def api_insumos_y_opciones(id_producto):
+    """Vista previa de personalizacion para el admin/cocinero al editar la receta."""
+    datos = RecetaService.opciones_de_venta(id_producto)
+    return jsonify(datos or {"tiene_personalizacion": False})
 
 
 @receta_bp.route("/api/productos-disponibles", methods=["GET"])
@@ -94,11 +110,14 @@ def api_insumos():
 def api_crear():
     data = request.get_json(silent=True) or {}
     try:
+        id_producto = data.get("id_producto")
         receta = RecetaService.crear_receta(
-            int(data.get("id_producto")),
+            int(id_producto) if id_producto else None,
             data,
             data.get("ingredientes") or [],
             current_user.id_usuario,
+            producto_nuevo=data.get("producto_nuevo"),
+            grupos_opciones=data.get("grupos_opciones"),
         )
         registrar_auditoria(
             "crear", "recetas",
@@ -119,7 +138,8 @@ def api_actualizar(id_receta):
     data = request.get_json(silent=True) or {}
     try:
         receta = RecetaService.actualizar_receta(
-            id_receta, data, data.get("ingredientes"), current_user.id_usuario
+            id_receta, data, data.get("ingredientes"), current_user.id_usuario,
+            grupos_opciones=data.get("grupos_opciones"),
         )
         registrar_auditoria("actualizar", "recetas", {"id_receta": id_receta})
         return jsonify({"success": True, "message": "Receta actualizada", "receta": receta.to_dict()})

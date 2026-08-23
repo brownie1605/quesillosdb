@@ -25,6 +25,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnCerrarModalMarca').addEventListener('click', () => {
         document.getElementById('modalNuevaMarca').style.display = 'none';
     });
+    document.getElementById('btnNuevaCategoria').addEventListener('click', () => {
+        document.getElementById('formNuevaCategoria').reset();
+        document.getElementById('modalNuevaCategoria').style.display = 'flex';
+    });
+    document.getElementById('btnCerrarModalCategoria').addEventListener('click', () => {
+        document.getElementById('modalNuevaCategoria').style.display = 'none';
+    });
+    document.getElementById('formNuevaCategoria').addEventListener('submit', guardarNuevaCategoria);
 
     // Precio + IVA dinámico
     document.getElementById('prod_precio_venta').addEventListener('input', calcularIvaEnModal);
@@ -59,20 +67,24 @@ async function cargarSelects() {
         categoriasList = await catRes.json();
         marcasList = await marRes.json();
         unidadesList = await uniRes.json();
-        
+
         const catFilter = document.getElementById('catFilter');
         const prodCategoria = document.getElementById('prod_categoria');
+        catFilter.innerHTML = '<option value="">Categoría: Todas</option>';
+        prodCategoria.innerHTML = '<option value="">Sin Categoría</option>';
         categoriasList.forEach(c => {
             catFilter.innerHTML += `<option value="${c.id_categoria}">${c.nombre}</option>`;
             prodCategoria.innerHTML += `<option value="${c.id_categoria}">${c.nombre}</option>`;
         });
         
         const prodMarca = document.getElementById('prod_marca');
+        prodMarca.innerHTML = '<option value="">Sin Marca</option>';
         marcasList.forEach(m => {
             prodMarca.innerHTML += `<option value="${m.id_marca}">${m.nombre}</option>`;
         });
-        
+
         const prodUnidad = document.getElementById('prod_unidad');
+        prodUnidad.innerHTML = '<option value="">Sin Unidad</option>';
         unidadesList.forEach(u => {
             prodUnidad.innerHTML += `<option value="${u.id_unidad}">${u.nombre} (${u.abreviatura})</option>`;
         });
@@ -118,10 +130,12 @@ function renderizarTabla() {
             ? `<img src="${p.imagen_url}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #e1e7f0;">`
             : `<span style="font-size: 26px;">📦</span>`;
         
+        const tipoChip = {final: 'final', insumo: 'insumo', material: 'material'}[p.tipo_producto] || 'final';
         tr.innerHTML = `
             <td>${imgHtml}</td>
             <td>${p.codigo || '-'}</td>
             <td>${p.nombre}</td>
+            <td><span class="q-chip ${tipoChip}" style="padding:2px 8px;font-size:11px;">${p.tipo_label || p.tipo_producto || 'final'}</span></td>
             <td>${p.categoria_nombre}</td>
             <td>C$ ${p.precio_compra.toFixed(2)}</td>
             <td>C$ ${p.precio_venta.toFixed(2)}</td>
@@ -143,6 +157,7 @@ function abrirModalCrear() {
     document.getElementById('modalProductoTitle').textContent = 'Nuevo Producto';
     document.getElementById('formProducto').reset();
     document.getElementById('prod_id').value = '';
+    document.getElementById('prod_tipo_producto').value = 'final';
     document.getElementById('prod_imagen_preview').innerHTML = '';
     document.getElementById('modalProducto').style.display = 'flex';
     calcularIvaEnModal();
@@ -168,6 +183,7 @@ function abrirModalEditar(id) {
     document.getElementById('prod_codigo_barra').value = p.codigo_barra || '';
     document.getElementById('prod_nombre').value = p.nombre || '';
     document.getElementById('prod_descripcion').value = p.descripcion || '';
+    document.getElementById('prod_tipo_producto').value = p.tipo_producto || 'final';
     document.getElementById('prod_categoria').value = p.id_categoria || '';
     document.getElementById('prod_marca').value = p.id_marca || '';
     document.getElementById('prod_unidad').value = p.id_unidad || '';
@@ -206,6 +222,7 @@ async function guardarProducto(e) {
     formData.append('codigo_barra', document.getElementById('prod_codigo_barra').value);
     formData.append('nombre', document.getElementById('prod_nombre').value);
     formData.append('descripcion', document.getElementById('prod_descripcion').value);
+    formData.append('tipo_producto', document.getElementById('prod_tipo_producto').value);
     formData.append('id_categoria', document.getElementById('prod_categoria').value);
     formData.append('id_marca', document.getElementById('prod_marca').value);
     formData.append('id_unidad', document.getElementById('prod_unidad').value);
@@ -297,6 +314,30 @@ async function guardarNuevaMarca(e) {
         }
     } catch (error) {
         console.error("Error al crear marca:", error);
+        showCustomAlert('Ocurrió un error en el servidor');
+    }
+}
+
+async function guardarNuevaCategoria(e) {
+    e.preventDefault();
+
+    const nombre = document.getElementById('nueva_categoria_nombre').value;
+
+    try {
+        const response = await fetch(`/productos/api/categorias/crear`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({nombre: nombre})
+        });
+        const result = await response.json();
+        if (result.success) {
+            document.getElementById('modalNuevaCategoria').style.display = 'none';
+            cargarSelects();
+        } else {
+            showCustomAlert('Error al crear categoría: ' + result.message);
+        }
+    } catch (error) {
+        console.error("Error al crear categoría:", error);
         showCustomAlert('Ocurrió un error en el servidor');
     }
 }
