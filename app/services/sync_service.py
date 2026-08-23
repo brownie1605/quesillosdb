@@ -105,6 +105,12 @@ def _json_safe(value):
         return value.strftime("%Y-%m-%d %H:%M:%S")
     if isinstance(value, (bytes, bytearray)):
         return None  # las imagenes binarias no viajan en el payload
+    if isinstance(value, (dict, list)):
+        # Columnas JSON (ej. detalle_ventas.personalizacion): pymysql las
+        # devuelve ya decodificadas como dict/list, pero un bind param de
+        # SQL no acepta eso directamente -- hay que volver a mandarlas como
+        # texto JSON para que la columna remota las reciba bien.
+        return json.dumps(value, default=str)
     return value
 
 
