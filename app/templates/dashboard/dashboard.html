@@ -108,9 +108,56 @@
 
 </div>
 
+<!-- Reportes: exportacion (antes era una pagina aparte, ahora vive aqui) -->
+<div class="panel" style="padding: 20px; margin-top: 20px;">
+    <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+        📊 Exportar reportes (CSV)
+    </h3>
+
+    <div style="display: flex; gap: 20px; align-items: flex-end; flex-wrap: wrap;">
+        <div class="modal-section" style="border: 1px solid #e1e7f0; padding: 15px; border-radius: 8px; flex: 1; min-width: 300px;">
+            <h4 style="margin-top: 0; color: #0b5cff; font-size: 15px;">Ventas y ganancias</h4>
+            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; margin-bottom: 4px; display: block;">Desde</label>
+                    <input type="date" id="exportFechaInicio" class="form-control">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; margin-bottom: 4px; display: block;">Hasta</label>
+                    <input type="date" id="exportFechaFin" class="form-control">
+                </div>
+            </div>
+            <button onclick="descargarReporteVentas()" class="btn btn-primary" style="width: 100%; justify-content: center;">📥 Descargar CSV</button>
+        </div>
+
+        <div class="modal-section" style="border: 1px solid #e1e7f0; padding: 15px; border-radius: 8px; flex: 1; min-width: 300px; display: flex; flex-direction: column;">
+            <h4 style="margin-top: 0; color: #00ca72; font-size: 15px;">Inventario actual</h4>
+            <p style="font-size: 13px; margin-bottom: 15px; flex: 1;">Stock, costo y valor total costeado de cada producto.</p>
+            <button onclick="window.location.href='/reportes/api/exportar/inventario'" class="btn btn-success" style="width: 100%; justify-content: center;">📦 Descargar CSV</button>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const hoy = new Date();
+    const inicio = new Date();
+    inicio.setDate(hoy.getDate() - 6);
+    const fmt = (f) => `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;
+    document.getElementById('exportFechaInicio').value = fmt(inicio);
+    document.getElementById('exportFechaFin').value = fmt(hoy);
+});
+
+function descargarReporteVentas() {
+    const inicio = document.getElementById('exportFechaInicio').value;
+    const fin = document.getElementById('exportFechaFin').value;
+    if (!inicio || !fin) { showCustomAlert('Selecciona ambas fechas'); return; }
+    window.location.href = `/reportes/api/exportar/ventas?inicio=${inicio}&fin=${fin}`;
+}
+</script>
 {% endblock %}

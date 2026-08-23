@@ -16,7 +16,9 @@ producto_bp = Blueprint("producto", __name__, url_prefix="/productos")
 def check_roles():
     # Ver el catalogo: Admin, Cajero, Cocinero. Crear/editar/eliminar: solo Admin
     # (se valida aparte en cada endpoint de escritura, ver `_solo_admin`).
-    return require_roles('Admin', 'Administrador', 'Cajero', 'Cocinero')
+    # Insumos vive ahora dentro de Productos (filtro "Tipo"), asi que Mesero
+    # tambien necesita poder verla, igual que antes con /insumos.
+    return require_roles('Admin', 'Administrador', 'Cajero', 'Cocinero', 'Mesero')
 
 
 def _solo_admin():

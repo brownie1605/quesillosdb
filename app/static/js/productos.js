@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Filtros
     document.getElementById('searchInput').addEventListener('input', renderizarTabla);
+    document.getElementById('tipoFilter').addEventListener('change', renderizarTabla);
     document.getElementById('catFilter').addEventListener('change', renderizarTabla);
     document.getElementById('estadoFilter').addEventListener('change', renderizarTabla);
     document.getElementById('impuestoFilter').addEventListener('change', renderizarTabla);
@@ -109,16 +110,18 @@ function renderizarTabla() {
     tbody.innerHTML = '';
     
     const search = document.getElementById('searchInput').value.toLowerCase();
+    const tipo = document.getElementById('tipoFilter').value;
     const cat = document.getElementById('catFilter').value;
     const estado = document.getElementById('estadoFilter').value;
     const impuesto = document.getElementById('impuestoFilter').value;
-    
+
     let filtrados = productosList.filter(p => {
         const matchSearch = p.nombre.toLowerCase().includes(search) || (p.codigo && p.codigo.toLowerCase().includes(search));
+        const matchTipo = tipo === '' || p.tipo_producto === tipo;
         const matchCat = cat === '' || String(p.id_categoria) === cat;
         const matchEstado = estado === '' || p.estado === estado;
         const matchImpuesto = impuesto === '' || String(p.aplica_impuesto) === impuesto;
-        return matchSearch && matchCat && matchEstado && matchImpuesto;
+        return matchSearch && matchTipo && matchCat && matchEstado && matchImpuesto;
     });
     
     filtrados.forEach(p => {

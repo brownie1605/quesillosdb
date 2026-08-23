@@ -17,7 +17,15 @@
 {% endblock %}
 
 {% block content %}
-<h3 class="titulo mb-3">🧾 Turno de caja</h3>
+<h3 class="titulo mb-3">🧾 Caja</h3>
+
+<ul class="nav nav-tabs mb-3" id="cajaTabs">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabTurno" type="button">Turno de caja</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabProveedores" type="button" onclick="cargarProveedores()">🚚 Proveedores</button></li>
+</ul>
+
+<div class="tab-content">
+<div class="tab-pane fade show active" id="tabTurno">
 
 <div id="sinTurno" style="display:none;">
     <div class="card p-4" style="max-width:420px;">
@@ -69,6 +77,43 @@
                         <tbody id="tbodyMov"></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div> <!-- /tabTurno -->
+
+<div class="tab-pane fade" id="tabProveedores">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <input type="text" class="form-control" style="max-width:320px;" id="provBuscar" placeholder="Buscar proveedor...">
+        <button class="btn btn-cafe" onclick="abrirNuevoProveedor()"><i class="bi bi-plus-circle"></i> Nuevo proveedor</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle bg-white">
+            <thead><tr><th>Nombre</th><th>RUC</th><th>Teléfono</th><th>Correo</th><th></th></tr></thead>
+            <tbody id="tbodyProveedores"><tr><td colspan="5" class="text-center py-4">Cargando…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+</div> <!-- /tab-content -->
+
+<div class="modal fade" id="modalProveedor" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="provModalTitulo">Nuevo proveedor</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="prov_id">
+                <div class="mb-2"><label class="form-label">Nombre *</label><input class="form-control" id="prov_nombre" required></div>
+                <div class="mb-2"><label class="form-label">RUC</label><input class="form-control" id="prov_ruc"></div>
+                <div class="mb-2"><label class="form-label">Teléfono</label><input class="form-control" id="prov_telefono"></div>
+                <div class="mb-2"><label class="form-label">Correo</label><input type="email" class="form-control" id="prov_correo"></div>
+                <div class="mb-2"><label class="form-label">Dirección</label><textarea class="form-control" id="prov_direccion" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-cafe" onclick="guardarProveedor()">Guardar</button>
             </div>
         </div>
     </div>
@@ -133,5 +178,76 @@ async function cerrarTurno() {
 }
 
 cargar();
+
+// ---- Proveedores (unificado aqui, antes vivian en su propia pagina) ----
+let proveedores = [];
+let modalProveedor;
+
+async function cargarProveedores() {
+    proveedores = await fetch('/proveedores/api/list').then(r => r.json());
+    renderProveedores();
+}
+
+function renderProveedores() {
+    const texto = (document.getElementById('provBuscar').value || '').toLowerCase();
+    const lista = proveedores.filter(p => !texto || p.nombre.toLowerCase().includes(texto) || (p.ruc||'').toLowerCase().includes(texto));
+    const tbody = document.getElementById('tbodyProveedores');
+    if (!lista.length) { tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Sin proveedores registrados.</td></tr>'; return; }
+    tbody.innerHTML = lista.map(p => `
+        <tr>
+            <td>${p.nombre}</td>
+            <td>${p.ruc||'-'}</td>
+            <td>${p.telefono||'-'}</td>
+            <td>${p.correo||'-'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-secondary" onclick='abrirEditarProveedor(${JSON.stringify(p)})'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" onclick="eliminarProveedor(${p.id_proveedor})"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join('');
+}
+
+document.getElementById('provBuscar').addEventListener('input', renderProveedores);
+
+function abrirNuevoProveedor() {
+    document.getElementById('provModalTitulo').textContent = 'Nuevo proveedor';
+    ['prov_id','prov_nombre','prov_ruc','prov_telefono','prov_correo','prov_direccion'].forEach(id => document.getElementById(id).value = '');
+    modalProveedor = modalProveedor || new bootstrap.Modal(document.getElementById('modalProveedor'));
+    modalProveedor.show();
+}
+
+function abrirEditarProveedor(p) {
+    document.getElementById('provModalTitulo').textContent = 'Editar proveedor';
+    document.getElementById('prov_id').value = p.id_proveedor;
+    document.getElementById('prov_nombre').value = p.nombre || '';
+    document.getElementById('prov_ruc').value = p.ruc || '';
+    document.getElementById('prov_telefono').value = p.telefono || '';
+    document.getElementById('prov_correo').value = p.correo || '';
+    document.getElementById('prov_direccion').value = p.direccion || '';
+    modalProveedor = modalProveedor || new bootstrap.Modal(document.getElementById('modalProveedor'));
+    modalProveedor.show();
+}
+
+async function guardarProveedor() {
+    const id = document.getElementById('prov_id').value;
+    const datos = {
+        nombre: document.getElementById('prov_nombre').value.trim(),
+        ruc: document.getElementById('prov_ruc').value,
+        telefono: document.getElementById('prov_telefono').value,
+        correo: document.getElementById('prov_correo').value,
+        direccion: document.getElementById('prov_direccion').value,
+    };
+    if (!datos.nombre) { showCustomAlert('El nombre es obligatorio'); return; }
+    const url = id ? `/proveedores/api/editar/${id}` : '/proveedores/api/crear';
+    const r = await fetch(url, {method: id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(datos)}).then(r=>r.json());
+    if (r.success) { modalProveedor.hide(); cargarProveedores(); }
+    else showCustomAlert(r.message);
+}
+
+async function eliminarProveedor(id) {
+    showCustomConfirm('¿Eliminar este proveedor?', async () => {
+        const r = await fetch(`/proveedores/api/eliminar/${id}`, {method:'DELETE'}).then(r=>r.json());
+        if (r.success) cargarProveedores(); else showCustomAlert(r.message);
+    });
+}
 </script>
 {% endblock %}

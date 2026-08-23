@@ -6,10 +6,10 @@
                 <span class="text">Inicio</span>
             </a>
         </li>
-        <li class="list {% if request.blueprint == 'venta' and request.endpoint == 'venta.pos' %}active{% endif %}">
-            <a href="{{ url_for('venta.pos') }}">
-                <span class="icon"><ion-icon name="cart-outline"></ion-icon></span>
-                <span class="text">Venta</span>
+        <li class="list {% if request.blueprint == 'mesa' %}active{% endif %}">
+            <a href="{{ url_for('mesa.lista') }}">
+                <span class="icon"><ion-icon name="restaurant-outline"></ion-icon></span>
+                <span class="text">Mesas</span>
             </a>
         </li>
         <li class="list {% if request.blueprint == 'producto' %}active{% endif %}">

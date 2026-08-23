@@ -1,5 +1,6 @@
 {% set rol = (current_user.rol.nombre if current_user.rol else '') | lower %}
 {% set es_admin = rol in ['admin', 'administrador'] %}
+{% set en_config = request.blueprint in ['usuario', 'sync', 'auditoria', 'configuracion'] %}
 
 <aside class="sidebar">
 
@@ -27,7 +28,6 @@
         {% if es_admin or rol in ['cajero', 'mesero'] %}
         <div class="menu-label">🍽️ ATENCIÓN</div>
         <a href="{{ url_for('mesa.lista') }}" class="{% if request.blueprint == 'mesa' %}active{% endif %}">🍽️ Mesas</a>
-        <a href="{{ url_for('venta.pos') }}" class="{% if request.endpoint == 'venta.pos' %}active{% endif %}">💵 Punto de venta</a>
         <a href="{{ url_for('venta.historial') }}" class="{% if request.endpoint == 'venta.historial' %}active{% endif %}">🧾 Historial de ventas</a>
         <a href="{{ url_for('cliente.lista') }}" class="{% if request.blueprint == 'cliente' %}active{% endif %}">🙂 Clientes</a>
         {% endif %}
@@ -38,31 +38,30 @@
         <a href="{{ url_for('receta.lista') }}" class="{% if request.blueprint == 'receta' %}active{% endif %}">📖 Recetas</a>
         {% endif %}
 
+        {% if es_admin or rol in ['cajero', 'cocinero', 'mesero'] %}
         <div class="menu-label">📦 INVENTARIO</div>
-        <a href="{{ url_for('insumo.lista') }}" class="{% if request.blueprint == 'insumo' %}active{% endif %}">🥬 Insumos</a>
-
-        {% if es_admin or rol in ['cajero', 'cocinero'] %}
-        <a href="{{ url_for('producto.lista') }}" class="{% if request.blueprint == 'producto' %}active{% endif %}">📦 Productos</a>
+        <a href="{{ url_for('producto.lista') }}" class="{% if request.blueprint == 'producto' %}active{% endif %}">📦 Productos <small>(incl. insumos)</small></a>
         {% endif %}
 
         {% if es_admin or rol == 'cajero' %}
         <a href="{{ url_for('inventario.lista') }}" class="{% if request.blueprint == 'inventario' %}active{% endif %}">📊 Inventario</a>
         <a href="{{ url_for('compra.lista') }}" class="{% if request.blueprint == 'compra' %}active{% endif %}">🛍 Compras</a>
-        <a href="{{ url_for('proveedor.lista') }}" class="{% if request.blueprint == 'proveedor' %}active{% endif %}">🚚 Proveedores</a>
         {% endif %}
 
         {% if es_admin or rol == 'cajero' %}
         <div class="menu-label">🧾 CAJA</div>
-        <a href="{{ url_for('caja.index') }}" class="{% if request.blueprint == 'caja' %}active{% endif %}">🧾 Turno de caja</a>
+        <a href="{{ url_for('caja.index') }}" class="{% if request.blueprint == 'caja' %}active{% endif %}">🧾 Caja <small>(y proveedores)</small></a>
         {% endif %}
 
         {% if es_admin %}
         <div class="menu-label">👥 ADMINISTRACIÓN</div>
-        <a href="{{ url_for('reporte.index') }}" class="{% if request.blueprint == 'reporte' %}active{% endif %}">📈 Reportes</a>
-        <a href="{{ url_for('usuario.lista') }}" class="{% if request.blueprint == 'usuario' %}active{% endif %}">👥 Usuarios</a>
-        <a href="{{ url_for('sync.panel') }}" class="{% if request.blueprint == 'sync' %}active{% endif %}">🔄 Sincronización</a>
-        <a href="{{ url_for('auditoria.index') }}" class="{% if request.blueprint == 'auditoria' %}active{% endif %}">📋 Auditoría</a>
-        <a href="{{ url_for('configuracion.index') }}" class="{% if request.blueprint == 'configuracion' %}active{% endif %}">⚙ Configuración</a>
+        <details class="menu-dropdown" {% if en_config %}open{% endif %}>
+            <summary class="{% if en_config %}active{% endif %}">⚙ Configuración</summary>
+            <a href="{{ url_for('usuario.lista') }}" class="sub {% if request.blueprint == 'usuario' %}active{% endif %}">👥 Usuarios</a>
+            <a href="{{ url_for('sync.panel') }}" class="sub {% if request.blueprint == 'sync' %}active{% endif %}">🔄 Sincronización</a>
+            <a href="{{ url_for('auditoria.index') }}" class="sub {% if request.blueprint == 'auditoria' %}active{% endif %}">📋 Auditoría</a>
+            <a href="{{ url_for('configuracion.index') }}" class="sub {% if request.blueprint == 'configuracion' %}active{% endif %}">🎨 Preferencias</a>
+        </details>
         {% endif %}
     </nav>
 
