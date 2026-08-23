@@ -285,7 +285,14 @@ class RecetaService:
             for it in g.items:
                 disponible = True
                 if it.id_producto_insumo and it.cantidad:
-                    disponible = InventarioService.stock_de(it.id_producto_insumo) >= Decimal(str(it.cantidad))
+                    prod_opcion = Producto.query.get(it.id_producto_insumo)
+                    if prod_opcion and prod_opcion.es_receta:
+                        # La opcion es a su vez una receta (ej. "Gallopinto"):
+                        # su "stock" es cuanto se puede preparar con SUS
+                        # propios insumos, no un conteo directo de inventario.
+                        disponible = RecetaService.maximo_producible(it.id_producto_insumo) >= float(it.cantidad)
+                    else:
+                        disponible = InventarioService.stock_de(it.id_producto_insumo) >= Decimal(str(it.cantidad))
                 items.append({
                     "id_item": it.id_item,
                     "nombre": it.nombre,
@@ -337,12 +344,55 @@ class RecetaService:
 
     # -----------------------------------------------------------------
     @staticmethod
+    def _expandir_consumo(id_producto, cantidad, excluidos=None, _visitados=None):
+        """Cuanto de que producto se consume, bajando recursivamente por
+        recetas anidadas: si un ingrediente (o una opcion elegida) es a su
+        vez una receta -- ej. "Gallopinto" usado como opcion dentro de
+        "Desayuno tipico" -- se descuentan SUS propios insumos (arroz,
+        frijoles, aceite...) en vez de tratar a "Gallopinto" como si tuviera
+        stock propio. `_visitados` evita un loop infinito si una receta
+        terminara referenciandose a si misma por error de captura.
+        """
+        cantidad = Decimal(str(cantidad))
+        _visitados = _visitados or set()
+        if id_producto in _visitados:
+            return {id_producto: cantidad}
+        _visitados = _visitados | {id_producto}
+
+        producto = Producto.query.get(id_producto)
+        if not producto or not producto.es_receta:
+            return {id_producto: cantidad}
+
+        receta = Receta.query.filter_by(id_producto=id_producto, estado="activo").first()
+        if not receta or not receta.ingredientes:
+            return {id_producto: cantidad}
+
+        excluidos = set(int(x) for x in (excluidos or []))
+        rendimiento = Decimal(str(receta.rendimiento or 1))
+        if rendimiento <= 0:
+            rendimiento = Decimal("1")
+
+        total = {}
+        for ing in receta.ingredientes:
+            if ing.opcional or ing.id_producto in excluidos:
+                continue
+            consumo = Decimal(str(ing.cantidad_necesaria)) * cantidad / rendimiento
+            parcial = RecetaService._expandir_consumo(
+                ing.id_producto, consumo, _visitados=_visitados
+            )
+            for pid, cant in parcial.items():
+                total[pid] = total.get(pid, Decimal("0")) + cant
+        return total
+
+    # -----------------------------------------------------------------
+    @staticmethod
     def requerimiento_de_venta(id_producto, cantidad, excluidos=None, opciones=None):
         """Cuanto inventario consume vender `cantidad` de `id_producto`.
 
         - Producto con receta -> consumo de cada insumo (escalado por
           rendimiento), sin los `excluidos` y sumando lo que agreguen las
-          `opciones` elegidas.
+          `opciones` elegidas. Si un ingrediente/opcion es a su vez una
+          receta, se expande en cascada (ver `_expandir_consumo`).
         - Insumo o producto simple -> el propio producto.
         """
         cantidad = Decimal(str(cantidad))
@@ -353,18 +403,20 @@ class RecetaService:
         if producto.es_receta:
             receta = Receta.query.filter_by(id_producto=id_producto, estado="activo").first()
             if receta and receta.ingredientes:
-                excluidos = set(int(x) for x in (excluidos or []))
+                excluidos_set = set(int(x) for x in (excluidos or []))
                 rendimiento = Decimal(str(receta.rendimiento or 1))
                 if rendimiento <= 0:
                     rendimiento = Decimal("1")
                 requerido = {}
                 for ing in receta.ingredientes:
-                    if ing.opcional or ing.id_producto in excluidos:
+                    if ing.opcional or ing.id_producto in excluidos_set:
                         continue
                     consumo = Decimal(str(ing.cantidad_necesaria)) * cantidad / rendimiento
-                    requerido[ing.id_producto] = requerido.get(
-                        ing.id_producto, Decimal("0")
-                    ) + consumo
+                    parcial = RecetaService._expandir_consumo(
+                        ing.id_producto, consumo, _visitados={id_producto}
+                    )
+                    for pid, cant in parcial.items():
+                        requerido[pid] = requerido.get(pid, Decimal("0")) + cant
 
                 if opciones:
                     ids_item = [int(x) for x in opciones]
@@ -373,9 +425,11 @@ class RecetaService:
                         if not it.id_producto_insumo or not it.cantidad:
                             continue
                         consumo = Decimal(str(it.cantidad)) * cantidad / rendimiento
-                        requerido[it.id_producto_insumo] = requerido.get(
-                            it.id_producto_insumo, Decimal("0")
-                        ) + consumo
+                        parcial = RecetaService._expandir_consumo(
+                            it.id_producto_insumo, consumo, _visitados={id_producto}
+                        )
+                        for pid, cant in parcial.items():
+                            requerido[pid] = requerido.get(pid, Decimal("0")) + cant
 
                 return requerido
 

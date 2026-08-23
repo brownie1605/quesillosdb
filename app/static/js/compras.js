@@ -80,9 +80,11 @@ async function cargarDatosIniciales() {
         }
         
         
+        // Una receta (plato preparado) no se compra a un proveedor, se
+        // prepara con sus insumos -> no debe aparecer aqui como comprable.
         const selectProd = document.getElementById('compra_producto');
-        productosList.forEach(p => {
-            selectProd.innerHTML += `<option value="${p.id_producto}" data-costo="${p.costo || 0}">${p.nombre}</option>`;
+        productosList.filter(p => !p.es_receta).forEach(p => {
+            selectProd.innerHTML += `<option value="${p.id_producto}" data-costo="${p.precio_compra || 0}">${p.nombre}</option>`;
         });
         
         // Autocompletar costo al elegir producto

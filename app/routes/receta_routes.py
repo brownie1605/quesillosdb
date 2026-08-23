@@ -88,19 +88,29 @@ def api_productos_disponibles():
 @receta_bp.route("/api/insumos", methods=["GET"])
 @login_required
 def api_insumos():
-    """Productos utilizables como ingrediente (insumos y materiales)."""
+    """Productos utilizables como ingrediente u opcion dentro de una receta:
+    insumos/materiales normales, y tambien OTRAS recetas ya armadas (ej. usar
+    "Gallopinto" -- que es a su vez una receta con sus propios insumos --
+    como una de las opciones de "Desayuno tipico"). Al vender, si la opcion
+    elegida es a su vez una receta, se descuentan sus propios ingredientes
+    en cascada (ver RecetaService._expandir_consumo)."""
     from app.services.inventario_service import InventarioService
 
     productos = (
         Producto.query.filter(Producto.estado == "activo")
-        .filter(Producto.tipo_producto.in_(["insumo", "material"]))
+        .filter(db.or_(Producto.tipo_producto.in_(["insumo", "material"]), Producto.es_receta.is_(True)))
         .order_by(Producto.nombre)
         .all()
     )
     salida = []
     for p in productos:
         d = p.to_dict()
-        d["stock"] = float(InventarioService.stock_de(p.id_producto))
+        if p.es_receta:
+            d["stock"] = RecetaService.maximo_producible(p.id_producto)
+            d["es_receta_ingrediente"] = True
+        else:
+            d["stock"] = float(InventarioService.stock_de(p.id_producto))
+            d["es_receta_ingrediente"] = False
         salida.append(d)
     return jsonify(salida)
 
