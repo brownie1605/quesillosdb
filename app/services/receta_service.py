@@ -151,7 +151,11 @@ class RecetaService:
     # -----------------------------------------------------------------
     @staticmethod
     def _reemplazar_ingredientes(receta, ingredientes):
-        RecetaIngrediente.query.filter_by(id_receta=receta.id_receta).delete()
+        # Se borra fila por fila (no Query.delete()) para que cada baja pase
+        # por session.deleted y sync_events la encole hacia la nube; un DELETE
+        # masivo no dispara eventos de instancia y deja filas huerfanas alla.
+        for actual in list(receta.ingredientes):
+            db.session.delete(actual)
         db.session.flush()
 
         vistos = set()
@@ -195,7 +199,10 @@ class RecetaService:
     @staticmethod
     def _reemplazar_grupos_opciones(receta, grupos):
         """Reemplaza por completo los grupos de opciones de eleccion unica."""
-        RecetaOpcionGrupo.query.filter_by(id_receta=receta.id_receta).delete()
+        # Borrado por instancia (no Query.delete()): el cascade de SQLAlchemy
+        # borra tambien los items y ambas bajas quedan encoladas hacia la nube.
+        for actual in list(receta.grupos_opciones):
+            db.session.delete(actual)
         db.session.flush()
 
         for orden_g, grupo in enumerate(grupos):
