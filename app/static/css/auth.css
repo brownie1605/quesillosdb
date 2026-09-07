@@ -90,166 +90,221 @@ body {
     display: grid;
     place-items: center;
     padding: 40px;
-    background:
-        radial-gradient(circle at 30% 20%, rgba(139, 46, 46, .18), transparent 55%),
-        radial-gradient(circle at 80% 85%, rgba(139, 46, 46, .12), transparent 50%),
-        linear-gradient(160deg, #16100d, #1c1512 55%, #14100d);
+    background: #f4f7fb;
 }
 
 @keyframes loginCardIn {
-    from { opacity: 0; transform: translateY(22px) scale(.97); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes lockPulse {
-    0%   { transform: scale(1);   opacity: .55; }
-    70%  { transform: scale(1.7); opacity: 0; }
-    100% { transform: scale(1.7); opacity: 0; }
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .login-card {
-    position: relative;
     width: 100%;
-    max-width: 560px;
-    background: linear-gradient(165deg, #241a16, #1a130f);
-    border: 1px solid rgba(224, 158, 120, .14);
-    border-radius: 18px;
-    padding: 45px;
-    box-shadow:
-        0 25px 70px rgba(0, 0, 0, .55),
-        0 0 0 1px rgba(255, 255, 255, .02) inset,
-        0 0 45px rgba(139, 46, 46, .08);
-    animation: loginCardIn .55s cubic-bezier(.16, 1, .3, 1);
+    max-width: 480px;
+    background: white;
+    border: 1px solid #ecdfd6;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(80, 50, 30, .1);
+    animation: loginCardIn .4s ease-out;
 }
 
 .lock-icon {
-    position: relative;
-    width: 82px;
-    height: 82px;
-    margin: 0 auto 20px;
+    width: 74px;
+    height: 74px;
+    margin: 0 auto 18px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(139, 46, 46, .35), rgba(139, 46, 46, .08));
-    border: 1px solid rgba(224, 120, 90, .3);
+    background: #fbe9e2;
     display: grid;
     place-items: center;
-    font-size: 36px;
-}
-
-.lock-icon::before,
-.lock-icon::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    border: 1px solid rgba(224, 120, 90, .55);
-    animation: lockPulse 2.6s ease-out infinite;
-}
-
-.lock-icon::after {
-    animation-delay: 1.3s;
+    font-size: 32px;
 }
 
 .login-card h2 {
     text-align: center;
-    font-size: 30px;
-    color: #f5ece6;
+    font-size: 26px;
+    color: #3e2723;
     font-weight: 700;
 }
 
 .login-card > p {
     text-align: center;
-    margin: 15px 0 35px;
-    color: #9c8a7e;
-    font-size: 18px;
+    margin: 10px 0 30px;
+    color: #8d6e63;
+    font-size: 15px;
 }
 
 label {
     display: block;
-    margin: 20px 0 8px;
-    color: #d9c7bb;
+    margin: 18px 0 8px;
+    color: #5d4037;
     font-weight: 600;
+    font-size: 14px;
 }
 
-input {
+input[type="text"] {
     width: 100%;
-    height: 58px;
-    background: rgba(255, 255, 255, .035);
-    border: 1px solid rgba(255, 255, 255, .09);
+    height: 54px;
+    background: #fff;
+    border: 1.5px solid #e6d9d0;
     border-radius: 10px;
-    padding: 0 18px;
+    padding: 0 16px;
     font-size: 16px;
     outline: none;
-    color: #f2e8e1;
-    transition: border-color .2s, box-shadow .2s, background .2s;
+    color: #3e2723;
+    transition: border-color .15s, box-shadow .15s;
 }
 
-input::placeholder {
-    color: #6f6058;
+input[type="text"]::placeholder {
+    color: #b8a89c;
 }
 
-input:focus {
-    background: rgba(255, 255, 255, .05);
-    border-color: #d9765a;
-    box-shadow: 0 0 0 4px rgba(217, 118, 90, .14), 0 0 22px rgba(217, 118, 90, .18);
+input[type="text"]:focus {
+    border-color: #8B2E2E;
+    box-shadow: 0 0 0 4px rgba(139, 46, 46, .1);
+}
+
+/* ---------------------------------------------------------------
+   PIN: cuadricula de casillas + teclado numerico en pantalla.
+   Pensado para cajero/mesero en un POS -- nada de contrasena
+   alfanumerica que haya que teclear con cuidado, solo tocar numeros.
+   ------------------------------------------------------------- */
+.pin-boxes {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 4px 0 22px;
+}
+
+.pin-box {
+    width: 42px;
+    height: 52px;
+    border: 1.5px solid #e6d9d0;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: #3e2723;
+    background: #fdfaf8;
+    transition: border-color .15s, box-shadow .15s;
+}
+
+.pin-box.activa {
+    border-color: #8B2E2E;
+    box-shadow: 0 0 0 4px rgba(139, 46, 46, .1);
+}
+
+.pin-box.llena {
+    border-color: #d7b9ab;
+    background: #fbf3ef;
+}
+
+.pin-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.pin-key {
+    height: 56px;
+    border: 1.5px solid #e6d9d0;
+    border-radius: 10px;
+    background: #fff;
+    color: #3e2723;
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s, transform .08s;
+}
+
+.pin-key:hover {
+    background: #fbf3ef;
+}
+
+.pin-key:active {
+    transform: scale(.94);
+    background: #f5e6df;
+}
+
+.pin-key-del {
+    color: #8B2E2E;
+    font-size: 18px;
+}
+
+.pin-key-empty {
+    border: none;
+    background: transparent;
+    cursor: default;
 }
 
 .options {
     display: flex;
     justify-content: space-between;
-    margin: 22px 0;
-    font-size: 15px;
-    color: #9c8a7e;
+    margin: 0 0 22px;
+    font-size: 14px;
+    color: #8d6e63;
 }
 
 .options a {
-    color: #e0785a;
+    color: #8B2E2E;
     text-decoration: none;
 }
 
 button {
     width: 100%;
-    height: 60px;
+    height: 56px;
     border: none;
     border-radius: 10px;
-    background: linear-gradient(135deg, #c05a45, #8B2E2E);
+    background: linear-gradient(135deg, #b04545, #8B2E2E);
     color: white;
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 600;
     cursor: pointer;
-    transition: transform .2s, box-shadow .2s;
+    transition: transform .15s, box-shadow .15s, opacity .15s;
 }
 
 button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 28px rgba(139, 46, 46, .45), 0 0 30px rgba(217, 118, 90, .2);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(139, 46, 46, .3);
+}
+
+button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .divider {
-    margin: 28px 0;
+    margin: 24px 0;
     text-align: center;
-    color: #6f6058;
+    color: #b8a89c;
+    font-size: 14px;
 }
 
 .demo-btn {
-    background: rgba(255, 255, 255, .03);
-    color: #d9c7bb;
-    border: 1px solid rgba(255, 255, 255, .1);
+    background: #fff;
+    color: #5d4037;
+    border: 1.5px solid #e6d9d0;
 }
 
 .demo-btn:hover {
-    background: rgba(255, 255, 255, .06);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, .3);
+    background: #fbf3ef;
+    box-shadow: none;
+    transform: none;
 }
 
 .flash-error {
-    background: rgba(176, 0, 0, .12);
-    color: #f2a89a;
-    padding: 14px;
+    background: #fdecea;
+    color: #b30000;
+    padding: 13px;
     border-radius: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
     font-size: 14px;
     text-align: center;
-    border: 1px solid rgba(217, 118, 90, .3);
+    border: 1px solid #f5c6c0;
 }
 
 @media (max-width: 900px) {

@@ -112,7 +112,7 @@
             {% endwith %}
 
             <!-- FORM LOGIN -->
-            <form method="POST" action="{{ url_for('auth.login') }}">
+            <form method="POST" action="{{ url_for('auth.login') }}" id="loginForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <!-- USUARIO -->
@@ -123,21 +123,34 @@
                 <input
                     type="text"
                     name="usuario"
+                    id="usuarioInput"
                     placeholder="Ingresa tu usuario"
+                    autocomplete="username"
                     required
                 >
 
-                <!-- PASSWORD -->
+                <!-- PIN -->
                 <label>
-                    Contraseña
+                    PIN
                 </label>
 
-                <input
-                    type="password"
-                    name="password"
-                    placeholder="Ingresa tu contraseña"
-                    required
-                >
+                <div class="pin-boxes" id="pinBoxes"></div>
+                <input type="hidden" name="password" id="pinValue" required>
+
+                <div class="pin-keypad" id="pinKeypad">
+                    <button type="button" class="pin-key" data-num="1">1</button>
+                    <button type="button" class="pin-key" data-num="2">2</button>
+                    <button type="button" class="pin-key" data-num="3">3</button>
+                    <button type="button" class="pin-key" data-num="4">4</button>
+                    <button type="button" class="pin-key" data-num="5">5</button>
+                    <button type="button" class="pin-key" data-num="6">6</button>
+                    <button type="button" class="pin-key" data-num="7">7</button>
+                    <button type="button" class="pin-key" data-num="8">8</button>
+                    <button type="button" class="pin-key" data-num="9">9</button>
+                    <button type="button" class="pin-key pin-key-empty" tabindex="-1"></button>
+                    <button type="button" class="pin-key" data-num="0">0</button>
+                    <button type="button" class="pin-key pin-key-del" id="pinDelete">⌫</button>
+                </div>
 
                 <!-- OPCIONES -->
                 <div class="options">
@@ -147,13 +160,13 @@
                     </span>
 
                     <a href="#" id="forgotPasswordLink">
-                        ¿Olvidaste tu contraseña?
+                        ¿Olvidaste tu PIN?
                     </a>
 
                 </div>
 
                 <!-- BOTÓN LOGIN -->
-                <button type="submit">
+                <button type="submit" id="btnLoginSubmit" disabled>
 
                     ↪ Iniciar Sesión
 
@@ -170,10 +183,10 @@
                 <button
                     type="button"
                     class="demo-btn"
-                    onclick="document.querySelector('input[name=\'usuario\']').value='admin'; document.querySelector('input[name=\'password\']').value='admin123'; this.form.submit();"
+                    id="btnUsuarioDemo"
                 >
 
-                    👤 Usuario Demo
+                    🧀 quesillos
 
                 </button>
 
@@ -230,6 +243,76 @@
 </div>
 
 <script>
+// ---------------------------------------------------------------
+// PIN de acceso: cuadricula de casillas + teclado numerico. Nada de
+// escribir una contrasena alfanumerica -- el cajero/mesero solo toca
+// numeros (funciona igual con teclado fisico, para quien prefiera).
+// ---------------------------------------------------------------
+const PIN_MAX = 6;
+const PIN_MIN = 4;
+let pinActual = '';
+
+function renderPinBoxes() {
+    const cont = document.getElementById('pinBoxes');
+    cont.innerHTML = '';
+    for (let i = 0; i < PIN_MAX; i++) {
+        const box = document.createElement('div');
+        box.className = 'pin-box';
+        if (i < pinActual.length) {
+            box.classList.add('llena');
+            box.textContent = '•';
+        } else if (i === pinActual.length) {
+            box.classList.add('activa');
+        }
+        cont.appendChild(box);
+    }
+    document.getElementById('pinValue').value = pinActual;
+    document.getElementById('btnLoginSubmit').disabled = pinActual.length < PIN_MIN;
+}
+
+function agregarDigitoPin(d) {
+    if (pinActual.length >= PIN_MAX) return;
+    pinActual += d;
+    renderPinBoxes();
+}
+
+function borrarDigitoPin() {
+    pinActual = pinActual.slice(0, -1);
+    renderPinBoxes();
+}
+
+document.getElementById('pinKeypad').addEventListener('click', (e) => {
+    const btn = e.target.closest('.pin-key');
+    if (!btn) return;
+    if (btn.id === 'pinDelete') {
+        borrarDigitoPin();
+    } else if (btn.dataset.num !== undefined) {
+        agregarDigitoPin(btn.dataset.num);
+    }
+});
+
+// Tambien acepta el teclado fisico (numeros y Backspace) para quien
+// prefiera escribir en vez de tocar la cuadricula.
+document.addEventListener('keydown', (e) => {
+    if (document.activeElement === document.getElementById('usuarioInput')) return;
+    if (e.key >= '0' && e.key <= '9') {
+        agregarDigitoPin(e.key);
+    } else if (e.key === 'Backspace') {
+        borrarDigitoPin();
+    } else if (e.key === 'Enter' && pinActual.length >= PIN_MIN) {
+        document.getElementById('loginForm').submit();
+    }
+});
+
+document.getElementById('btnUsuarioDemo').addEventListener('click', () => {
+    document.getElementById('usuarioInput').value = 'quesillos';
+    pinActual = '12345';
+    renderPinBoxes();
+    document.getElementById('loginForm').submit();
+});
+
+renderPinBoxes();
+
 let currentEmail = '';
 let currentCode = '';
 
