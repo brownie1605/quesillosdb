@@ -103,16 +103,7 @@
                 {% if messages %}
                     {% for category, message in messages %}
 
-                        <div style="
-                            background: #ffe5e5;
-                            color: #b30000;
-                            padding: 14px;
-                            border-radius: 8px;
-                            margin-bottom: 20px;
-                            font-size: 14px;
-                            text-align: center;
-                            border: 1px solid #ffb8b8;
-                        ">
+                        <div class="flash-error">
                             {{ message }}
                         </div>
 
