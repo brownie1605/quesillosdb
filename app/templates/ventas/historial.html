@@ -37,6 +37,7 @@
             <!-- Llenado por JS -->
         </tbody>
     </table>
+    <div id="paginacionVentas" class="pagination"></div>
 </div>
 
 <!-- Modal Detalles Venta -->
@@ -67,19 +68,91 @@
     </div>
 </div>
 
+<!-- Modal Editar Factura (solo datos: cliente y método de pago, no montos) -->
+<div id="modalEditarVenta" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="padding: 20px; border-radius: 8px; width: 400px; max-width: 90%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+            <h3 style="margin: 0;">Editar factura <span id="editNumeroVenta" style="opacity:.6;"></span></h3>
+            <button onclick="cerrarModalEditarVenta()" style="background: none; border: none; font-size: 20px; cursor: pointer;">&times;</button>
+        </div>
+        <p style="font-size: 12.5px; color: #6a768d; margin-top:0;">Solo se puede corregir el cliente, el método de pago y la nota. Los productos y el total no se pueden cambiar aquí — si el monto está mal, anula la venta y regístrala de nuevo.</p>
+
+        <input type="hidden" id="editIdVenta">
+        <div style="margin-bottom: 12px;">
+            <label>Cliente</label>
+            <select id="editCliente" class="form-control" style="width: 100%;">
+                <option value="">Público general</option>
+            </select>
+        </div>
+        <div style="margin-bottom: 12px;">
+            <label>Método de pago</label>
+            <select id="editMetodoPago" class="form-control" style="width: 100%;" onchange="toggleBancoEditar()">
+                <option value="Efectivo">Efectivo</option>
+                <option value="Tarjeta">Tarjeta</option>
+                <option value="Transferencia">Transferencia</option>
+            </select>
+        </div>
+        <div id="editBancoSection" style="display: none; margin-bottom: 12px;">
+            <label>Banco emisor</label>
+            <div style="display: flex; gap: 8px;">
+                <label class="cb-banco-option" style="flex:1; text-align:center; border:1px solid #e1e7f0; border-radius:6px; padding:8px;">
+                    <input type="radio" name="editBanco" value="BAC" checked style="display:none;">
+                    <div style="font-weight:800;color:#da291c;font-size:13px;">BAC</div>
+                </label>
+                <label class="cb-banco-option" style="flex:1; text-align:center; border:1px solid #e1e7f0; border-radius:6px; padding:8px;">
+                    <input type="radio" name="editBanco" value="BANPRO" style="display:none;">
+                    <div style="font-weight:800;color:#00825e;font-size:13px;">BANPRO</div>
+                </label>
+                <label class="cb-banco-option" style="flex:1; text-align:center; border:1px solid #e1e7f0; border-radius:6px; padding:8px;">
+                    <input type="radio" name="editBanco" value="LAFISE" style="display:none;">
+                    <div style="font-weight:800;color:#005a2b;font-size:13px;">LAFISE</div>
+                </label>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <label>Nota</label>
+            <textarea id="editNotas" class="form-control" style="width: 100%;" rows="2" placeholder="Ej. descuento por cliente frecuente"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn" style="flex:1; background: #e0e0e0; color: #333;" onclick="cerrarModalEditarVenta()">Cancelar</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="guardarEdicionVenta()">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.cb-banco-option:has(input:checked) { border-color:#0b5cff !important; background:#f0f5ff !important; box-shadow:0 0 0 1px #0b5cff; }
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
     let ventasList = [];
+    let clientesList = [];
+    const pagVentas = crearPaginador('paginacionVentas', 20);
 
     document.addEventListener('DOMContentLoaded', () => {
         cargarVentas();
-        document.getElementById('searchInput').addEventListener('input', renderizarTabla);
-        document.getElementById('fechaInicioFilter').addEventListener('change', renderizarTabla);
-        document.getElementById('fechaFinFilter').addEventListener('change', renderizarTabla);
-        document.getElementById('pagoFilter').addEventListener('change', renderizarTabla);
+        cargarClientesParaEdicion();
+        const reiniciarYRenderizar = () => { pagVentas.reset(); renderizarTabla(); };
+        document.getElementById('searchInput').addEventListener('input', reiniciarYRenderizar);
+        document.getElementById('fechaInicioFilter').addEventListener('change', reiniciarYRenderizar);
+        document.getElementById('fechaFinFilter').addEventListener('change', reiniciarYRenderizar);
+        document.getElementById('pagoFilter').addEventListener('change', reiniciarYRenderizar);
     });
+
+    async function cargarClientesParaEdicion() {
+        try {
+            clientesList = await fetch('/ventas/api/clientes').then(r => r.json());
+            const sel = document.getElementById('editCliente');
+            sel.innerHTML = '<option value="">Público general</option>' +
+                clientesList.map(c => `<option value="${c.id_cliente}">${escapeHtml(c.nombre)}</option>`).join('');
+        } catch (e) {
+            console.error('Error cargando clientes', e);
+        }
+    }
 
     async function cargarVentas() {
         try {
@@ -115,21 +188,49 @@
             return matchSearch && matchFecha && matchPago;
         });
 
-        filtrados.forEach(v => {
+        pagVentas.paginar(filtrados, renderizarTabla).forEach(v => {
             const tr = document.createElement('tr');
+            const badgeClass = v.estado === 'completada' ? 'badge-active' : 'badge-inactive';
             tr.innerHTML = `
                 <td><strong>${v.numero_venta}</strong></td>
                 <td>${v.fecha_venta}</td>
                 <td>${v.cliente}</td>
                 <td>C$ ${parseFloat(v.subtotal).toFixed(2)}</td>
                 <td><strong>C$ ${parseFloat(v.total).toFixed(2)}</strong></td>
-                <td><span class="badge badge-active">${v.estado}</span></td>
+                <td><span class="badge ${badgeClass}">${v.estado}</span></td>
                 <td>
                     <button class="btn-icon" title="Ver Detalles" onclick="verDetalles(${v.id_venta})">👁️</button>
                     <button class="btn-icon" title="Ver Factura" onclick="window.open('/ventas/factura/${v.id_venta}', '_blank')">🧾</button>
+                    ${v.estado === 'completada' ? `<button class="btn-icon" title="Editar cliente / método de pago" onclick="abrirModalEditarVenta(${v.id_venta})">✏️</button>` : ''}
+                    ${v.estado === 'completada' ? `<button class="btn-icon delete" title="Anular factura" onclick="anularVenta(${v.id_venta}, '${escapeHtml(v.numero_venta)}')">🚫</button>` : ''}
                 </td>
             `;
             tbody.appendChild(tr);
+        });
+    }
+
+    async function anularVenta(idVenta, numero) {
+        const motivo = prompt(`Anular la factura ${numero}.\nEscribe el motivo (obligatorio):`, '');
+        if (motivo === null) return; // cancelado
+        if (!motivo.trim()) { showCustomAlert('Escribe el motivo de la anulación.'); return; }
+
+        showCustomConfirm(`¿Anular la factura ${numero}? Esta acción no se puede deshacer.`, async () => {
+            try {
+                const r = await fetch(`/ventas/api/${idVenta}/anular`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ motivo: motivo.trim() }),
+                }).then(r => r.json());
+                if (r.success) {
+                    showCustomAlert('Factura anulada.', false);
+                    cargarVentas();
+                } else {
+                    showCustomAlert('Error: ' + r.message);
+                }
+            } catch (e) {
+                console.error('Error al anular venta', e);
+                showCustomAlert('Error en el servidor');
+            }
         });
     }
 
@@ -161,6 +262,75 @@
 
     function cerrarModalDetalles() {
         document.getElementById('modalDetalles').style.display = 'none';
+    }
+
+    // ---- Editar factura (solo cliente y metodo de pago) ----
+
+    function toggleBancoEditar() {
+        const metodo = document.getElementById('editMetodoPago').value;
+        document.getElementById('editBancoSection').style.display = metodo === 'Tarjeta' ? 'block' : 'none';
+    }
+
+    function abrirModalEditarVenta(idVenta) {
+        const v = ventasList.find(x => x.id_venta === idVenta);
+        if (!v) return;
+
+        document.getElementById('editIdVenta').value = v.id_venta;
+        document.getElementById('editNumeroVenta').textContent = '#' + v.numero_venta;
+        document.getElementById('editCliente').value = v.id_cliente || '';
+        document.getElementById('editNotas').value = v.notas || '';
+
+        // Si el metodo guardado es "Tarjeta BAC" etc., separamos el banco.
+        const partes = (v.metodo_pago || 'Efectivo').split(' ');
+        const metodoBase = partes[0];
+        const bancoGuardado = partes.slice(1).join(' ');
+        document.getElementById('editMetodoPago').value = ['Efectivo', 'Tarjeta', 'Transferencia'].includes(metodoBase) ? metodoBase : 'Efectivo';
+        toggleBancoEditar();
+        if (bancoGuardado) {
+            const radio = document.querySelector(`input[name="editBanco"][value="${bancoGuardado}"]`);
+            if (radio) radio.checked = true;
+        }
+
+        document.getElementById('modalEditarVenta').style.display = 'flex';
+    }
+
+    function cerrarModalEditarVenta() {
+        document.getElementById('modalEditarVenta').style.display = 'none';
+    }
+
+    async function guardarEdicionVenta() {
+        const idVenta = document.getElementById('editIdVenta').value;
+        let metodoPago = document.getElementById('editMetodoPago').value;
+        if (metodoPago === 'Tarjeta') {
+            const banco = document.querySelector('input[name="editBanco"]:checked');
+            if (banco) metodoPago = `Tarjeta ${banco.value}`;
+        }
+        const payload = {
+            id_cliente: document.getElementById('editCliente').value || null,
+            metodo_pago: metodoPago,
+            notas: document.getElementById('editNotas').value,
+        };
+
+        try {
+            const r = await fetch(`/ventas/api/${idVenta}/editar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            }).then(r => r.json());
+
+            if (r.success) {
+                cerrarModalEditarVenta();
+                if (typeof showCustomAlert !== 'undefined' && r.cambios && r.cambios.length) {
+                    showCustomAlert('Factura actualizada:\n' + r.cambios.join('\n'));
+                }
+                cargarVentas();
+            } else {
+                if (typeof showCustomAlert !== 'undefined') showCustomAlert('Error: ' + r.message);
+                else alert('Error: ' + r.message);
+            }
+        } catch (e) {
+            console.error('Error al editar venta', e);
+        }
     }
 </script>
 {% endblock %}

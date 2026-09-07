@@ -31,13 +31,12 @@ html {
 }
 
 .app-layout {
-    min-height: 100vh;
-    display: flex;
+    display: block;
 }
 
 .sidebar {
     width: 250px;
-    min-height: 100vh;
+    height: 100vh;
     background: linear-gradient(180deg, #061a35, #07111f);
     color: white;
     padding: 22px;
@@ -45,6 +44,10 @@ html {
     flex-direction: column;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 1000;
+    position: fixed;
+    left: 0;
+    top: 0;
+    overflow-y: auto;
 }
 
 .brand {
@@ -129,8 +132,9 @@ html {
 }
 
 .main-content {
-    flex: 1;
+    margin-left: 250px;
     padding: 24px;
+    padding-bottom: 80px;
     min-height: 100vh;
 }
 
@@ -434,6 +438,45 @@ th {
     display: flex;
     gap: 12px;
     align-items: center;
+    flex-wrap: wrap;
+}
+
+/* Paginacion (ver static/js/pagination.js) */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 14px 10px 6px;
+    flex-wrap: wrap;
+}
+.page-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid #e1e7f0;
+    background: white;
+    color: #33415c;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.page-btn:hover:not(:disabled) {
+    background: #f4f7fb;
+    border-color: var(--primary-color, #0b5cff);
+    color: var(--primary-color, #0b5cff);
+}
+.page-btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+.page-info {
+    font-size: 12.5px;
+    color: #6a768d;
+}
+body.dark-theme .page-btn {
+    background: #1c2333;
+    border-color: #2c3446;
+    color: #d7deee;
 }
 
 /* Badges */
@@ -883,7 +926,7 @@ body.dark-theme .notif-empty {
 body.sidebar-open .mobile-magic-nav {
     display: none !important;
 }
-/* --- Componentes Específicos Extraídos de Inline --- */
+/* --- Componentes Especï¿½ficos Extraï¿½dos de Inline --- */
 .dashboard-filters {
     margin-bottom: 20px;
     display: flex;
@@ -929,7 +972,7 @@ body.sidebar-open .mobile-magic-nav {
     color: #999;
     margin-top: 4px;
 }
-/* --- Fin Componentes Específicos --- */
+/* --- Fin Componentes Especï¿½ficos --- */
 /* Responsive para dashboard filters en mobile */
 @media (max-width: 768px) {
     .dashboard-filters {

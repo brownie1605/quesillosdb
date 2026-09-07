@@ -83,6 +83,13 @@ def api_agregar(id_mesa):
         else:
             venta = Venta.query.get(mesa.id_venta_actual)
             venta = VentaService.agregar_items(venta, items, current_user)
+
+        from app.services.notificacion_service import NotificacionService
+        NotificacionService.avisar_nuevo_pedido(id_mesa, current_user.nombre_completo)
+
+        from app.services.impresion_service import ImpresionService
+        ImpresionService.emitir_comandas(mesa.nombre, items, current_user.nombre_completo)
+
         return jsonify({"success": True, "venta": venta.to_dict()})
     except StockInsuficiente as e:
         db.session.rollback()
@@ -124,6 +131,7 @@ def api_cobrar(id_mesa):
             propina=float(data.get("propina", 0.0) or 0),
             monto_recibido=float(data.get("monto_recibido", 0.0) or 0),
             id_cliente=data.get("id_cliente"),
+            notas=data.get("notas"),
         )
         registrar_auditoria(
             "COBRAR MESA", "Mesas",

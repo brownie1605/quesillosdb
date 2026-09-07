@@ -1,0 +1,17 @@
+{% extends 'auth/_recovery_base.html' %}
+{% set paso = 0 %}
+{% block title %}Verificación en dos pasos{% endblock %}
+
+{% block contenido %}
+<h2>Verificación en dos pasos</h2>
+<p class="ayuda">Ingresa el código de 6 dígitos de tu app de autenticación para <strong>{{ usuario }}</strong>.
+   Si no tienes acceso a tu app, puedes usar uno de tus códigos de recuperación.</p>
+
+<form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="codigo">Código</label>
+    <input type="text" id="codigo" name="codigo" class="codigo" required autofocus
+           maxlength="20" placeholder="000000" autocomplete="one-time-code">
+    <button type="submit">Verificar</button>
+</form>
+{% endblock %}

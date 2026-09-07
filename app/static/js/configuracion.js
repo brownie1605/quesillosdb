@@ -112,4 +112,76 @@ document.addEventListener('DOMContentLoaded', () => {
             showCustomAlert('Error en el servidor');
         }
     });
+
+    // ---------------------------------------------------------- 2FA
+    async function cargarEstado2FA() {
+        const r = await fetch('/configuracion/api/2fa/estado').then(r => r.json());
+        document.getElementById('twofaOff').style.display = r.habilitado ? 'none' : 'block';
+        document.getElementById('twofaOn').style.display = r.habilitado ? 'block' : 'none';
+        document.getElementById('twofaSetup').style.display = 'none';
+    }
+
+    const btn2faIniciar = document.getElementById('btn2faIniciar');
+    if (btn2faIniciar) {
+        btn2faIniciar.addEventListener('click', async () => {
+            const r = await fetch('/configuracion/api/2fa/iniciar', { method: 'POST' }).then(r => r.json());
+            if (!r.success) { showCustomAlert(r.message); return; }
+            document.getElementById('twofaQr').src = r.qr;
+            document.getElementById('twofaSecreto').textContent = r.secreto;
+            document.getElementById('twofa_codigo').value = '';
+            document.getElementById('twofaSetup').style.display = 'block';
+        });
+    }
+
+    const btn2faCancelar = document.getElementById('btn2faCancelar');
+    if (btn2faCancelar) {
+        btn2faCancelar.addEventListener('click', () => {
+            document.getElementById('twofaSetup').style.display = 'none';
+        });
+    }
+
+    const btn2faConfirmar = document.getElementById('btn2faConfirmar');
+    if (btn2faConfirmar) {
+        btn2faConfirmar.addEventListener('click', async () => {
+            const codigo = document.getElementById('twofa_codigo').value.trim();
+            if (codigo.length !== 6) { showCustomAlert('Ingresa el código de 6 dígitos'); return; }
+            const r = await fetch('/configuracion/api/2fa/confirmar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codigo }),
+            }).then(r => r.json());
+            if (!r.success) { showCustomAlert(r.message); return; }
+            document.getElementById('twofaSetup').style.display = 'none';
+            document.getElementById('twofaRecoveryLista').innerHTML = r.codigos_recuperacion.map(c => `<div>${c}</div>`).join('');
+            document.getElementById('twofaRecovery').style.display = 'block';
+        });
+    }
+
+    const btn2faRecoveryListo = document.getElementById('btn2faRecoveryListo');
+    if (btn2faRecoveryListo) {
+        btn2faRecoveryListo.addEventListener('click', () => {
+            document.getElementById('twofaRecovery').style.display = 'none';
+            cargarEstado2FA();
+        });
+    }
+
+    const btn2faDesactivar = document.getElementById('btn2faDesactivar');
+    if (btn2faDesactivar) {
+        btn2faDesactivar.addEventListener('click', () => {
+            const password = document.getElementById('twofa_pass_desactivar').value;
+            if (!password) { showCustomAlert('Ingresa tu contraseña para desactivar el 2FA'); return; }
+            showCustomConfirm('¿Desactivar la verificación en dos pasos?', async () => {
+                const r = await fetch('/configuracion/api/2fa/desactivar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password }),
+                }).then(r => r.json());
+                if (!r.success) { showCustomAlert(r.message); return; }
+                document.getElementById('twofa_pass_desactivar').value = '';
+                cargarEstado2FA();
+            });
+        });
+    }
+
+    if (document.getElementById('twofaOff')) cargarEstado2FA();
 });

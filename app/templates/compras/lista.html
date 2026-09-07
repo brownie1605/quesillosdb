@@ -37,6 +37,7 @@
             <!-- Generado por JS -->
         </tbody>
     </table>
+    <div id="paginacionCompras" class="pagination"></div>
 </div>
 </div> <!-- /panelCompras -->
 
@@ -64,9 +65,10 @@
             </tr>
         </thead>
         <tbody id="tbodyProveedoresTab">
-            <tr><td colspan="6" style="text-align:center;">Cargando…</td></tr>
+            <tr><td colspan="7" style="text-align:center;">Cargando…</td></tr>
         </tbody>
     </table>
+    <div id="paginacionProveedoresTab" class="pagination"></div>
 </div>
 </div> <!-- /panelProveedores -->
 
@@ -221,7 +223,7 @@
         </div>
 
         <p style="font-size: 12px; color: #6a768d; margin: 0 0 14px;">
-            El <strong>Proveedor</strong> es obligatorio por fila (o que la Marca ya tenga uno asignado). Si el Código o Nombre coincide con un producto existente, se actualiza en vez de crear uno nuevo. Se genera una Compra por cada proveedor distinto en el archivo.
+            El <strong>Proveedor</strong> es obligatorio por fila. Si el Código o Nombre coincide con un producto existente, se actualiza en vez de crear uno nuevo. Se genera una Compra por cada proveedor distinto en el archivo.
         </p>
 
         <div id="importarCompraResultado"></div>
@@ -256,6 +258,7 @@ function mostrarTabCompras(tab) {
 }
 
 let proveedoresTabList = [];
+const pagProveedoresTab = crearPaginador('paginacionProveedoresTab', 20);
 
 async function cargarProveedoresTab() {
     try {
@@ -277,24 +280,25 @@ function renderProveedoresTab() {
         (p.telefono && p.telefono.toLowerCase().includes(query))
     );
     if (!filtrados.length) {
+        document.getElementById('paginacionProveedoresTab').innerHTML = '';
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Sin proveedores registrados.</td></tr>';
         return;
     }
-    tbody.innerHTML = filtrados.map(p => `
+    tbody.innerHTML = pagProveedoresTab.paginar(filtrados, renderProveedoresTab).map(p => `
         <tr>
-            <td>${p.nombre}</td>
-            <td>${p.ruc || '-'}</td>
-            <td>${p.telefono || '-'}</td>
-            <td>${p.correo || '-'}</td>
-            <td>${p.direccion || '-'}</td>
+            <td>${escapeHtml(p.nombre)}</td>
+            <td>${escapeHtml(p.ruc) || '-'}</td>
+            <td>${escapeHtml(p.telefono) || '-'}</td>
+            <td>${escapeHtml(p.correo) || '-'}</td>
+            <td>${escapeHtml(p.direccion) || '-'}</td>
             <td>
-                <button class="btn-icon" onclick='editarProveedorTab(${JSON.stringify(p)})'>✏️</button>
+                <button class="btn-icon" onclick="editarProveedorTab(${p.id_proveedor})">✏️</button>
                 <button class="btn-icon delete" onclick="eliminarProveedorTab(${p.id_proveedor})">🗑️</button>
             </td>
         </tr>`).join('');
 }
 
-document.getElementById('provTabSearch').addEventListener('input', renderProveedoresTab);
+document.getElementById('provTabSearch').addEventListener('input', () => { pagProveedoresTab.reset(); renderProveedoresTab(); });
 
 function abrirNuevoProveedorTab() {
     document.getElementById('modalProveedorTabTitle').textContent = 'Nuevo Proveedor';
@@ -302,7 +306,9 @@ function abrirNuevoProveedorTab() {
     document.getElementById('modalProveedorTab').style.display = 'flex';
 }
 
-function editarProveedorTab(p) {
+function editarProveedorTab(idProveedor) {
+    const p = proveedoresTabList.find(x => x.id_proveedor === idProveedor);
+    if (!p) return;
     document.getElementById('modalProveedorTabTitle').textContent = 'Editar Proveedor';
     document.getElementById('provt_id').value = p.id_proveedor;
     document.getElementById('provt_nombre').value = p.nombre || '';

@@ -1,10 +1,10 @@
 import logging
 from datetime import datetime
 
-from flask import Flask
+from flask import Flask, request, jsonify, render_template
 
 from app.config.config import Config
-from app.extensions import db, migrate, login_manager, mail, socketio
+from app.extensions import db, migrate, login_manager, mail, socketio, csrf, limiter
 
 from app.routes.auth_routes import auth_bp
 from app.routes.dashboard_routes import dashboard_bp
@@ -18,7 +18,6 @@ from app.routes.usuario_routes import usuario_bp
 from app.routes.configuracion_routes import configuracion_bp
 from app.routes.auditoria_routes import auditoria_bp
 from app.routes.receta_routes import receta_bp
-from app.routes.insumo_routes import insumo_bp
 from app.routes.cocina_routes import cocina_bp
 from app.routes.sync_routes import sync_bp
 from app.routes.notificacion_routes import notificacion_bp
@@ -49,6 +48,9 @@ def create_app(config_class=Config, iniciar_jobs=True):
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Debes iniciar sesión para acceder."
     login_manager.login_message_category = "warning"
+
+    csrf.init_app(app)
+    limiter.init_app(app)
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -89,11 +91,108 @@ def create_app(config_class=Config, iniciar_jobs=True):
                 return value
         return value.strftime(formato)
 
+    # ---------------------------------------------------------- headers de seguridad
+    # CSP deliberadamente permisivo en 'unsafe-inline' (script/style): casi
+    # toda plantilla de este proyecto usa <script> y style="" inline, y
+    # pasar a nonces por request tocaria decenas de archivos de golpe. Aun
+    # asi esto ya bloquea cargar scripts desde un dominio que no sea este
+    # o cdn.jsdelivr.net (los unicos CDN que usa el sistema), y bloquea que
+    # la app se incruste en un iframe ajeno (frame-ancestors).
+    _CSP = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "font-src 'self' https://cdn.jsdelivr.net data:; "
+        "img-src 'self' data: blob: https://unpkg.com; "
+        "connect-src 'self' https://unpkg.com; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'"
+    )
+
+    @app.after_request
+    def _security_headers(resp):
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        resp.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+        resp.headers.setdefault("X-Frame-Options", "DENY")
+        resp.headers.setdefault("Content-Security-Policy", _CSP)
+        # HSTS solo tiene sentido (y solo es seguro anunciar) si esta
+        # request de verdad llego por HTTPS -- anunciarlo sobre HTTP no
+        # hace nada y puede confundir a quien audite los headers.
+        if request.is_secure:
+            resp.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        return resp
+
+    # ---------------------------------------------------------- paginas de error
+    def _quiere_json():
+        return request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json"
+
+    def _error_response(codigo, mensaje):
+        if _quiere_json():
+            return jsonify({"success": False, "message": mensaje}), codigo
+        return render_template("errores/error.html", codigo=codigo, mensaje=mensaje), codigo
+
+    @app.errorhandler(400)
+    def _e400(e):
+        return _error_response(400, "Solicitud invalida.")
+
+    @app.errorhandler(401)
+    def _e401(e):
+        return _error_response(401, "Debes iniciar sesión para acceder.")
+
+    @app.errorhandler(403)
+    def _e403(e):
+        return _error_response(403, "No tienes permiso para acceder a esto.")
+
+    @app.errorhandler(404)
+    def _e404(e):
+        return _error_response(404, "No encontramos lo que buscas.")
+
+    @app.errorhandler(429)
+    def _e429(e):
+        return _error_response(429, "Demasiados intentos. Espera un momento e intenta de nuevo.")
+
+    @app.errorhandler(500)
+    def _e500(e):
+        app.logger.exception("Error interno no manejado")
+        return _error_response(500, "Ocurrió un error interno. Ya quedó registrado.")
+
+    @app.errorhandler(503)
+    def _e503(e):
+        return _error_response(503, "El sistema no está disponible en este momento.")
+
+    # ---------------------------------------------------------- salud
+    # Endpoint sin login para que un monitor externo (ej. UptimeRobot,
+    # gratis) revise si el sistema sigue respondiendo y avise si se cae --
+    # sin esto, el primer aviso de una caida es un cliente molesto.
+    @app.route("/healthz")
+    def _healthz():
+        from flask import jsonify
+        try:
+            db.session.execute(db.text("SELECT 1"))
+            return jsonify({"status": "ok", "hora": datetime.now().isoformat()})
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"status": "error", "detalle": str(e)}), 503
+
+    # ---------------------------------------------------------- PWA
+    # sw.js debe servirse desde la raiz (no desde /static/) para que su
+    # alcance ("scope") cubra toda la app y no solo /static/.
+    @app.route("/sw.js")
+    def _service_worker():
+        from flask import send_from_directory
+        resp = send_from_directory(app.static_folder, "sw.js")
+        resp.headers["Service-Worker-Allowed"] = "/"
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
     # ---------------------------------------------------------- blueprints
     for bp in (
         auth_bp, dashboard_bp, producto_bp, venta_bp, compra_bp, inventario_bp,
         reporte_bp, proveedor_bp, usuario_bp, configuracion_bp, auditoria_bp,
-        receta_bp, insumo_bp, cocina_bp, sync_bp, notificacion_bp,
+        receta_bp, cocina_bp, sync_bp, notificacion_bp,
         mesa_bp, cliente_bp, caja_bp,
     ):
         app.register_blueprint(bp)

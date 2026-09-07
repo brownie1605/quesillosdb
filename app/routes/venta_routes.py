@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 from app.extensions import db
 from app.models import Producto, Cliente, Venta, DetalleVenta, Inventario, Categoria
 from app.services.auditoria_service import registrar_auditoria
-from app.services.venta_service import VentaService
+from app.services.venta_service import VentaService, VentaError
 from app.services.receta_service import RecetaService
 from app.services.inventario_service import InventarioService, StockInsuficiente
 from app.services.network_service import NetworkService
@@ -47,6 +47,7 @@ def api_historial():
         cliente = Cliente.query.get(v.id_cliente) if v.id_cliente else None
         d = v.to_dict()
         d["cliente"] = cliente.nombre if cliente else "Público General"
+        d["id_cliente"] = v.id_cliente
         d["usuario"] = v.usuario.nombre_completo if v.usuario else None
         res.append(d)
     return jsonify(res)
@@ -162,6 +163,7 @@ def api_cobrar():
             propina=float(data.get("propina", 0.0) or 0),
             id_cliente=data.get("id_cliente"),
             monto_recibido=float(data.get("monto_recibido", 0.0) or 0),
+            notas=data.get("notas"),
         )
         registrar_auditoria(
             "NUEVA VENTA", "Ventas",
@@ -202,6 +204,40 @@ def api_anular(id_venta):
         )
         registrar_auditoria("actualizar", "Ventas", {"venta_id": id_venta, "accion": "anular"})
         return jsonify({"success": True, "message": "Venta anulada", "venta": venta.to_dict()})
+    except Exception as e:  # noqa: BLE001
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@venta_bp.route("/api/<int:id_venta>/editar", methods=["POST", "PUT"])
+@login_required
+def api_editar_venta(id_venta):
+    """Corrige cliente y/o metodo de pago de una factura ya cobrada. No
+    toca productos ni totales -- ver VentaService.editar_datos_venta."""
+    if not usuario_tiene_rol("Admin", "Administrador", "Cajero"):
+        return jsonify({"success": False, "message": "Sin permiso para editar facturas"}), 403
+
+    venta = Venta.query.get_or_404(id_venta)
+    if venta.id_empresa != current_user.id_empresa:
+        return jsonify({"success": False, "message": "Acceso denegado"}), 403
+
+    data = request.get_json(silent=True) or {}
+    try:
+        venta, cambios = VentaService.editar_datos_venta(
+            id_venta,
+            id_cliente=data.get("id_cliente"),
+            metodo_pago=data.get("metodo_pago"),
+            notas=data.get("notas"),
+        )
+        if cambios:
+            registrar_auditoria(
+                "EDITAR FACTURA", "Ventas",
+                {"venta_id": id_venta, "numero": venta.numero_venta, "cambios": cambios},
+            )
+        return jsonify({"success": True, "message": "Factura actualizada", "venta": venta.to_dict(), "cambios": cambios})
+    except VentaError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500

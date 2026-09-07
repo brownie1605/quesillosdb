@@ -22,13 +22,21 @@
     </button>
 </div>
 
-<input type="text" class="form-control mb-3" id="buscar" placeholder="Buscar por nombre o cédula...">
+<div class="d-flex gap-2 mb-3 flex-wrap">
+    <input type="text" class="form-control" style="max-width:320px;" id="buscar" placeholder="Buscar por nombre o cédula...">
+    <select class="form-select" style="max-width:180px;" id="filtroTipo">
+        <option value="">Tipo: Todos</option>
+        <option value="interno">Interno</option>
+        <option value="externo">Externo</option>
+    </select>
+</div>
 
 <div class="table-responsive">
     <table class="table table-hover align-middle bg-white">
-        <thead><tr><th>Nombre</th><th>Cédula</th><th>Teléfono</th><th>Dirección</th><th>Estado</th><th></th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="6" class="text-center py-4">Cargando…</td></tr></tbody>
+        <thead><tr><th>Nombre</th><th>Tipo</th><th>Cédula</th><th>Teléfono</th><th>Dirección</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="text-center py-4">Cargando…</td></tr></tbody>
     </table>
+    <div id="paginacionClientes" class="pagination"></div>
 </div>
 
 <div class="modal fade" id="modalCliente" tabindex="-1">
@@ -41,6 +49,17 @@
                 <div class="mb-2"><label class="form-label">Cédula</label><input class="form-control" id="c_cedula"></div>
                 <div class="mb-2"><label class="form-label">Teléfono</label><input class="form-control" id="c_telefono"></div>
                 <div class="mb-2"><label class="form-label">Dirección</label><textarea class="form-control" id="c_direccion" rows="2"></textarea></div>
+                <div class="mb-2">
+                    <label class="form-label">Tipo de cliente</label>
+                    <select class="form-select" id="c_tipo">
+                        <option value="externo">Externo (cliente normal)</option>
+                        <option value="interno">Interno (personal/membresía)</option>
+                    </select>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="c_preferencial">
+                    <label class="form-check-label" for="c_preferencial">⭐ Cliente preferencial</label>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -56,6 +75,7 @@
 <script>
 let clientes = [];
 let modal;
+const pagClientes = crearPaginador('paginacionClientes', 20);
 
 async function cargar() {
     clientes = await fetch('/clientes/api/list').then(r => r.json());
@@ -64,37 +84,58 @@ async function cargar() {
 
 function render() {
     const texto = document.getElementById('buscar').value.toLowerCase();
-    const lista = clientes.filter(c => !texto || c.nombre.toLowerCase().includes(texto) || (c.cedula||'').includes(texto));
+    const filtroTipo = document.getElementById('filtroTipo').value;
+    const lista = clientes.filter(c =>
+        (!texto || c.nombre.toLowerCase().includes(texto) || (c.cedula||'').includes(texto)) &&
+        (!filtroTipo || c.tipo_cliente === filtroTipo)
+    );
     const tbody = document.getElementById('tbody');
-    if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Sin clientes registrados.</td></tr>'; return; }
-    tbody.innerHTML = lista.map(c => `
+    if (!lista.length) {
+        document.getElementById('paginacionClientes').innerHTML = '';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">Sin clientes registrados.</td></tr>';
+        return;
+    }
+    const pagina = pagClientes.paginar(lista, render);
+    tbody.innerHTML = pagina.map(c => `
         <tr>
-            <td>${c.nombre}</td>
-            <td>${c.cedula||'-'}</td>
-            <td>${c.telefono||'-'}</td>
-            <td>${c.direccion||'-'}</td>
+            <td>${c.es_preferencial ? '⭐ ' : ''}${escapeHtml(c.nombre)}</td>
+            <td><span class="badge ${c.tipo_cliente==='interno'?'bg-info text-dark':'bg-light text-dark border'}">${c.tipo_cliente==='interno'?'Interno':'Externo'}</span></td>
+            <td>${escapeHtml(c.cedula)||'-'}</td>
+            <td>${escapeHtml(c.telefono)||'-'}</td>
+            <td>${escapeHtml(c.direccion)||'-'}</td>
             <td><span class="badge ${c.estado==='activo'?'bg-success':'bg-secondary'}">${c.estado}</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-secondary" onclick='abrirEditar(${JSON.stringify(c)})'><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="abrirEditar(${c.id_cliente})"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-sm btn-outline-danger" onclick="eliminar(${c.id_cliente})"><i class="bi bi-trash"></i></button>
             </td>
         </tr>`).join('');
 }
 
-document.getElementById('buscar').addEventListener('input', render);
+const reiniciarYRenderizar = () => { pagClientes.reset(); render(); };
+document.getElementById('buscar').addEventListener('input', reiniciarYRenderizar);
+document.getElementById('filtroTipo').addEventListener('change', reiniciarYRenderizar);
 
 function abrirNuevo() {
     document.getElementById('modalTitulo').textContent = 'Nuevo cliente';
     ['c_id','c_nombre','c_cedula','c_telefono','c_direccion'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('c_tipo').value = 'externo';
+    document.getElementById('c_preferencial').checked = false;
 }
 
-function abrirEditar(c) {
+function abrirEditar(idCliente) {
+    // Se busca en `clientes` (ya cargado) en vez de recibir el objeto
+    // completo desde el atributo onclick: evita tener que inyectar el
+    // nombre/direccion del cliente crudos dentro de un atributo HTML.
+    const c = clientes.find(x => x.id_cliente === idCliente);
+    if (!c) return;
     document.getElementById('modalTitulo').textContent = 'Editar cliente';
     document.getElementById('c_id').value = c.id_cliente;
     document.getElementById('c_nombre').value = c.nombre || '';
     document.getElementById('c_cedula').value = c.cedula || '';
     document.getElementById('c_telefono').value = c.telefono || '';
     document.getElementById('c_direccion').value = c.direccion || '';
+    document.getElementById('c_tipo').value = c.tipo_cliente || 'externo';
+    document.getElementById('c_preferencial').checked = !!c.es_preferencial;
     modal = modal || new bootstrap.Modal(document.getElementById('modalCliente'));
     modal.show();
 }
@@ -106,6 +147,8 @@ async function guardar() {
         cedula: document.getElementById('c_cedula').value,
         telefono: document.getElementById('c_telefono').value,
         direccion: document.getElementById('c_direccion').value,
+        tipo_cliente: document.getElementById('c_tipo').value,
+        es_preferencial: document.getElementById('c_preferencial').checked,
     };
     if (!datos.nombre) { showCustomAlert('El nombre es obligatorio'); return; }
     const url = id ? `/clientes/api/editar/${id}` : '/clientes/api/crear';

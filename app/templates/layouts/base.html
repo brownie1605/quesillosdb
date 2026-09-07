@@ -5,6 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Quesillos Lo Nuestro{% endblock %}</title>
 
+    <!-- CSRF: leido por el fetch() global de mas abajo. Sin esto, todo
+         POST/PUT/DELETE del sistema (crear producto, cobrar, etc.) fallaria
+         con 400 CSRF una vez se activo Flask-WTF. -->
+    {{ csrf_meta_tag() }}
+    <script>
+        // Agrega el token CSRF a todo fetch() que modifique datos, sin
+        // tener que tocar cada uno de los fetch() del sistema uno por
+        // uno. Solo afecta peticiones al propio origen -- nunca manda el
+        // token a otro dominio.
+        (function () {
+            var metaToken = document.querySelector('meta[name="csrf-token"]');
+            var token = metaToken ? metaToken.getAttribute('content') : null;
+            var original = window.fetch;
+            window.fetch = function (input, init) {
+                init = init || {};
+                var method = (init.method || 'GET').toUpperCase();
+                var esMismoOrigen = true;
+                try {
+                    var url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
+                    esMismoOrigen = url.origin === window.location.origin;
+                } catch (e) { /* URL relativa: mismo origen */ }
+                if (token && esMismoOrigen && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+                    init.headers = new Headers(init.headers || {});
+                    if (!init.headers.has('X-CSRFToken')) {
+                        init.headers.set('X-CSRFToken', token);
+                    }
+                }
+                return original(input, init);
+            };
+        })();
+    </script>
+
+    <!-- PWA: instalable en tablets/celulares de meseros y cajeros -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#8B2E2E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Quesillos POS">
+    <link rel="icon" href="{{ url_for('static', filename='icons/favicon-32.png') }}" sizes="32x32">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}?v=8">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/quesillos.css') }}?v=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
@@ -65,17 +107,16 @@
                     <span id="notif-bell" style="font-size: 20px;">🔔</span>
                     <span id="notif-badge" style="display: none; position: absolute; top: -5px; right: -5px; background: red; color: white; border-radius: 50%; font-size: 10px; padding: 2px 5px; font-weight: bold;">0</span>
                     <div id="notif-dropdown" class="notif-dropdown" style="display: none; position: absolute; right: 0; top: 30px; width: 300px; border-radius: 8px; z-index: 1000; max-height: 400px; overflow-y: auto;">
-                        <div class="notif-header">Notificaciones</div>
+                        <div class="notif-header" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                            <span>Notificaciones</span>
+                            <button id="btn-notif-leer-todas" type="button" style="background:none; border:none; color:var(--primary-color, #0b5cff); font-size:12px; font-weight:600; cursor:pointer; padding:2px 4px;">Marcar todas leídas</button>
+                        </div>
                         <div id="notif-list">
                             <div class="notif-empty">Sin notificaciones nuevas.</div>
                         </div>
                     </div>
                 </div>
                 <div class="profile" style="display: flex; align-items: center; gap: 10px;">
-                    {% if empresa_actual %}
-                    <span style="font-weight: bold; color: #1abc9c;">🏢 {{ empresa_actual.nombre }}</span>
-                    <span style="color: #ccc;">|</span>
-                    {% endif %}
                     <span>👤 {{ current_user.usuario }}</span>
                 </div>
             </div>
@@ -89,6 +130,23 @@
 
 </div>
 
+<script>
+// Escapa texto antes de insertarlo con innerHTML/onclick embebido. Sin
+// esto, un nombre de cliente/producto/proveedor con < > " ' se puede
+// interpretar como HTML/JS en vez de texto (XSS de un rol de menor
+// confianza -- ej. Mesero -- hacia quien lo vea despues, ej. Admin).
+function escapeHtml(valor) {
+    if (valor === null || valor === undefined) return '';
+    return String(valor)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+</script>
+
+<script src="{{ url_for('static', filename='js/pagination.js') }}"></script>
 {% block scripts %}{% endblock %}
 
 
@@ -122,6 +180,21 @@ document.addEventListener('DOMContentLoaded', async () => {
             drop.style.display = 'none';
         }
     });
+
+    const btnLeerTodas = document.getElementById('btn-notif-leer-todas');
+    if (btnLeerTodas) {
+        btnLeerTodas.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                const res = await fetch('/api/notificaciones/leer-todas', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('notif-list').innerHTML = '<div class="notif-empty">Sin notificaciones nuevas.</div>';
+                    document.getElementById('notif-badge').style.display = 'none';
+                }
+            } catch (err) { console.error(err); }
+        });
+    }
 
     try {
         const res = await fetch('/api/notificaciones/?no_leidas=1');
@@ -240,5 +313,17 @@ window.closeCustomConfirm = function() {
 </style>
 
 {% include 'layouts/mobile_nav.html' %}
+
+<script>
+// Registra el service worker (solo cachea estaticos, ver /static/sw.js).
+// Requiere contexto seguro (HTTPS o localhost) -- por diseño del navegador,
+// en http:// dentro de la red local esto no se registra y la app sigue
+// funcionando igual, solo sin el beneficio extra de carga instantanea.
+if ('serviceWorker' in navigator && window.isSecureContext) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+}
+</script>
 </body>
 </html>

@@ -2,22 +2,30 @@ document.addEventListener('DOMContentLoaded', () => {
     cargarReportes();
 });
 
+function _moneyFmt(valor) {
+    return 'C$ ' + (parseFloat(valor) || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 async function cargarReportes(inicio = '', fin = '') {
     try {
         let qs = '';
         if (inicio && fin) {
             qs = `?inicio=${inicio}&fin=${fin}`;
         }
-        
-        const [ventasRes, prodRes, stockRes] = await Promise.all([
+
+        const [ventasRes, prodRes, stockRes, finRes, propRes] = await Promise.all([
             fetch('/reportes/api/resumen_ventas' + qs),
             fetch('/reportes/api/productos_top' + qs),
-            fetch('/reportes/api/stock_bajo') // Stock no depende de fechas, es actual
+            fetch('/reportes/api/stock_bajo'), // Stock no depende de fechas, es actual
+            fetch('/reportes/api/resumen_financiero' + qs),
+            fetch('/reportes/api/propinas' + qs),
         ]);
-        
+
         const ventasData = await ventasRes.json();
         const prodData = await prodRes.json();
         const stockData = await stockRes.json();
+        const finData = await finRes.json();
+        const propData = await propRes.json();
 
         if (ventasData.success) {
             if (window.ventasChartInst) window.ventasChartInst.destroy();
@@ -28,9 +36,48 @@ async function cargarReportes(inicio = '', fin = '') {
             renderProductosChart(prodData.data);
         }
         if (stockData.success) renderStockBajoTable(stockData.data);
-        
+        if (finData.success) renderKpisFinancieros(finData);
+        if (propData.success) {
+            if (window.propinasChartInst) window.propinasChartInst.destroy();
+            renderPropinas(propData);
+        }
+
     } catch (error) {
         console.error("Error al cargar reportes:", error);
+    }
+}
+
+function renderKpisFinancieros(data) {
+    document.getElementById('rangoKpiLabel').textContent = `Del ${data.inicio} al ${data.fin}`;
+
+    document.getElementById('kpiVentas').textContent = _moneyFmt(data.total_vendido);
+    document.getElementById('kpiCantVentas').textContent = `${data.cantidad_ventas} venta${data.cantidad_ventas === 1 ? '' : 's'}`;
+
+    document.getElementById('kpiGanancia').textContent = _moneyFmt(data.ganancia_neta);
+    document.getElementById('kpiMargen').textContent = `${(data.margen_pct || 0).toFixed(1)}% margen`;
+
+    document.getElementById('kpiProductos').textContent = (data.total_productos_vendidos || 0).toLocaleString('es-NI');
+    document.getElementById('kpiTicket').textContent = `Ticket prom. ${_moneyFmt(data.ticket_promedio)}`;
+
+    document.getElementById('kpiBruta').textContent = _moneyFmt(data.ganancia_bruta);
+    document.getElementById('kpiCosto').textContent = _moneyFmt(data.costo_productos);
+    document.getElementById('kpiGastos').textContent = _moneyFmt(data.gastos_varios);
+    document.getElementById('kpiPropinas').textContent = _moneyFmt(data.total_propinas);
+
+    if (data.mesa_top) {
+        document.getElementById('kpiMesa').textContent = data.mesa_top.nombre;
+        document.getElementById('kpiMesaDetalle').textContent = `${_moneyFmt(data.mesa_top.total)} · ${data.mesa_top.ventas} venta${data.mesa_top.ventas === 1 ? '' : 's'}`;
+    } else {
+        document.getElementById('kpiMesa').textContent = '—';
+        document.getElementById('kpiMesaDetalle').textContent = 'Sin ventas por mesa en el rango';
+    }
+
+    if (data.producto_top) {
+        document.getElementById('kpiProductoPopular').textContent = data.producto_top.nombre;
+        document.getElementById('kpiProductoPopularDetalle').textContent = `${data.producto_top.cantidad} unidades · ${_moneyFmt(data.producto_top.ingresos)}`;
+    } else {
+        document.getElementById('kpiProductoPopular').textContent = '—';
+        document.getElementById('kpiProductoPopularDetalle').textContent = 'Sin ventas en el rango';
     }
 }
 
@@ -137,6 +184,48 @@ function renderProductosChart(data) {
             maintainAspectRatio: false
         }
     });
+}
+
+function renderPropinas(data) {
+    const colorPorMetodo = { 'Efectivo': '#2ecc71', 'Tarjeta': '#3498db', 'Otro': '#95a5a6' };
+    const porMetodo = data.por_metodo || [];
+
+    document.getElementById('kpiPropinasDetalle').textContent = porMetodo.length
+        ? porMetodo.map(m => `${m.metodo}: ${_moneyFmt(m.total)}`).join(' · ')
+        : 'No cuenta como ganancia del negocio';
+
+    const ctx = document.getElementById('propinasChart').getContext('2d');
+    window.propinasChartInst = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: porMetodo.length ? porMetodo.map(m => m.metodo) : ['Sin propinas'],
+            datasets: [{
+                data: porMetodo.length ? porMetodo.map(m => m.total) : [1],
+                backgroundColor: porMetodo.length ? porMetodo.map(m => colorPorMetodo[m.metodo] || '#95a5a6') : ['#e1e7f0'],
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { tooltip: { callbacks: { label: (c) => ` ${c.label}: ${_moneyFmt(c.raw)}` } } }
+        }
+    });
+
+    const tbody = document.getElementById('tbodyPropinas');
+    const lista = data.lista || [];
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 14px; opacity:.6;">Sin propinas en el rango.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = lista.map(v => `
+        <tr>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #f4f4f4;">#${escapeHtml(v.numero_venta)}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #f4f4f4;">${escapeHtml(v.fecha)}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #f4f4f4;">${escapeHtml(v.mesero) || '-'}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #f4f4f4;">${escapeHtml(v.mesa) || '-'}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #f4f4f4;">${escapeHtml(v.metodo_pago)}</td>
+            <td style="padding: 6px 8px; border-bottom: 1px solid #f4f4f4; text-align:right;">${_moneyFmt(v.propina)}</td>
+        </tr>`).join('');
 }
 
 function renderStockBajoTable(data) {

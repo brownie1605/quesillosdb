@@ -1,14 +1,13 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import Producto, Categoria, Inventario, Marca, UnidadMedida
+from app.models import Producto, Categoria, Inventario, UnidadMedida, Proveedor
 from datetime import datetime
-import os
 import io
-from werkzeug.utils import secure_filename
 from flask import send_file
 
 from app.utils.decorators import require_roles, usuario_tiene_rol
+from app.utils.imagenes import leer_imagen_validada
 
 producto_bp = Blueprint("producto", __name__, url_prefix="/productos")
 
@@ -36,18 +35,27 @@ def lista():
 @login_required
 def api_list():
     productos = Producto.query.filter_by(estado="activo", id_empresa=current_user.id_empresa).all()
+
+    # Una sola consulta para categorias e inventario en vez de una por
+    # producto (N+1): con el catalogo creciendo esto importa cada vez mas.
+    categorias = {c.id_categoria: c.nombre for c in Categoria.query.all()}
+    ids_producto = [p.id_producto for p in productos]
+    inventarios = {
+        inv.id_producto: inv
+        for inv in Inventario.query.filter(Inventario.id_producto.in_(ids_producto)).all()
+    } if ids_producto else {}
+
     resultado = []
     for p in productos:
-        cat = Categoria.query.get(p.id_categoria) if p.id_categoria else None
-        inv = Inventario.query.filter_by(id_producto=p.id_producto).first()
-        
+        inv = inventarios.get(p.id_producto)
+
         data = p.to_dict()
-        data["categoria_nombre"] = cat.nombre if cat else "Sin Categoría"
+        data["categoria_nombre"] = categorias.get(p.id_categoria, "Sin Categoría")
         data["precio_compra"] = float(p.precio_compra) if p.precio_compra else 0.0
         data["stock"] = float(inv.stock_actual) if inv else 0.0
         data["stock_minimo"] = float(inv.stock_minimo) if inv and inv.stock_minimo else 0.0
         data["estado"] = p.estado
-        data["id_marca"] = p.id_marca
+        data["id_proveedor"] = p.id_proveedor
         data["id_unidad"] = p.id_unidad
         data["codigo_barra"] = p.codigo_barra
         data["descripcion"] = p.descripcion
@@ -61,32 +69,14 @@ def api_categorias():
     categorias = Categoria.query.filter_by(estado="activo", id_empresa=current_user.id_empresa).all()
     return jsonify([c.to_dict() for c in categorias])
 
-@producto_bp.route("/api/marcas", methods=["GET"])
+@producto_bp.route("/api/proveedores", methods=["GET"])
 @login_required
-def api_marcas():
-    marcas = Marca.query.filter_by(estado="activo", id_empresa=current_user.id_empresa).all()
-    return jsonify([m.to_dict() for m in marcas])
-
-@producto_bp.route("/api/marcas/crear", methods=["POST"])
-@login_required
-def api_marcas_crear():
-    error = _solo_admin()
-    if error:
-        return error
-    data = request.json
-    try:
-        nueva_marca = Marca(
-            id_empresa=current_user.id_empresa,
-            nombre=data.get("nombre", ""),
-            id_proveedor=data.get("id_proveedor") or None,
-            estado="activo"
-        )
-        db.session.add(nueva_marca)
-        db.session.commit()
-        return jsonify({"success": True, "marca": nueva_marca.to_dict()})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+def api_proveedores_para_producto():
+    """Lista de proveedores para el selector del formulario de producto."""
+    proveedores = Proveedor.query.filter_by(
+        estado="activo", id_empresa=current_user.id_empresa
+    ).order_by(Proveedor.nombre).all()
+    return jsonify([p.to_dict() for p in proveedores])
 
 
 @producto_bp.route("/api/categorias/crear", methods=["POST"])
@@ -127,8 +117,6 @@ def api_crear():
     error = _solo_admin()
     if error:
         return error
-    UPLOAD_FOLDER = os.path.join('app', 'static', 'uploads', 'productos')
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     try:
         imagen_file = request.files.get('imagen')
         imagen_url = None
@@ -136,8 +124,7 @@ def api_crear():
         imagen_mimetype = None
 
         if imagen_file and imagen_file.filename:
-            imagen_datos = imagen_file.read()
-            imagen_mimetype = imagen_file.mimetype
+            imagen_datos, imagen_mimetype = leer_imagen_validada(imagen_file)
 
         tipo_producto = request.form.get("tipo_producto") or "final"
         # Insumo/material son solo para costear recetas: no se venden, no
@@ -147,8 +134,9 @@ def api_crear():
         nuevo_prod = Producto(
             id_empresa=current_user.id_empresa,
             id_categoria=(request.form.get("id_categoria") or None) if vendible else None,
-            id_marca=request.form.get("id_marca") or None,
+            id_proveedor=request.form.get("id_proveedor") or None,
             id_unidad=request.form.get("id_unidad") or None,
+            impresora=request.form.get("impresora") or None,
             codigo=request.form.get("codigo", ""),
             codigo_barra=request.form.get("codigo_barra", ""),
             nombre=request.form.get("nombre"),
@@ -168,11 +156,11 @@ def api_crear():
         
         if imagen_datos:
             nuevo_prod.imagen_url = f"/productos/imagen/{nuevo_prod.id_producto}"
-            
-        # Generar código automáticamente si no se proporcionó
-        if not nuevo_prod.codigo or nuevo_prod.codigo.strip() == "":
-            nuevo_prod.codigo = f"P{nuevo_prod.id_producto:03d}"
-            
+
+        # El codigo se autogenera solo si viene vacio (ver evento
+        # `_asignar_codigo` en app/models/producto.py), asi que ya esta
+        # garantizado en este punto -- no hace falta reforzarlo aqui.
+
         # Crear inventario en 0
         nuevo_inv = Inventario(
             id_sucursal=current_user.id_sucursal,
@@ -185,7 +173,10 @@ def api_crear():
         from app.services.auditoria_service import registrar_auditoria
         registrar_auditoria("CREAR PRODUCTO", "Productos", f"Producto {nuevo_prod.nombre} creado (Código: {nuevo_prod.codigo})")
         return jsonify({"success": True})
-    except Exception as e:
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 
@@ -195,8 +186,6 @@ def api_editar(id):
     error = _solo_admin()
     if error:
         return error
-    UPLOAD_FOLDER = os.path.join('app', 'static', 'uploads', 'productos')
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     try:
         prod = Producto.query.get_or_404(id)
         if prod.id_empresa != current_user.id_empresa:
@@ -204,15 +193,15 @@ def api_editar(id):
 
         imagen_file = request.files.get('imagen')
         if imagen_file and imagen_file.filename:
-            prod.imagen_datos = imagen_file.read()
-            prod.imagen_mimetype = imagen_file.mimetype
+            prod.imagen_datos, prod.imagen_mimetype = leer_imagen_validada(imagen_file)
             prod.imagen_url = f"/productos/imagen/{prod.id_producto}"
 
         prod.codigo = request.form.get("codigo", prod.codigo)
         prod.codigo_barra = request.form.get("codigo_barra", prod.codigo_barra)
         prod.nombre = request.form.get("nombre", prod.nombre)
         prod.descripcion = request.form.get("descripcion", prod.descripcion)
-        prod.id_marca = request.form.get("id_marca") or None
+        prod.id_proveedor = request.form.get("id_proveedor") or None
+        prod.impresora = request.form.get("impresora") or None
         prod.id_unidad = request.form.get("id_unidad") or None
         prod.precio_compra = float(request.form.get("precio_compra", prod.precio_compra or 0.0))
         if request.form.get("tipo_producto"):
@@ -235,53 +224,43 @@ def api_editar(id):
         from app.services.auditoria_service import registrar_auditoria
         registrar_auditoria("EDITAR PRODUCTO", "Productos", f"Producto {prod.nombre} modificado")
         return jsonify({"success": True})
-    except Exception as e:
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 
-@producto_bp.route("/api/eliminar/<int:id>", methods=["DELETE"])
+@producto_bp.route("/api/estado/<int:id>", methods=["PUT", "POST"])
 @login_required
-def api_eliminar(id):
+def api_cambiar_estado(id):
+    """Activa o desactiva un producto directamente (selector de estado en la
+    tabla, con confirmacion desde el modal en el frontend)."""
     error = _solo_admin()
     if error:
         return error
+    data = request.json or {}
+    nuevo_estado = (data.get("estado") or "").strip().lower()
+    if nuevo_estado not in ("activo", "inactivo"):
+        return jsonify({"success": False, "message": "Estado invalido"}), 400
     try:
         prod = Producto.query.get_or_404(id)
         if prod.id_empresa != current_user.id_empresa:
             return jsonify({"success": False, "message": "Acceso denegado"}), 403
-            
-        prod.estado = "inactivo"
+
+        prod.estado = nuevo_estado
         db.session.commit()
         from app.services.auditoria_service import registrar_auditoria
-        registrar_auditoria("ELIMINAR PRODUCTO", "Productos", f"Producto {prod.nombre} marcado como inactivo")
-        return jsonify({"success": True})
+        registrar_auditoria(
+            "CAMBIAR ESTADO PRODUCTO", "Productos",
+            f"Producto {prod.nombre} marcado como {nuevo_estado}",
+        )
+        return jsonify({"success": True, "estado": nuevo_estado})
     except Exception as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 
-@producto_bp.route("/api/entrada/<int:id>", methods=["POST"])
-@login_required
-def api_entrada(id):
-    data = request.json
-    cantidad = float(data.get("cantidad", 0.0))
-    if cantidad <= 0:
-        return jsonify({"success": False, "message": "Cantidad debe ser mayor a 0"}), 400
-        
-    try:
-        prod = Producto.query.get_or_404(id)
-        if prod.id_empresa != current_user.id_empresa:
-            return jsonify({"success": False, "message": "Acceso denegado"}), 403
-            
-        inv = Inventario.query.filter_by(id_producto=id).first()
-        if not inv:
-            return jsonify({"success": False, "message": "Inventario no encontrado para este producto"}), 404
-            
-        inv.stock_actual = float(inv.stock_actual) + cantidad
-        db.session.commit()
-        return jsonify({"success": True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+
 
 @producto_bp.route("/imagen/<int:id>", methods=["GET"])
 def obtener_imagen(id):

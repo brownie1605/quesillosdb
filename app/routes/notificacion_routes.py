@@ -41,8 +41,13 @@ def marcar_leida(id_notificacion):
 @notificacion_bp.route("/leer-todas", methods=["POST"])
 @login_required
 def marcar_todas():
-    Notificacion.query.filter_by(id_usuario=current_user.id_usuario, leida=False).update(
-        {"leida": True}
-    )
+    # Igual que en listar(): casi todas las notificaciones son "para todos"
+    # (id_usuario=None), asi que hay que marcar tanto las propias como las
+    # de broadcast -- si no, el boton no limpia nada en la practica.
+    Notificacion.query.filter(
+        (Notificacion.id_usuario == current_user.id_usuario)
+        | (Notificacion.id_usuario.is_(None)),
+        Notificacion.leida.is_(False),
+    ).update({"leida": True}, synchronize_session=False)
     db.session.commit()
     return jsonify({"success": True})

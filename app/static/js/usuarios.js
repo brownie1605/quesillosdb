@@ -1,12 +1,14 @@
 let usuariosList = [];
 let rolesList = [];
+const pagUsuarios = crearPaginador('paginacionUsuarios', 20);
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarDatos();
 
-    document.getElementById('searchInput').addEventListener('input', renderizarTabla);
-    document.getElementById('rolFilter').addEventListener('change', renderizarTabla);
-    document.getElementById('estadoFilter').addEventListener('change', renderizarTabla);
+    const reiniciarYRenderizar = () => { pagUsuarios.reset(); renderizarTabla(); };
+    document.getElementById('searchInput').addEventListener('input', reiniciarYRenderizar);
+    document.getElementById('rolFilter').addEventListener('change', reiniciarYRenderizar);
+    document.getElementById('estadoFilter').addEventListener('change', reiniciarYRenderizar);
 
     document.getElementById('btnNuevoUsuario').addEventListener('click', () => {
         document.getElementById('modalUsuarioTitle').textContent = 'Nuevo Usuario';
@@ -64,18 +66,18 @@ function renderizarTabla() {
                (u.usuario && u.usuario.toLowerCase().includes(q));
     });
 
-    filtrados.forEach(u => {
+    pagUsuarios.paginar(filtrados, renderizarTabla).forEach(u => {
         const tr = document.createElement('tr');
-        const avatarHtml = u.imagen_url 
-            ? `<img src="${u.imagen_url}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">` 
-            : `<div style="width:40px; height:40px; border-radius:50%; background:#ccc; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff;">${u.usuario.charAt(0).toUpperCase()}</div>`;
-        
+        const avatarHtml = u.imagen_url
+            ? `<img src="${u.imagen_url}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">`
+            : `<div style="width:40px; height:40px; border-radius:50%; background:#ccc; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff;">${escapeHtml(u.usuario.charAt(0).toUpperCase())}</div>`;
+
         tr.innerHTML = `
             <td>${avatarHtml}</td>
-            <td>${u.usuario}</td>
-            <td>${u.nombre_completo || '-'}</td>
-            <td>${u.rol_nombre}</td>
-            <td>${u.correo || '-'}</td>
+            <td>${escapeHtml(u.usuario)}</td>
+            <td>${escapeHtml(u.nombre_completo) || '-'}</td>
+            <td>${escapeHtml(u.rol_nombre)}</td>
+            <td>${escapeHtml(u.correo) || '-'}</td>
             <td><span class="badge badge-${u.estado === 'activo' ? 'active' : 'danger'}">${u.estado}</span></td>
             <td>
                 <button class="btn-icon" onclick="editarUsuario(${u.id_usuario})">✏️</button>

@@ -19,6 +19,13 @@ class Compra(db.Model):
     tipo_compra = db.Column(db.Enum('productos', 'varios'), default='productos')
     descripcion_gasto = db.Column(db.String(255), nullable=True)
 
+    @staticmethod
+    def generar_numero(prefijo):
+        """Numero de compra legible y unico: PREFIJO-AAAAMMDDHHMMSSmmm.
+        Se centraliza aqui para no repetir el formato en cada endpoint de
+        compra_routes.py (alta, gasto vario, importacion masiva)."""
+        return f"{prefijo}-{nicaragua_now().strftime('%Y%m%d%H%M%S%f')[:-3]}"
+
     def to_dict(self):
         return {
             "id_compra": self.id_compra,

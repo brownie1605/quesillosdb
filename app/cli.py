@@ -31,6 +31,7 @@ def registrar_comandos(app):
     app.cli.add_command(crear_admin)
     app.cli.add_command(sync_now)
     app.cli.add_command(sync_status)
+    app.cli.add_command(backup_ahora)
     app.cli.add_command(demo_quesillo)
     app.cli.add_command(bootstrap_nube)
     app.cli.add_command(aplicar_offset)
@@ -166,6 +167,18 @@ def sync_status():
 
     NetworkService.check_connectivity()
     click.echo(SyncService.estado_general())
+
+
+# ==================================================================
+@click.command("backup-ahora")
+@click.option("--bind", default="local", help="'local' o 'cloud'. Por defecto 'local'.")
+@with_appcontext
+def backup_ahora(bind):
+    """Crea un respaldo ahora mismo (fuera del automatico diario)."""
+    from app.services.backup_service import BackupService
+
+    ruta = BackupService.crear_backup(nombre_bind=bind)
+    click.echo(f"Respaldo creado: {ruta}")
 
 
 # ==================================================================

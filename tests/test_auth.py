@@ -33,7 +33,7 @@ def test_hash_de_password_funciona():
 # ------------------------------------------------------------------ roles
 def test_rutas_protegidas_exigen_sesion(app, datos_base):
     cliente = app.test_client()
-    for ruta in ("/recetas/", "/insumos/", "/cocina/pendientes", "/ventas/pos"):
+    for ruta in ("/recetas/", "/cocina/pendientes", "/ventas/pos"):
         r = cliente.get(ruta)
         assert r.status_code in (302, 401), ruta
 
@@ -140,7 +140,7 @@ def test_flujo_completo_cambia_la_contrasena(app, db, datos_base):
     assert r.status_code == 302
 
     r = cliente.post(
-        "/reset-password/admin@quesillos.test/Admin/654321",
+        "/reset-password/admin@quesillos.test/Admin",
         data={"password": "nuevaClave1", "password_confirm": "nuevaClave1"},
     )
     assert r.status_code == 302
@@ -159,10 +159,32 @@ def test_contrasenas_que_no_coinciden_no_se_guardan(app, db, datos_base):
     db.session.commit()
 
     cliente = app.test_client()
+    # El paso de reset ahora exige haber verificado el codigo antes (queda
+    # en la sesion, ya no viaja en la URL).
+    r = cliente.post("/verify-code/admin@quesillos.test/Admin", data={"codigo": "111222"})
+    assert r.status_code == 302
+
     r = cliente.post(
-        "/reset-password/admin@quesillos.test/Admin/111222",
+        "/reset-password/admin@quesillos.test/Admin",
         data={"password": "unaClave1", "password_confirm": "otraClave2"},
     )
     assert r.status_code == 200
     db.session.refresh(admin)
     assert admin.password_hash == hash_original
+
+
+def test_reset_password_sin_verificar_codigo_antes_redirige(app, db, datos_base):
+    """El paso 3 ya no acepta el codigo por la URL: sin pasar por
+    verify-code primero, no debe dejar cambiar la contrasena."""
+    admin = datos_base["admin"]
+    admin.codigo_recuperacion = "999888"
+    admin.codigo_expiry = datetime.now() + timedelta(minutes=15)
+    db.session.commit()
+
+    cliente = app.test_client()
+    r = cliente.post(
+        "/reset-password/admin@quesillos.test/Admin",
+        data={"password": "otraClave1", "password_confirm": "otraClave1"},
+    )
+    assert r.status_code == 302
+    assert "forgot-password" in r.headers["Location"]

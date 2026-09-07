@@ -1,7 +1,8 @@
 // ventas.js
 let productos = [];
 let cart = [];
-let descuentoAplicado = 0.0;
+let descuentoPct = 0.0;       // % que el cajero eligio (0-100)
+let descuentoAplicado = 0.0;  // monto en C$ derivado de descuentoPct * subtotal
 let propinaAplicada = 0.0;
 let propinaManual = null; // Si el usuario edita manualmente
 let categoriaActiva = '';
@@ -20,14 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
         aplicarFiltros();
     });
 
-    // Método de pago selector de bancos
+    // Método de pago: selector de bancos si es Tarjeta, efectivo/cambio si es Efectivo
     document.getElementById('paymentMethod').addEventListener('change', (e) => {
-        const bankSelection = document.getElementById('bankSelection');
-        if (e.target.value === 'Tarjeta') {
-            bankSelection.style.display = 'flex';
-        } else {
-            bankSelection.style.display = 'none';
-        }
+        document.getElementById('bankSelection').style.display = e.target.value === 'Tarjeta' ? 'flex' : 'none';
+        actualizarCambio();
     });
 
     // Antiguo botón cobrar, ahora abre el modal
@@ -38,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('closeCheckoutModalBtn').addEventListener('click', cerrarModalCheckout);
     document.getElementById('propinaSwitch').addEventListener('change', recalcularTotalesModal);
     document.getElementById('confirmCheckoutBtn').addEventListener('click', confirmarCobro);
+    document.getElementById('modalEfectivoRecibido').addEventListener('input', actualizarCambio);
 
     // Eventos del Modal de Descuento
     document.getElementById('openDiscountModalBtn').addEventListener('click', abrirModalDescuento);
@@ -245,27 +243,39 @@ function renderizarCarrito() {
         const div = document.createElement('div');
         div.className = 'cart-item';
         const notaHtml = item.comentario
-            ? `<div class="cart-item-note">✎ ${item.comentario}</div>` : '';
+            ? `<div class="cart-item-note">✎ ${escapeHtml(item.comentario)}</div>` : '';
+        // La key se pasa por data-key (atributo, escapado por escapeHtml) y
+        // no metida cruda dentro del string de JS del onclick: un
+        // nombre/comentario de producto con una comilla ya no rompe fuera
+        // del atributo.
         div.innerHTML = `
             <div>
-                <strong>${item.nombre}</strong><br>
+                <strong>${escapeHtml(item.nombre)}</strong><br>
                 <span style="color:#6a768d;">C$ ${item.precio.toFixed(2)}</span>
             </div>
             <div class="qty-control">
-                <button class="qty-btn" onclick="modificarCantidad('${item.key}', -1)">-</button>
+                <button class="qty-btn" data-key="${escapeHtml(item.key)}" onclick="modificarCantidad(this.dataset.key, -1)">-</button>
                 <span>${item.cantidad}</span>
-                <button class="qty-btn" onclick="modificarCantidad('${item.key}', 1)">+</button>
+                <button class="qty-btn" data-key="${escapeHtml(item.key)}" onclick="modificarCantidad(this.dataset.key, 1)">+</button>
             </div>
             <div style="text-align: right; font-weight: bold;">C$ ${itemTotal.toFixed(2)}</div>
             <div style="text-align: right;">
-                <button class="btn-icon delete" onclick="eliminarDelCarrito('${item.key}')">🗑️</button>
+                <button class="btn-icon delete" data-key="${escapeHtml(item.key)}" onclick="eliminarDelCarrito(this.dataset.key)">🗑️</button>
             </div>
             ${notaHtml}
         `;
         cartItemsDiv.appendChild(div);
     });
 
+    descuentoAplicado = subtotal * (descuentoPct / 100);
+
     document.getElementById('subtotalDisplay').textContent = `C$ ${subtotal.toFixed(2)}`;
+    const discountDisplay = document.getElementById('discountDisplay');
+    if (discountDisplay) {
+        discountDisplay.textContent = descuentoPct > 0
+            ? `${descuentoPct}% (− C$ ${descuentoAplicado.toFixed(2)})`
+            : 'C$ 0.00';
+    }
 
     let total = subtotal - descuentoAplicado;
     if (total < 0) total = 0;
@@ -277,6 +287,7 @@ function cancelarVenta() {
     if (cart.length === 0) return;
     showCustomConfirm('¿Está seguro de cancelar la venta?', () => {
         cart = [];
+        descuentoPct = 0;
         descuentoAplicado = 0;
         propinaManual = null;
         renderizarCarrito();
@@ -401,17 +412,43 @@ function abrirModalCheckout() {
     cart.forEach(item => {
         const div = document.createElement('div');
         div.style.marginBottom = '4px';
-        const nota = item.comentario ? `<div style="font-size:11px;color:#e67e22;">✎ ${item.comentario}</div>` : '';
-        div.innerHTML = `<div style="display:flex;justify-content:space-between;"><span>${item.cantidad}x ${item.nombre}</span> <span>C$ ${(item.precio * item.cantidad).toFixed(2)}</span></div>${nota}`;
+        const nota = item.comentario ? `<div style="font-size:11px;color:#e67e22;">✎ ${escapeHtml(item.comentario)}</div>` : '';
+        div.innerHTML = `<div style="display:flex;justify-content:space-between;"><span>${item.cantidad}x ${escapeHtml(item.nombre)}</span> <span>C$ ${(item.precio * item.cantidad).toFixed(2)}</span></div>${nota}`;
         modalItems.appendChild(div);
     });
 
     // Reset Propina manual si el carrito cambió (opcional), aquí lo mantenemos
     document.getElementById('propinaSwitch').checked = true; // Por defecto activo como pidió el usuario
+    document.getElementById('modalEfectivoRecibido').value = '0';
+    document.getElementById('modalNotas').value = '';
 
     recalcularTotalesModal();
 
     document.getElementById('checkoutModal').style.display = 'flex';
+}
+
+// Muestra el bloque de efectivo/cambio solo si el metodo de pago actual es
+// Efectivo, y recalcula la diferencia contra el total del modal.
+function actualizarCambio() {
+    const metodo = document.getElementById('paymentMethod').value;
+    const seccion = document.getElementById('efectivoSection');
+    const btnConfirmar = document.getElementById('confirmCheckoutBtn');
+    if (metodo !== 'Efectivo') {
+        seccion.style.display = 'none';
+        if (btnConfirmar) btnConfirmar.disabled = false;
+        return;
+    }
+    seccion.style.display = 'block';
+
+    const total = parseFloat(document.getElementById('modalTotal').textContent.replace('C$', '').trim()) || 0;
+    const recibido = parseFloat(document.getElementById('modalEfectivoRecibido').value) || 0;
+    const diferencia = recibido - total;
+
+    document.getElementById('modalCambioLabel').textContent = diferencia < 0 ? 'Falta:' : 'Cambio a entregar:';
+    document.getElementById('modalCambio').textContent = 'C$ ' + Math.abs(diferencia).toFixed(2);
+    document.getElementById('modalCambio').style.color = diferencia < 0 ? '#c0392b' : '#1abc9c';
+
+    if (btnConfirmar) btnConfirmar.disabled = diferencia < 0;
 }
 
 function cerrarModalCheckout() {
@@ -420,6 +457,7 @@ function cerrarModalCheckout() {
 
 function recalcularTotalesModal() {
     let subtotal = getSubtotal();
+    descuentoAplicado = subtotal * (descuentoPct / 100);
     let baseTotal = subtotal - descuentoAplicado;
     if (baseTotal < 0) baseTotal = 0;
 
@@ -438,15 +476,18 @@ function recalcularTotalesModal() {
     let finalTotal = baseTotal + propinaAplicada;
 
     document.getElementById('modalSubtotal').textContent = `C$ ${subtotal.toFixed(2)}`;
-    document.getElementById('modalDiscount').textContent = `- C$ ${descuentoAplicado.toFixed(2)}`;
+    document.getElementById('modalDiscount').textContent = descuentoPct > 0
+        ? `${descuentoPct}% (- C$ ${descuentoAplicado.toFixed(2)})`
+        : '- C$ 0.00';
     document.getElementById('modalPropina').textContent = `+ C$ ${propinaAplicada.toFixed(2)}`;
     document.getElementById('modalTotal').textContent = `C$ ${finalTotal.toFixed(2)}`;
+    actualizarCambio();
 }
 
 // ---- LOGICA DEL MODAL DE DESCUENTO ----
 
 function abrirModalDescuento() {
-    document.getElementById('modalDiscountInput').value = descuentoAplicado.toFixed(2);
+    document.getElementById('modalDiscountInput').value = descuentoPct;
     document.getElementById('discountModal').style.display = 'flex';
 }
 
@@ -457,14 +498,12 @@ function cerrarModalDescuento() {
 function aplicarDescuento() {
     let val = parseFloat(document.getElementById('modalDiscountInput').value);
     if (isNaN(val) || val < 0) val = 0;
-
-    let subtotal = getSubtotal();
-    if (val > subtotal) {
-        showCustomAlert("El descuento no puede ser mayor al subtotal.");
-        val = subtotal;
+    if (val > 100) {
+        showCustomAlert("El descuento no puede ser mayor al 100%.");
+        val = 100;
     }
 
-    descuentoAplicado = val;
+    descuentoPct = val;
     cerrarModalDescuento();
     recalcularTotalesModal();
     renderizarCarrito(); // Para actualizar la vista principal de atrás
@@ -495,9 +534,17 @@ function aplicarPropina() {
 
 async function confirmarCobro() {
     let methodValue = document.getElementById('paymentMethod').value;
+    let montoRecibido = 0;
     if (methodValue === 'Tarjeta') {
         const selectedBank = document.querySelector('input[name="bankSelect"]:checked').value;
         methodValue = `Tarjeta ${selectedBank}`;
+    } else if (methodValue === 'Efectivo') {
+        const total = parseFloat(document.getElementById('modalTotal').textContent.replace('C$', '').trim()) || 0;
+        montoRecibido = parseFloat(document.getElementById('modalEfectivoRecibido').value) || 0;
+        if (montoRecibido < total) {
+            showCustomAlert('El efectivo recibido es menor al total a pagar.');
+            return;
+        }
     }
 
     const payload = {
@@ -512,7 +559,9 @@ async function confirmarCobro() {
         descuento: descuentoAplicado,
         propina: propinaAplicada,
         metodo_pago: methodValue,
-        id_cliente: document.getElementById('clientSelect').value || null
+        monto_recibido: montoRecibido,
+        id_cliente: document.getElementById('clientSelect').value || null,
+        notas: document.getElementById('modalNotas').value,
     };
 
     const btn = document.getElementById('confirmCheckoutBtn');
@@ -533,10 +582,11 @@ async function confirmarCobro() {
 
             // Mostrar modal de éxito con los datos de la venta
             const totalPagado = document.getElementById('modalTotal').textContent;
-            showSuccessModal(result.venta_id, totalPagado);
+            showSuccessModal(result.venta_id, totalPagado, result.cambio || 0);
 
             // Limpiar carrito
             cart = [];
+            descuentoPct = 0;
             descuentoAplicado = 0;
             propinaAplicada = 0;
             propinaManual = null;
@@ -554,12 +604,21 @@ async function confirmarCobro() {
     }
 }
 
-function showSuccessModal(ventaId, totalDisplay) {
+function showSuccessModal(ventaId, totalDisplay, cambio) {
     // Rellenar info de la venta
     document.getElementById('successVentaNum').textContent = `#${ventaId}`;
     document.getElementById('successTotal').textContent = totalDisplay;
     // Guardar el id en el botón de imprimir
     document.getElementById('successPrintBtn').dataset.ventaId = ventaId;
+
+    const filaCambio = document.getElementById('successCambioRow');
+    if (cambio && cambio > 0) {
+        document.getElementById('successCambio').textContent = 'C$ ' + cambio.toFixed(2);
+        filaCambio.style.display = 'flex';
+    } else {
+        filaCambio.style.display = 'none';
+    }
+
     // Mostrar el modal
     const modal = document.getElementById('successModal');
     modal.style.display = 'flex';

@@ -18,6 +18,7 @@ class TestConfig(Config):
     SQLALCHEMY_ENGINE_OPTIONS = {}
     SYNC_ENABLED = False
     WTF_CSRF_ENABLED = False
+    RATELIMIT_ENABLED = False
     SECRET_KEY = "test"
 
 
@@ -76,7 +77,17 @@ def datos_base(app, db):
     db.session.add_all([admin, cajero])
     db.session.commit()
 
-    return {"roles": roles, "unidades": unidades, "admin": admin, "cajero": cajero}
+    # Desde que una venta exige turno de caja abierto, se abre uno por
+    # defecto aqui: la gran mayoria de pruebas de venta no estan probando
+    # esta regla en si, solo necesitan poder cobrar.
+    from app.services.caja_service import CajaService
+
+    apertura = CajaService.abrir_turno(cajero, 0)
+
+    return {
+        "roles": roles, "unidades": unidades, "admin": admin, "cajero": cajero,
+        "apertura_caja": apertura,
+    }
 
 
 @pytest.fixture()

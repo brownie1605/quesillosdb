@@ -29,6 +29,7 @@
         <thead><tr><th>Detectado</th><th>Tipo</th><th>Registro</th><th>Hora local</th><th>Hora nube</th><th>Estado</th><th></th></tr></thead>
         <tbody><tr><td colspan="7">Cargando…</td></tr></tbody>
     </table>
+    <div id="paginacionConflictos" class="pagination"></div>
 </div>
 
 <div class="q-card">
@@ -37,6 +38,7 @@
         <thead><tr><th>#</th><th>Operación</th><th>Tabla</th><th>Registro</th><th>Hora</th><th>Estado</th></tr></thead>
         <tbody><tr><td colspan="6">Cargando…</td></tr></tbody>
     </table>
+    <div id="paginacionCola" class="pagination"></div>
 </div>
 {% endblock %}
 
@@ -64,14 +66,18 @@ async function soloPush()    { mostrar(await fetch('/api/sync/push', {method:'PO
 async function soloPull()    { mostrar(await fetch('/api/sync/pull', {method:'POST'}).then(r=>r.json())); refrescar(); }
 async function probar()      { mostrar(await fetch('/api/sync/check', {method:'POST'}).then(r=>r.json())); estado(); }
 
+const pagConflictos = crearPaginador('paginacionConflictos', 20);
+const pagCola = crearPaginador('paginacionCola', 20);
+
 async function conflictos() {
     const datos = await fetch('/api/conflicts?estado=todos').then(r => r.json());
     const tb = document.querySelector('#tabla-conflictos tbody');
     if (!datos.length) {
+        document.getElementById('paginacionConflictos').innerHTML = '';
         tb.innerHTML = '<tr><td colspan="7" style="text-align:center;opacity:.6">Sin conflictos registrados. 👌</td></tr>';
         return;
     }
-    tb.innerHTML = datos.map(c => `
+    tb.innerHTML = pagConflictos.paginar(datos, conflictos).map(c => `
         <tr>
             <td>${(c.timestamp_deteccion || '').replace('T',' ').slice(0,19)}</td>
             <td><span class="q-chip receta">${c.tipo_conflicto}</span></td>
@@ -98,10 +104,11 @@ async function cola() {
     const datos = await fetch('/api/sync/queue').then(r => r.json());
     const tb = document.querySelector('#tabla-cola tbody');
     if (!datos.length) {
+        document.getElementById('paginacionCola').innerHTML = '';
         tb.innerHTML = '<tr><td colspan="6" style="text-align:center;opacity:.6">La cola está vacía.</td></tr>';
         return;
     }
-    tb.innerHTML = datos.map(q => `
+    tb.innerHTML = pagCola.paginar(datos, cola).map(q => `
         <tr>
             <td>${q.id_sync_queue}</td>
             <td>${q.operation_type}</td>

@@ -36,12 +36,17 @@ def api_crear():
     if not nombre:
         return jsonify({"success": False, "message": "El nombre es obligatorio"}), 400
     try:
+        tipo_cliente = data.get("tipo_cliente") or "externo"
+        if tipo_cliente not in ("interno", "externo"):
+            tipo_cliente = "externo"
         cliente = Cliente(
             id_empresa=current_user.id_empresa,
             nombre=nombre,
             cedula=data.get("cedula"),
             telefono=data.get("telefono"),
             direccion=data.get("direccion"),
+            tipo_cliente=tipo_cliente,
+            es_preferencial=bool(data.get("es_preferencial")),
             estado="activo",
         )
         db.session.add(cliente)
@@ -63,6 +68,10 @@ def api_editar(id_cliente):
         cliente.cedula = data.get("cedula", cliente.cedula)
         cliente.telefono = data.get("telefono", cliente.telefono)
         cliente.direccion = data.get("direccion", cliente.direccion)
+        if data.get("tipo_cliente") in ("interno", "externo"):
+            cliente.tipo_cliente = data.get("tipo_cliente")
+        if "es_preferencial" in data:
+            cliente.es_preferencial = bool(data.get("es_preferencial"))
         db.session.commit()
         registrar_auditoria("EDITAR CLIENTE", "Clientes", {"cliente": cliente.nombre})
         return jsonify({"success": True, "cliente": cliente.to_dict()})

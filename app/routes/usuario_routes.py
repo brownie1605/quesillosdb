@@ -1,8 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request, current_app
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from werkzeug.utils import secure_filename
-import os
 import io
 from flask import send_file
 from app.extensions import db
@@ -11,6 +9,7 @@ from app.models import Usuario, Rol
 from app.services.auditoria_service import registrar_auditoria
 
 from app.utils.decorators import require_roles
+from app.utils.imagenes import leer_imagen_validada
 
 usuario_bp = Blueprint("usuario", __name__, url_prefix="/usuarios")
 
@@ -51,11 +50,10 @@ def api_crear():
     imagen_datos = None
     imagen_mimetype = None
     
-    if imagen and imagen.filename:
-        imagen_datos = imagen.read()
-        imagen_mimetype = imagen.mimetype
-
     try:
+        if imagen and imagen.filename:
+            imagen_datos, imagen_mimetype = leer_imagen_validada(imagen)
+
         usuario = data.get("usuario")
         correo = data.get("correo")
         telefono = data.get("telefono", "")
@@ -72,6 +70,12 @@ def api_crear():
             if not telefono.isdigit():
                 return jsonify({"success": False, "message": "El teléfono solo debe contener números."}), 400
 
+        password = data.get("password") or ""
+        # Antes, si se dejaba en blanco, la cuenta quedaba con la
+        # contraseña "123456" -- un valor adivinable por cualquiera.
+        if len(password) < 8:
+            return jsonify({"success": False, "message": "La contraseña debe tener al menos 8 caracteres."}), 400
+
         nuevo = Usuario(
             id_empresa=current_user.id_empresa,
             id_sucursal=current_user.id_sucursal,
@@ -80,7 +84,7 @@ def api_crear():
             nombre_completo=data.get("nombre_completo"),
             correo=correo,
             telefono=telefono,
-            password_hash=generate_password_hash(data.get("password") or "123456"),
+            password_hash=generate_password_hash(password),
             imagen_url=imagen_url,
             imagen_datos=imagen_datos,
             imagen_mimetype=imagen_mimetype,
@@ -98,7 +102,10 @@ def api_crear():
     except IntegrityError:
         db.session.rollback()
         return jsonify({"success": False, "message": "El nombre de usuario o correo ya está en uso en esta empresa."}), 400
-    except Exception as e:
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 
@@ -114,8 +121,7 @@ def api_editar(id):
             return jsonify({"success": False, "message": "Acceso denegado"}), 403
             
         if imagen and imagen.filename:
-            u.imagen_datos = imagen.read()
-            u.imagen_mimetype = imagen.mimetype
+            u.imagen_datos, u.imagen_mimetype = leer_imagen_validada(imagen)
             u.imagen_url = f"/usuarios/imagen/{u.id_usuario}"
 
         usuario = data.get("usuario", u.usuario)
@@ -141,15 +147,20 @@ def api_editar(id):
         u.id_rol = data.get("id_rol", u.id_rol)
         
         if data.get("password"):
+            if len(data.get("password")) < 8:
+                return jsonify({"success": False, "message": "La contraseña debe tener al menos 8 caracteres."}), 400
             u.password_hash = generate_password_hash(data.get("password"))
-        
+
         db.session.commit()
         registrar_auditoria("EDITAR USUARIO", "Usuarios", f"Usuario {u.usuario} modificado")
         return jsonify({"success": True})
     except IntegrityError:
         db.session.rollback()
         return jsonify({"success": False, "message": "El nombre de usuario o correo ya está en uso."}), 400
-    except Exception as e:
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 

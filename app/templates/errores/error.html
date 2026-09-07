@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ codigo }} — Quesillos Lo Nuestro</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f7f3ee;
+            color: #2a1b12;
+            font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+            text-align: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .caja {
+            max-width: 420px;
+        }
+        .codigo {
+            font-size: 64px;
+            font-weight: 800;
+            color: #8B2E2E;
+            line-height: 1;
+            margin: 0 0 8px;
+        }
+        .mensaje {
+            font-size: 16px;
+            color: #4a2e1e;
+            margin: 0 0 24px;
+        }
+        a.volver {
+            display: inline-block;
+            padding: 10px 22px;
+            background: #8B2E2E;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        a.volver:hover { opacity: .9; }
+    </style>
+</head>
+<body>
+    <div class="caja">
+        <p class="codigo">{{ codigo }}</p>
+        <p class="mensaje">{{ mensaje }}</p>
+        <a class="volver" href="/">Volver al inicio</a>
+    </div>
+</body>
+</html>

@@ -1,11 +1,11 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import Compra, DetalleCompra, Producto, Proveedor, Inventario, Categoria, Marca, UnidadMedida
+from app.models import Compra, DetalleCompra, Producto, Proveedor, Inventario, Categoria, UnidadMedida
 from datetime import datetime
-from app.utils.date_utils import nicaragua_now
 
 from app.utils.decorators import require_roles
+from app.services.inventario_service import InventarioService
 
 compra_bp = Blueprint("compra", __name__, url_prefix="/compras")
 
@@ -54,7 +54,7 @@ def api_crear():
             prov_varios = Proveedor.query.filter(Proveedor.nombre.ilike('%varios%')).first()
             id_prov_varios = prov_varios.id_proveedor if prov_varios else None
 
-            num_compra = f"GV-{nicaragua_now().strftime('%Y%m%d%H%M%S')}"
+            num_compra = Compra.generar_numero("GV")
             nueva_compra = Compra(
                 id_empresa=current_user.id_empresa,
                 id_sucursal=current_user.id_sucursal,
@@ -71,16 +71,19 @@ def api_crear():
             db.session.add(nueva_compra)
             db.session.commit()
             return jsonify({"success": True, "message": "Gasto vario registrado exitosamente"})
-        except Exception as e:
+        except (ValueError, TypeError):
+            db.session.rollback()
+            return jsonify({"success": False, "message": "El monto debe ser un número válido"}), 400
+        except Exception as e:  # noqa: BLE001
             db.session.rollback()
             return jsonify({"success": False, "message": str(e)}), 500
-            
+
     if not items:
         return jsonify({"success": False, "message": "No hay productos en la compra"}), 400
         
     try:
         subtotal_compra = 0.0
-        num_compra = f"C-{nicaragua_now().strftime('%Y%m%d%H%M%S')}"
+        num_compra = Compra.generar_numero("C")
         
         nueva_compra = Compra(
             id_empresa=current_user.id_empresa,
@@ -111,26 +114,25 @@ def api_crear():
                 subtotal=subtotal_item
             )
             db.session.add(detalle)
-            
-            # Sumar al inventario
-            inv = Inventario.query.filter_by(id_producto=producto_id).first()
-            if inv:
-                inv.stock_actual = float(inv.stock_actual) + cantidad
-            else:
-                inv = Inventario(
-                    id_sucursal=current_user.id_sucursal,
-                    id_producto=producto_id,
-                    stock_actual=cantidad,
-                    stock_minimo=0
-                )
-                db.session.add(inv)
-                
+
+            # Suma el stock, deja el movimiento auditado y actualiza el
+            # costo del producto al precio pagado -- un solo punto de
+            # entrada para todo lo que "se compro" (ver InventarioService).
+            InventarioService.registrar_compra(
+                producto_id, cantidad, costo_unitario, current_user.id_usuario,
+                referencia=f"COMPRA-{nueva_compra.id_compra}",
+                observacion=f"Compra {num_compra}",
+            )
+
         nueva_compra.subtotal = subtotal_compra
         nueva_compra.total = subtotal_compra # Asumimos 0 impuesto por ahora
-        
+
         db.session.commit()
         return jsonify({"success": True, "message": "Compra registrada exitosamente"})
-    except Exception as e:
+    except (ValueError, TypeError):
+        db.session.rollback()
+        return jsonify({"success": False, "message": "Cantidad o costo inválido en uno de los productos"}), 400
+    except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 
@@ -189,35 +191,43 @@ def api_editar(id):
             compra.total = float(monto)
             db.session.commit()
             return jsonify({"success": True, "message": "Gasto actualizado exitosamente"})
-        except Exception as e:
+        except (ValueError, TypeError):
+            db.session.rollback()
+            return jsonify({"success": False, "message": "El monto debe ser un número válido"}), 400
+        except Exception as e:  # noqa: BLE001
             db.session.rollback()
             return jsonify({"success": False, "message": str(e)}), 500
 
     if not items:
         return jsonify({"success": False, "message": "No hay productos en la compra"}), 400
-        
+
     try:
-        # 1. Revertir inventario de la compra anterior
+        # 1. Revertir inventario de la compra anterior. Se usa el mismo
+        # servicio auditado (con cantidad negativa) para que quede constancia
+        # de que ese stock salio porque la compra se estaba editando, en vez
+        # de restarlo a mano sin dejar rastro.
         detalles_previos = DetalleCompra.query.filter_by(id_compra=id).all()
         for dp in detalles_previos:
-            inv = Inventario.query.filter_by(id_producto=dp.id_producto).first()
-            if inv:
-                inv.stock_actual = float(inv.stock_actual) - float(dp.cantidad)
-                
+            InventarioService.mover(
+                dp.id_producto, -float(dp.cantidad), "ajuste", current_user.id_usuario,
+                referencia=f"COMPRA-{id}",
+                observacion=f"Reversion por edicion de compra {compra.numero_compra}",
+            )
+
         # 2. Eliminar detalles de compra anteriores
         DetalleCompra.query.filter_by(id_compra=id).delete()
-        
+
         # 3. Guardar nuevos datos de compra y calcular total
         compra.id_proveedor = id_proveedor
         subtotal_compra = 0.0
-        
+
         for item in items:
             producto_id = item.get("id_producto")
             cantidad = float(item.get("cantidad", 0))
             costo_unitario = float(item.get("costo_unitario", 0))
             subtotal_item = cantidad * costo_unitario
             subtotal_compra += subtotal_item
-            
+
             detalle = DetalleCompra(
                 id_compra=compra.id_compra,
                 id_producto=producto_id,
@@ -226,26 +236,22 @@ def api_editar(id):
                 subtotal=subtotal_item
             )
             db.session.add(detalle)
-            
-            # Sumar al inventario
-            inv = Inventario.query.filter_by(id_producto=producto_id).first()
-            if inv:
-                inv.stock_actual = float(inv.stock_actual) + cantidad
-            else:
-                inv = Inventario(
-                    id_sucursal=current_user.id_sucursal,
-                    id_producto=producto_id,
-                    stock_actual=cantidad,
-                    stock_minimo=0
-                )
-                db.session.add(inv)
-                
+
+            InventarioService.registrar_compra(
+                producto_id, cantidad, costo_unitario, current_user.id_usuario,
+                referencia=f"COMPRA-{compra.id_compra}",
+                observacion=f"Compra {compra.numero_compra} (editada)",
+            )
+
         compra.subtotal = subtotal_compra
         compra.total = subtotal_compra
 
         db.session.commit()
         return jsonify({"success": True, "message": "Compra actualizada exitosamente"})
-    except Exception as e:
+    except (ValueError, TypeError):
+        db.session.rollback()
+        return jsonify({"success": False, "message": "Cantidad o costo inválido en uno de los productos"}), 400
+    except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
 
@@ -279,7 +285,7 @@ def api_importar_masivo():
     de Excel de "Cargar compra masiva" y registra una o mas Compras reales.
 
     Fase 1: por cada fila, crea o actualiza el Producto (sin tocar stock) y
-    valida/crea Proveedor, Categoria, Marca, Unidad segun corresponda. Cada
+    valida/crea Proveedor, Categoria, Unidad segun corresponda. Cada
     fila se confirma con su propio commit/rollback para que una fila mala no
     tumbe ni deje a medias las demas.
     Fase 2: agrupa las filas validas por Proveedor y genera una Compra con
@@ -297,10 +303,6 @@ def api_importar_masivo():
     categorias_cache = {
         c.nombre.strip().lower(): c
         for c in Categoria.query.filter_by(id_empresa=current_user.id_empresa, estado="activo").all()
-    }
-    marcas_cache = {
-        m.nombre.strip().lower(): m
-        for m in Marca.query.filter_by(id_empresa=current_user.id_empresa, estado="activo").all()
     }
     proveedores_cache = {
         p.nombre.strip().lower(): p
@@ -347,20 +349,6 @@ def api_importar_masivo():
                 ).first()
             es_nuevo = prod is None
 
-            # Marca (para heredar su proveedor si la fila no trae uno propio)
-            id_marca = None
-            marca_obj = None
-            marca_nombre = (fila.get("marca") or "").strip()
-            if marca_nombre:
-                marca_obj = marcas_cache.get(marca_nombre.lower())
-                if not marca_obj:
-                    marca_obj = Marca(id_empresa=current_user.id_empresa, nombre=marca_nombre, estado="activo")
-                    db.session.add(marca_obj)
-                    db.session.flush()
-                    marcas_cache[marca_nombre.lower()] = marca_obj
-                id_marca = marca_obj.id_marca
-
-            # Proveedor: el de la fila, o si no viene, el de la marca elegida
             prov_nombre = (fila.get("proveedor") or "").strip()
             proveedor = None
             if prov_nombre:
@@ -370,12 +358,10 @@ def api_importar_masivo():
                     db.session.add(proveedor)
                     db.session.flush()
                     proveedores_cache[prov_nombre.lower()] = proveedor
-            elif marca_obj and marca_obj.id_proveedor:
-                proveedor = Proveedor.query.get(marca_obj.id_proveedor)
 
             if not proveedor:
                 db.session.rollback()
-                errores.append(f"Fila {idx} ({nombre}): falta el Proveedor (o una Marca que ya tenga proveedor asignado)")
+                errores.append(f"Fila {idx} ({nombre}): falta el Proveedor")
                 continue
 
             id_categoria = None
@@ -418,8 +404,8 @@ def api_importar_masivo():
                         prod.precio_venta = _num(precio_venta_val)
                     if aplica_iva_val not in (None, ""):
                         prod.aplica_impuesto = _si_no(aplica_iva_val)
-                if id_marca:
-                    prod.id_marca = id_marca
+                if proveedor:
+                    prod.id_proveedor = proveedor.id_proveedor
                 if id_unidad:
                     prod.id_unidad = id_unidad
                 if costo_unitario:
@@ -430,7 +416,7 @@ def api_importar_masivo():
                 prod = Producto(
                     id_empresa=current_user.id_empresa,
                     id_categoria=id_categoria,
-                    id_marca=id_marca,
+                    id_proveedor=proveedor.id_proveedor,
                     id_unidad=id_unidad,
                     codigo=codigo,
                     nombre=nombre,
@@ -482,7 +468,7 @@ def api_importar_masivo():
 
     for i, (id_proveedor, grupo) in enumerate(grupos.items(), start=1):
         try:
-            num_compra = f"CM-{nicaragua_now().strftime('%Y%m%d%H%M%S')}-{i}"
+            num_compra = Compra.generar_numero("CM") + f"-{i}"
             nueva_compra = Compra(
                 id_empresa=current_user.id_empresa,
                 id_sucursal=current_user.id_sucursal,
@@ -512,17 +498,14 @@ def api_importar_masivo():
                 )
                 db.session.add(detalle)
 
-                inv = Inventario.query.filter_by(id_producto=f["id_producto"]).first()
-                if inv:
-                    inv.stock_actual = float(inv.stock_actual) + f["cantidad"]
-                else:
-                    inv = Inventario(
-                        id_sucursal=current_user.id_sucursal,
-                        id_producto=f["id_producto"],
-                        stock_actual=f["cantidad"],
-                        stock_minimo=f["stock_minimo"] or 0,
-                    )
-                    db.session.add(inv)
+                InventarioService.registrar_compra(
+                    f["id_producto"], f["cantidad"], f["costo_unitario"], current_user.id_usuario,
+                    referencia=f"COMPRA-{nueva_compra.id_compra}",
+                    observacion=f"Importacion masiva: compra {num_compra}",
+                )
+                if f["stock_minimo"] is not None:
+                    inv = InventarioService.obtener_o_crear(f["id_producto"])
+                    inv.stock_minimo = f["stock_minimo"]
 
                 if f["es_nuevo"]:
                     productos_creados += 1

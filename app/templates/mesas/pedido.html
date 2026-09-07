@@ -29,6 +29,30 @@
     .totales { padding: 14px 18px; background:#faf5f2; border-radius:0 0 14px 14px; }
     .totales .fila { display:flex; justify-content:space-between; font-size:14px; margin-bottom:6px; color:#6d5f5a; }
     .totales .fila.total { font-weight:800; font-size: 19px; color:#3e2723; border-top:1px solid #e0d5d0; padding-top:8px; margin-top:8px; }
+    .pz-opcion-cards { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .pz-opcion-card { position:relative; border-radius:14px; padding:26px 14px; text-align:center; cursor:pointer;
+        font-weight:700; font-size:15px; color:#fff; border:3px solid transparent; transition: all .15s;
+        background: linear-gradient(160deg,#bcaaa4,#8d6e63); opacity:.75; }
+    .pz-opcion-card.si { background: linear-gradient(160deg,#a8d5a2,#4c8c4a); }
+    .pz-opcion-card.no { background: linear-gradient(160deg,#e0a3a3,#8B2E2E); }
+    .pz-opcion-card:hover { opacity:.95; transform: translateY(-2px); }
+    .pz-opcion-card.activa { opacity:1; border-color:#3e2723; box-shadow:0 6px 16px rgba(0,0,0,.18); }
+    .pz-opcion-card .pz-check { position:absolute; top:8px; right:10px; width:20px; height:20px; border-radius:50%;
+        border:2px solid rgba(255,255,255,.85); display:flex; align-items:center; justify-content:center; font-size:12px; }
+    .pz-opcion-card.activa .pz-check { background:#fff; color:#3e2723; }
+    .pz-opcion-card.deshabilitada { opacity:.35; cursor:not-allowed; }
+    .cant-stepper { display:flex; align-items:center; gap:6px; background:#faf5f2; border:1px solid #e0d5d0; border-radius:20px; padding:2px 6px; }
+    .cant-stepper button { width:22px; height:22px; border:none; border-radius:50%; background:#8d6e63; color:#fff; font-weight:700; line-height:1; }
+    .cant-stepper .cant-num { min-width:22px; text-align:center; font-weight:700; color:#3e2723; cursor:pointer; }
+    .tk-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:2px; background:#d7ccc8; border:2px solid #d7ccc8; border-radius:12px; overflow:hidden; }
+    .tk-grid button { padding:22px 0; font-size:24px; font-weight:700; border:none; background:#fff; color:#3e2723; }
+    .tk-grid button:active { background:#f3e9e4; }
+    .tk-grid button.tk-borrar { background:#faf5f2; color:#8B2E2E; font-size:19px; }
+    .tk-grid button.tk-borrar:active { background:#f0e2dd; }
+    .tk-display { font-size:34px; font-weight:800; text-align:center; color:#3e2723; background:#faf5f2; border:1px solid #e0d5d0; border-radius:10px; padding:12px; margin-bottom:14px; }
+    .cb-banco-option { cursor:pointer; transition: all .15s; }
+    .cb-banco-option input[type="radio"] { display:none; }
+    .cb-banco-option:has(input:checked) { border-color:#8B2E2E !important; background:#fbeceb; box-shadow:0 0 0 1px #8B2E2E; }
 </style>
 {% endblock %}
 
@@ -93,6 +117,36 @@
     </div>
 </div>
 
+<!-- Modal teclado numérico (cantidad) -->
+<div class="modal fade" id="modalTeclado" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header"><h6 class="modal-title" id="tkTitulo">Cantidad</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="tk-display" id="tkDisplay">0</div>
+                <div class="tk-grid">
+                    <button type="button" onclick="tkDigito('7')">7</button>
+                    <button type="button" onclick="tkDigito('8')">8</button>
+                    <button type="button" onclick="tkDigito('9')">9</button>
+                    <button type="button" onclick="tkDigito('4')">4</button>
+                    <button type="button" onclick="tkDigito('5')">5</button>
+                    <button type="button" onclick="tkDigito('6')">6</button>
+                    <button type="button" onclick="tkDigito('1')">1</button>
+                    <button type="button" onclick="tkDigito('2')">2</button>
+                    <button type="button" onclick="tkDigito('3')">3</button>
+                    <button type="button" class="tk-borrar" onclick="tkLimpiar()">C</button>
+                    <button type="button" onclick="tkDigito('0')">0</button>
+                    <button type="button" class="tk-borrar" onclick="tkBorrar()">⌫</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn text-white" style="background:#8B2E2E;" onclick="tkConfirmar()">Aceptar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal cobrar -->
 <div class="modal fade" id="modalCobrar" tabindex="-1">
     <div class="modal-dialog">
@@ -101,12 +155,18 @@
             <div class="modal-body">
                 <div class="mb-2 d-flex justify-content-between"><span>Subtotal</span><strong id="cbSubtotal">C$ 0.00</strong></div>
                 <div class="mb-2">
-                    <label class="form-label">Descuento (C$)</label>
-                    <input type="number" class="form-control" id="cbDescuento" value="0" min="0" step="0.01">
+                    <label class="form-label">Descuento (%)</label>
+                    <input type="number" class="form-control" id="cbDescuento" value="0" min="0" max="100" step="0.1">
+                    <div class="form-text" id="cbDescuentoMontoTexto" style="font-size:11.5px;"></div>
                 </div>
-                <div class="mb-2">
-                    <label class="form-label">Propina (C$)</label>
-                    <input type="number" class="form-control" id="cbPropina" value="0" min="0" step="0.01">
+                <div class="mb-2 d-flex justify-content-between align-items-center p-2 border rounded">
+                    <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer;">
+                        <input type="checkbox" id="cbPropinaSwitch" checked>
+                        Propina (10%)
+                        <button type="button" id="cbEditarPropinaBtn" class="btn btn-sm btn-outline-secondary" style="font-size:11px; padding:1px 6px;">✏️</button>
+                    </label>
+                    <strong id="cbPropinaMonto">C$ 0.00</strong>
+                    <input type="hidden" id="cbPropina" value="0">
                 </div>
                 <div class="mb-2">
                     <label class="form-label">Método de pago</label>
@@ -116,12 +176,49 @@
                         <option value="Transferencia">Transferencia</option>
                     </select>
                 </div>
-                <div class="mb-2">
+
+                <!-- Banco emisor (solo Tarjeta) -->
+                <div class="mb-2" id="cbBancoSection" style="display:none;">
+                    <label class="form-label">Banco emisor</label>
+                    <div class="d-flex gap-2">
+                        <label class="cb-banco-option flex-fill text-center border rounded p-2">
+                            <input type="radio" name="cbBanco" value="BAC" checked>
+                            <div style="font-weight:800;color:#da291c;font-size:13px;">BAC</div>
+                        </label>
+                        <label class="cb-banco-option flex-fill text-center border rounded p-2">
+                            <input type="radio" name="cbBanco" value="BANPRO">
+                            <div style="font-weight:800;color:#00825e;font-size:13px;">BANPRO</div>
+                        </label>
+                        <label class="cb-banco-option flex-fill text-center border rounded p-2">
+                            <input type="radio" name="cbBanco" value="LAFISE">
+                            <div style="font-weight:800;color:#005a2b;font-size:13px;">LAFISE</div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Efectivo recibido (solo Efectivo) -->
+                <div class="mb-2" id="cbEfectivoSection">
                     <label class="form-label">Monto recibido (C$)</label>
                     <input type="number" class="form-control" id="cbRecibido" value="0" min="0" step="0.01">
                 </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Cliente (opcional)</label>
+                    <select class="form-select" id="cbCliente">
+                        <option value="">Público general</option>
+                    </select>
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label">Nota (opcional)</label>
+                    <textarea class="form-control" id="cbNotas" rows="2" placeholder="Ej. descuento por cliente frecuente"></textarea>
+                </div>
+
                 <div class="d-flex justify-content-between fs-5 fw-bold mt-3 pt-2 border-top">
                     <span>Total</span><span id="cbTotal">C$ 0.00</span>
+                </div>
+                <div class="d-flex justify-content-between mt-1" id="cbCambioRow" style="display:none;">
+                    <span id="cbCambioLabel">Cambio a entregar</span><strong id="cbCambio">C$ 0.00</strong>
                 </div>
             </div>
             <div class="modal-footer">
@@ -143,16 +240,20 @@ let categoriaActiva = '';
 let carritoNuevo = [];   // lo que se va a "enviar" a la cuenta
 let cuenta = { venta: null, detalles: [] };
 let pzProducto = null, pzDatos = null;
+let cbPropinaManual = null; // si el usuario edita la propina a mano (null = automática al 10%)
 
 async function init() {
     await cargarProductos();
     await cargarCuenta();
+    await cargarClientesParaCobro();
     document.getElementById('buscar').addEventListener('input', renderProductos);
     document.getElementById('btnEnviar').addEventListener('click', enviarCarrito);
     document.getElementById('btnCobrar').addEventListener('click', abrirCobrar);
     document.getElementById('btnConfirmarCobro').addEventListener('click', confirmarCobro);
-    ['cbDescuento', 'cbPropina', 'cbRecibido'].forEach(id =>
+    ['cbDescuento', 'cbRecibido'].forEach(id =>
         document.getElementById(id).addEventListener('input', recalcularCobro));
+    document.getElementById('cbPropinaSwitch').addEventListener('change', recalcularCobro);
+    document.getElementById('cbEditarPropinaBtn').addEventListener('click', editarPropinaCobro);
 }
 
 async function cargarProductos() {
@@ -182,7 +283,7 @@ function renderProductos() {
     document.getElementById('prodGrid').innerHTML = lista.map(p => `
         <div class="prod-card ${p.stock<=0?'agotado':''}" onclick="onProdClick(${p.id_producto})">
             <div style="font-size:28px;">🍽️</div>
-            <div class="prod-nombre">${p.nombre}</div>
+            <div class="prod-nombre">${escapeHtml(p.nombre)}</div>
             <div class="prod-precio">C$ ${p.precio_venta.toFixed(2)}</div>
             ${p.tiene_personalizacion ? '<div style="font-size:10px;color:#8d6e63;">✎ personalizable</div>' : ''}
         </div>
@@ -209,12 +310,17 @@ function renderCarritoNuevo() {
     if (!carritoNuevo.length) { cont.innerHTML = '<p class="text-muted small">Toca un producto para agregarlo.</p>'; }
     else {
         cont.innerHTML = carritoNuevo.map(i => `
-            <div class="carrito-item">
-                <span>${i.cantidad}x ${i.nombre}${i.comentario?`<br><small style="color:#e67e22">✎ ${i.comentario}</small>`:''}</span>
-                <span>
-                    C$ ${(i.cantidad*i.precio).toFixed(2)}
-                    <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="quitarDelCarritoNuevo('${i.key}')"><i class="bi bi-x-circle"></i></button>
-                </span>
+            <div class="carrito-item" data-key="${escapeHtml(i.key)}">
+                <span>${escapeHtml(i.nombre)}${i.comentario?`<br><small style="color:#e67e22">✎ ${escapeHtml(i.comentario)}</small>`:''}</span>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="cant-stepper">
+                        <button type="button" onclick="cambiarCantidad(this.closest('.carrito-item').dataset.key, -1)">−</button>
+                        <span class="cant-num" onclick="abrirTeclado(this.closest('.carrito-item').dataset.key)">${i.cantidad}</span>
+                        <button type="button" onclick="cambiarCantidad(this.closest('.carrito-item').dataset.key, 1)">+</button>
+                    </div>
+                    <span>C$ ${(i.cantidad*i.precio).toFixed(2)}</span>
+                    <button class="btn btn-sm btn-link text-danger p-0" onclick="quitarDelCarritoNuevo(this.closest('.carrito-item').dataset.key)"><i class="bi bi-x-circle"></i></button>
+                </div>
             </div>`).join('');
     }
     document.getElementById('btnEnviar').disabled = carritoNuevo.length === 0;
@@ -225,12 +331,59 @@ function quitarDelCarritoNuevo(key) {
     renderCarritoNuevo();
 }
 
+function cambiarCantidad(key, delta) {
+    const item = carritoNuevo.find(i => i.key === key);
+    if (!item) return;
+    item.cantidad += delta;
+    if (item.cantidad <= 0) { quitarDelCarritoNuevo(key); return; }
+    renderCarritoNuevo();
+}
+
+// ---- teclado numérico: para meter de una vez "12x tortilla" en vez de tocar + doce veces ----
+let tkKey = null;
+
+function abrirTeclado(key) {
+    tkKey = key;
+    const item = carritoNuevo.find(i => i.key === key);
+    if (!item) return;
+    document.getElementById('tkTitulo').textContent = item.nombre;
+    document.getElementById('tkDisplay').textContent = String(item.cantidad);
+    new bootstrap.Modal(document.getElementById('modalTeclado')).show();
+}
+
+function tkDigito(d) {
+    const el = document.getElementById('tkDisplay');
+    let actual = el.textContent === '0' ? '' : el.textContent;
+    if (actual.length >= 3) return; // hasta 999
+    el.textContent = actual + d;
+}
+
+function tkBorrar() {
+    const el = document.getElementById('tkDisplay');
+    el.textContent = el.textContent.slice(0, -1) || '0';
+}
+
+function tkLimpiar() {
+    document.getElementById('tkDisplay').textContent = '0';
+}
+
+function tkConfirmar() {
+    const cantidad = parseInt(document.getElementById('tkDisplay').textContent) || 0;
+    const item = carritoNuevo.find(i => i.key === tkKey);
+    if (item) {
+        if (cantidad <= 0) quitarDelCarritoNuevo(tkKey);
+        else { item.cantidad = cantidad; renderCarritoNuevo(); }
+    }
+    bootstrap.Modal.getInstance(document.getElementById('modalTeclado')).hide();
+}
+
 async function enviarCarrito() {
     const items = carritoNuevo.map(i => ({id_producto:i.id_producto, cantidad:i.cantidad, precio:i.precio, excluidos:i.excluidos, opciones:i.opciones, comentario:i.comentario}));
     const btn = document.getElementById('btnEnviar');
     btn.disabled = true;
     try {
-        const r = await fetch(`/mesas/api/${ID_MESA}/agregar`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({items})}).then(r=>r.json());
+        const resp = await fetch(`/mesas/api/${ID_MESA}/agregar`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({items})});
+        const r = await resp.json();
         if (r.success) {
             carritoNuevo = [];
             renderCarritoNuevo();
@@ -240,6 +393,14 @@ async function enviarCarrito() {
         } else {
             Swal.fire({icon:'error', title:'No se pudo agregar', text:r.message});
         }
+    } catch (e) {
+        // Si el pedido en verdad se guardó en el servidor pero algo falló
+        // aquí en el navegador (conexión, respuesta rara, etc.), refrescamos
+        // igual la cuenta para no dejar la pantalla pegada mostrando un
+        // pedido que ya se envió.
+        console.error('Error al enviar a la cuenta:', e);
+        await cargarCuenta();
+        Swal.fire({icon:'warning', title:'Revisa la cuenta', text:'Hubo un problema al confirmar el envío. Revisa si el pedido ya aparece en la cuenta antes de volver a enviarlo.'});
     } finally { btn.disabled = false; }
 }
 
@@ -256,7 +417,7 @@ function renderCuenta() {
     } else {
         cont.innerHTML = detalles.map(d => `
             <div class="cuenta-linea">
-                <span>${d.cantidad}x ${d.producto}${d.comentario?`<small>✎ ${d.comentario}</small>`:''}</span>
+                <span>${d.cantidad}x ${escapeHtml(d.producto)}${d.comentario?`<small>✎ ${escapeHtml(d.comentario)}</small>`:''}</span>
                 <span>
                     C$ ${d.subtotal.toFixed(2)}
                     <button class="btn btn-sm btn-link text-danger p-0 ms-1" onclick="quitarDeLaCuenta(${d.id_detalle_venta})"><i class="bi bi-trash"></i></button>
@@ -280,9 +441,10 @@ async function quitarDeLaCuenta(idDetalle) {
 // Cada grupo de la receta (ej. "Gallopinto o frijoles", "Huevo", "Acompañamiento",
 // "Tortilla o maduro") es un paso independiente. El mesero elige una opción y le
 // da Continuar, o le da Continuar sin elegir nada para OMITIR ese ingrediente
-// por completo (no sale en la comanda de cocina). Al final, si la receta tiene
-// ingredientes que se pueden quitar (ej. cebolla, crema), se muestra un último
-// paso tipo checklist.
+// por completo (no sale en la comanda de cocina). Ademas, CADA ingrediente
+// quitable (ej. cebolla, crema, gallopinto) es su propio paso con dos tarjetas
+// grandes "Con X" / "Sin X" (no un checklist con todo junto): tocar una tarjeta
+// avanza automaticamente al siguiente paso.
 let pzPasos = [];
 let pzIndice = 0;
 let pzSeleccion = {};       // id_grupo -> id_item elegido (o undefined si se omitió)
@@ -296,7 +458,9 @@ async function abrirPersonalizar(p) {
 
     pzPasos = (datos.grupos || []).map(g => ({ tipo: 'grupo', grupo: g }));
     const exc = datos.ingredientes_excluibles || [];
-    if (exc.length) pzPasos.push({ tipo: 'exc', items: exc });
+    // Cada ingrediente quitable es su propio paso (tarjeta "Con" / "Sin"),
+    // no un checklist con todos juntos.
+    exc.forEach(item => pzPasos.push({ tipo: 'exc-item', item }));
 
     if (!pzPasos.length) { agregarAlCarritoNuevo(p, [], [], null); return; }
 
@@ -322,29 +486,42 @@ function pzRenderPaso() {
     if (paso.tipo === 'grupo') {
         const g = paso.grupo;
         const elegido = pzSeleccion[g.id_grupo];
+        // Mismo estilo de tarjetas que los ingredientes quitables. Si el grupo
+        // es un "Con X" / "Sin X" (2 opciones, una empieza con "Sin"), se pinta
+        // verde/rojo igual que esos pasos; si tiene mas opciones (ej. Proteina:
+        // ranchera/jamon/chorizo) se pintan neutras, en cuadricula.
+        const esConSin = g.items.length === 2 && g.items.some(it => /^sin\b/i.test(it.nombre.trim()));
         cont.innerHTML = `
-            <label class="fw-bold d-block mb-2">${g.nombre}</label>
-            <div class="d-grid gap-2">
-                ${g.items.map(it => `
-                    <button type="button" class="btn ${elegido === it.id_item ? 'text-white' : 'btn-outline-secondary'}"
-                        style="text-align:left;${elegido === it.id_item ? 'background:#8B2E2E;border-color:#8B2E2E;' : ''}"
-                        ${!it.disponible ? 'disabled' : ''}
-                        onclick="pzElegir(${g.id_grupo}, ${it.id_item})">
-                        ${elegido === it.id_item ? '✓ ' : ''}${it.nombre}${!it.disponible ? ' (sin stock)' : ''}
-                    </button>`).join('')}
+            <label class="fw-bold d-block mb-2">${escapeHtml(g.nombre)}</label>
+            <div class="pz-opcion-cards" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));">
+                ${g.items.map(it => {
+                    const activa = elegido === it.id_item;
+                    const clase = esConSin ? (/^sin\b/i.test(it.nombre.trim()) ? 'no' : 'si') : '';
+                    return `
+                    <div class="pz-opcion-card ${clase} ${activa ? 'activa' : ''} ${!it.disponible ? 'deshabilitada' : ''}"
+                        onclick="${it.disponible ? `pzElegir(${g.id_grupo}, ${it.id_item})` : ''}">
+                        <div class="pz-check">${activa ? '✓' : ''}</div>
+                        ${escapeHtml(it.nombre)}${!it.disponible ? '<br><small>(sin stock)</small>' : ''}
+                    </div>`;
+                }).join('')}
             </div>
             <p class="text-muted small mt-2 mb-0">Toca una opción, o dale "${esUltimo ? 'Agregar al pedido' : 'Continuar'}" para omitirla.</p>
         `;
     } else {
+        const i = paso.item;
+        const quitado = pzExcluidosSet.has(i.id_producto);
         cont.innerHTML = `
-            <label class="fw-bold d-block mb-2">¿Qué lleva?</label>
-            ${paso.items.map(i => `
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="pz-exc-${i.id_producto}"
-                        ${pzExcluidosSet.has(i.id_producto) ? '' : 'checked'}
-                        onchange="pzToggleExc(${i.id_producto}, this.checked)">
-                    <label class="form-check-label" for="pz-exc-${i.id_producto}">${i.nombre}</label>
-                </div>`).join('')}
+            <label class="fw-bold d-block mb-2">¿Lleva ${escapeHtml(i.nombre)}?</label>
+            <div class="pz-opcion-cards">
+                <div class="pz-opcion-card si ${!quitado ? 'activa' : ''}" onclick="pzElegirExc(${i.id_producto}, true)">
+                    <div class="pz-check">${!quitado ? '✓' : ''}</div>
+                    Con ${escapeHtml(i.nombre)}
+                </div>
+                <div class="pz-opcion-card no ${quitado ? 'activa' : ''}" onclick="pzElegirExc(${i.id_producto}, false)">
+                    <div class="pz-check">${quitado ? '✓' : ''}</div>
+                    Sin ${escapeHtml(i.nombre)}
+                </div>
+            </div>
         `;
     }
 }
@@ -355,9 +532,10 @@ function pzElegir(idGrupo, idItem) {
     pzRenderPaso();
 }
 
-function pzToggleExc(idProducto, marcado) {
-    if (marcado) pzExcluidosSet.delete(idProducto);
+function pzElegirExc(idProducto, incluir) {
+    if (incluir) pzExcluidosSet.delete(idProducto);
     else pzExcluidosSet.add(idProducto);
+    pzSiguiente();
 }
 
 function pzAtras() {
@@ -392,33 +570,107 @@ function pzFinalizarPersonalizacion() {
 }
 
 // ---- cobrar ----
+async function cargarClientesParaCobro() {
+    try {
+        const clientes = await fetch('/ventas/api/clientes').then(r => r.json());
+        const sel = document.getElementById('cbCliente');
+        sel.innerHTML = '<option value="">Público general</option>' +
+            clientes.map(c => `<option value="${c.id_cliente}">${escapeHtml(c.nombre)}</option>`).join('');
+    } catch (e) {
+        console.error('Error cargando clientes', e);
+    }
+}
+
 function abrirCobrar() {
+    document.getElementById('cbMetodo').value = 'Efectivo';
+    document.getElementById('cbRecibido').value = '0';
+    document.getElementById('cbNotas').value = '';
+    document.getElementById('cbCliente').value = '';
+    document.getElementById('cbDescuento').value = '0';
+    document.getElementById('cbPropinaSwitch').checked = true; // 10% activo por defecto
+    cbPropinaManual = null;
     recalcularCobro();
     new bootstrap.Modal(document.getElementById('modalCobrar')).show();
 }
 
+function editarPropinaCobro() {
+    const actual = parseFloat(document.getElementById('cbPropina').value) || 0;
+    const val = prompt('Monto de propina (C$):', actual.toFixed(2));
+    if (val === null) return;
+    const num = parseFloat(val);
+    if (isNaN(num) || num < 0) { showCustomAlert('Monto inválido'); return; }
+    cbPropinaManual = num;
+    document.getElementById('cbPropinaSwitch').checked = true;
+    recalcularCobro();
+}
+
+document.getElementById('cbMetodo').addEventListener('change', recalcularCobro);
+document.getElementById('cbRecibido').addEventListener('input', recalcularCobro);
+
 function recalcularCobro() {
     const subtotal = (cuenta.venta && cuenta.venta.subtotal) || 0;
-    const desc = parseFloat(document.getElementById('cbDescuento').value) || 0;
-    const prop = parseFloat(document.getElementById('cbPropina').value) || 0;
-    const total = Math.max(0, subtotal - desc + prop);
+    let descPct = parseFloat(document.getElementById('cbDescuento').value) || 0;
+    if (descPct < 0) descPct = 0;
+    if (descPct > 100) descPct = 100;
+    const desc = subtotal * (descPct / 100);
+    document.getElementById('cbDescuentoMontoTexto').textContent = desc > 0 ? `− C$ ${desc.toFixed(2)}` : '';
+    const baseTotal = Math.max(0, subtotal - desc);
+
+    const propinaOn = document.getElementById('cbPropinaSwitch').checked;
+    const prop = propinaOn ? (cbPropinaManual !== null ? cbPropinaManual : baseTotal * 0.10) : 0;
+    document.getElementById('cbPropina').value = prop.toFixed(2);
+    document.getElementById('cbPropinaMonto').textContent = 'C$ ' + prop.toFixed(2);
+
+    const total = Math.max(0, baseTotal + prop);
     document.getElementById('cbSubtotal').textContent = 'C$ ' + subtotal.toFixed(2);
     document.getElementById('cbTotal').textContent = 'C$ ' + total.toFixed(2);
+
+    const metodo = document.getElementById('cbMetodo').value;
+    document.getElementById('cbBancoSection').style.display = metodo === 'Tarjeta' ? 'block' : 'none';
+    document.getElementById('cbEfectivoSection').style.display = metodo === 'Efectivo' ? 'block' : 'none';
+
+    const filaCambio = document.getElementById('cbCambioRow');
+    const btnConfirmar = document.getElementById('btnConfirmarCobro');
+    if (metodo === 'Efectivo') {
+        const recibido = parseFloat(document.getElementById('cbRecibido').value) || 0;
+        const diferencia = recibido - total;
+        document.getElementById('cbCambioLabel').textContent = diferencia < 0 ? 'Falta' : 'Cambio a entregar';
+        document.getElementById('cbCambio').textContent = 'C$ ' + Math.abs(diferencia).toFixed(2);
+        document.getElementById('cbCambio').style.color = diferencia < 0 ? '#c0392b' : '#1e7e34';
+        filaCambio.style.display = 'flex';
+        if (btnConfirmar) btnConfirmar.disabled = diferencia < 0;
+    } else {
+        filaCambio.style.display = 'none';
+        if (btnConfirmar) btnConfirmar.disabled = false;
+    }
 }
 
 async function confirmarCobro() {
+    let metodoPago = document.getElementById('cbMetodo').value;
+    if (metodoPago === 'Tarjeta') {
+        const banco = document.querySelector('input[name="cbBanco"]:checked').value;
+        metodoPago = `Tarjeta ${banco}`;
+    }
+    const subtotal = (cuenta.venta && cuenta.venta.subtotal) || 0;
+    let descPct = parseFloat(document.getElementById('cbDescuento').value) || 0;
+    if (descPct < 0) descPct = 0;
+    if (descPct > 100) descPct = 100;
+
     const payload = {
-        metodo_pago: document.getElementById('cbMetodo').value,
-        descuento: parseFloat(document.getElementById('cbDescuento').value) || 0,
+        metodo_pago: metodoPago,
+        descuento: subtotal * (descPct / 100),
         propina: parseFloat(document.getElementById('cbPropina').value) || 0,
         monto_recibido: parseFloat(document.getElementById('cbRecibido').value) || 0,
+        id_cliente: document.getElementById('cbCliente').value || null,
+        notas: document.getElementById('cbNotas').value,
     };
     const btn = document.getElementById('btnConfirmarCobro');
     btn.disabled = true;
     try {
         const r = await fetch(`/mesas/api/${ID_MESA}/cobrar`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}).then(r=>r.json());
         if (r.success) {
-            await Swal.fire({icon:'success', title:'Cobrado', text:'Venta #'+r.numero_venta});
+            const cambioTxt = r.cambio > 0 ? `\nCambio: C$ ${r.cambio.toFixed(2)}` : '';
+            await Swal.fire({icon:'success', title:'Cobrado', text:`Venta #${r.numero_venta}${cambioTxt}`});
             window.location.href = '/mesas/';
         } else {
             Swal.fire({icon:'error', title:'No se pudo cobrar', text:r.message});

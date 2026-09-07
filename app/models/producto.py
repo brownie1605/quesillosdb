@@ -25,7 +25,7 @@ class Producto(db.Model):
     id_producto = db.Column(db.Integer, primary_key=True)
     id_empresa = db.Column(db.Integer, nullable=True)
     id_categoria = db.Column(db.Integer, nullable=True)
-    id_marca = db.Column(db.Integer, nullable=True)
+    id_proveedor = db.Column(db.Integer, db.ForeignKey("proveedores.id_proveedor"), nullable=True)
     id_unidad = db.Column(db.Integer, nullable=True)
     codigo = db.Column(db.String(80))
     codigo_barra = db.Column(db.String(100))
@@ -45,6 +45,10 @@ class Producto(db.Model):
     es_receta = db.Column(db.Boolean, default=False)
     es_ingrediente_receta = db.Column(db.Boolean, default=False)
     se_vende = db.Column(db.Boolean, default=True)
+
+    # A que impresora de cocina/barra sale este producto en la comanda.
+    # NULL = no imprime en ninguna (ej. un material que no se vende).
+    impresora = db.Column(db.Enum("quesillo", "cocina", "bebidas"), nullable=True)
 
     estado = db.Column(db.Enum("activo", "inactivo"), default="activo")
     fecha_creacion = db.Column(db.DateTime, default=nicaragua_now)
@@ -74,7 +78,8 @@ class Producto(db.Model):
         return {
             "id_producto": self.id_producto,
             "id_categoria": self.id_categoria,
-            "id_marca": self.id_marca,
+            "id_proveedor": self.id_proveedor,
+            "impresora": self.impresora,
             "id_unidad": self.id_unidad,
             "codigo": self.codigo,
             "codigo_barra": self.codigo_barra,

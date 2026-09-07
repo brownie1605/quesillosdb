@@ -96,6 +96,7 @@ def api_resumen_financiero():
 
         query_ventas = text("""
             SELECT COALESCE(SUM(v.total), 0) as total_vendido,
+                   COALESCE(SUM(v.propina), 0) as total_propinas,
                    COALESCE(SUM((SELECT SUM(dv.cantidad * p.precio_compra) FROM detalle_ventas dv JOIN productos p ON dv.id_producto = p.id_producto WHERE dv.id_venta = v.id_venta)), 0) as costo_total,
                    COUNT(*) as cantidad_ventas
             FROM ventas v
@@ -103,7 +104,11 @@ def api_resumen_financiero():
             AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
         """)
         fila = db.session.execute(query_ventas, {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}).fetchone()
-        total_vendido = float(fila.total_vendido or 0)
+        # `total` de la venta incluye la propina (es lo que el cliente pago),
+        # pero la propina es del personal, no ingreso del negocio -- se
+        # separa aqui para que no infle ni la ganancia bruta ni la neta.
+        total_propinas = float(fila.total_propinas or 0)
+        total_vendido = float(fila.total_vendido or 0) - total_propinas
         costo_total = float(fila.costo_total or 0)
         cantidad_ventas = int(fila.cantidad_ventas or 0)
 
@@ -117,20 +122,167 @@ def api_resumen_financiero():
         ganancia_bruta = total_vendido - costo_total
         ganancia_neta = ganancia_bruta - total_gastos
 
+        # Total de unidades de producto vendidas en el rango.
+        query_unidades = text("""
+            SELECT COALESCE(SUM(dv.cantidad), 0)
+            FROM detalle_ventas dv
+            JOIN ventas v ON dv.id_venta = v.id_venta
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada'
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+        """)
+        total_productos = float(db.session.execute(
+            query_unidades, {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}
+        ).scalar() or 0)
+
+        # Mesa mas cotizada: la que mas ingresos genero en el rango (excluye
+        # ventas de mostrador/POS directo, que no tienen mesa).
+        query_mesa = text("""
+            SELECT m.nombre, SUM(v.total) as total_mesa, COUNT(*) as num_ventas
+            FROM ventas v
+            JOIN mesas m ON v.id_mesa = m.id_mesa
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada' AND v.id_mesa IS NOT NULL
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            GROUP BY m.id_mesa
+            ORDER BY total_mesa DESC
+            LIMIT 1
+        """)
+        fila_mesa = db.session.execute(
+            query_mesa, {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}
+        ).fetchone()
+        mesa_top = (
+            {"nombre": fila_mesa.nombre, "total": float(fila_mesa.total_mesa or 0), "ventas": int(fila_mesa.num_ventas or 0)}
+            if fila_mesa else None
+        )
+
+        # Producto mas popular: el que mas UNIDADES vendio (no ingresos).
+        query_producto = text("""
+            SELECT p.nombre, SUM(dv.cantidad) as cantidad, SUM(dv.subtotal) as ingresos
+            FROM detalle_ventas dv
+            JOIN productos p ON dv.id_producto = p.id_producto
+            JOIN ventas v ON dv.id_venta = v.id_venta
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada'
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            GROUP BY p.id_producto
+            ORDER BY cantidad DESC
+            LIMIT 1
+        """)
+        fila_prod = db.session.execute(
+            query_producto, {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}
+        ).fetchone()
+        producto_top = (
+            {"nombre": fila_prod.nombre, "cantidad": float(fila_prod.cantidad or 0), "ingresos": float(fila_prod.ingresos or 0)}
+            if fila_prod else None
+        )
+
         return jsonify({
             "success": True,
             "inicio": fecha_inicio,
             "fin": fecha_fin,
             "total_vendido": total_vendido,
+            "total_propinas": total_propinas,
             "cantidad_ventas": cantidad_ventas,
             "ticket_promedio": (total_vendido / cantidad_ventas) if cantidad_ventas else 0.0,
             "costo_productos": costo_total,
             "ganancia_bruta": ganancia_bruta,
             "gastos_varios": total_gastos,
             "ganancia_neta": ganancia_neta,
-            "margen_pct": (ganancia_neta / total_vendido * 100) if total_vendido else 0.0
+            "margen_pct": (ganancia_neta / total_vendido * 100) if total_vendido else 0.0,
+            "total_productos_vendidos": total_productos,
+            "mesa_top": mesa_top,
+            "producto_top": producto_top,
         })
     except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@reporte_bp.route("/api/propinas", methods=["GET"])
+@login_required
+def api_propinas():
+    """Control de propinas del rango: total, desglose por metodo de pago
+    (efectivo/tarjeta/transferencia), serie diaria para grafico y el
+    detalle factura por factura para la lista. La propina NUNCA cuenta
+    como ganancia del negocio -- ver api_resumen_financiero."""
+    try:
+        inicio = request.args.get('inicio')
+        fin = request.args.get('fin')
+        if inicio and fin:
+            fecha_inicio, fecha_fin = inicio, fin
+        else:
+            hoy = nicaragua_now().date()
+            fecha_inicio = str(hoy - timedelta(days=6))
+            fecha_fin = str(hoy)
+        params = {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}
+
+        # Se agrupa "Tarjeta BAC"/"Tarjeta BANPRO"/etc bajo "Tarjeta": al
+        # cliente y al mesero les importa efectivo vs. no-efectivo, no el banco.
+        query_metodo = text("""
+            SELECT
+                CASE
+                    WHEN metodo_pago LIKE 'Tarjeta%' THEN 'Tarjeta'
+                    WHEN metodo_pago = 'Efectivo' THEN 'Efectivo'
+                    ELSE 'Otro'
+                END as metodo,
+                COALESCE(SUM(propina), 0) as total,
+                COUNT(*) as cantidad
+            FROM ventas
+            WHERE id_empresa = :empresa AND estado = 'completada' AND propina > 0
+            AND DATE(fecha_venta) >= :inicio AND DATE(fecha_venta) <= :fin
+            GROUP BY metodo
+        """)
+        por_metodo = [
+            {"metodo": row.metodo, "total": float(row.total or 0), "cantidad": int(row.cantidad or 0)}
+            for row in db.session.execute(query_metodo, params).fetchall()
+        ]
+        total_propinas = sum(m["total"] for m in por_metodo)
+
+        query_diaria = text("""
+            SELECT DATE(fecha_venta) as fecha, COALESCE(SUM(propina), 0) as total
+            FROM ventas
+            WHERE id_empresa = :empresa AND estado = 'completada' AND propina > 0
+            AND DATE(fecha_venta) >= :inicio AND DATE(fecha_venta) <= :fin
+            GROUP BY DATE(fecha_venta)
+            ORDER BY fecha ASC
+        """)
+        serie_diaria = [
+            {"fecha": row.fecha.strftime("%d/%m") if hasattr(row.fecha, "strftime") else str(row.fecha),
+             "total": float(row.total or 0)}
+            for row in db.session.execute(query_diaria, params).fetchall()
+        ]
+
+        query_lista = text("""
+            SELECT v.numero_venta, v.fecha_venta, v.metodo_pago, v.propina, v.total,
+                   m.nombre as mesa_nombre, u.nombre_completo as mesero
+            FROM ventas v
+            LEFT JOIN mesas m ON v.id_mesa = m.id_mesa
+            LEFT JOIN usuarios u ON v.id_usuario = u.id_usuario
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada' AND v.propina > 0
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            ORDER BY v.fecha_venta DESC
+            LIMIT 200
+        """)
+        lista = [
+            {
+                "numero_venta": row.numero_venta,
+                "fecha": row.fecha_venta.strftime("%Y-%m-%d %H:%M") if row.fecha_venta else "",
+                "metodo_pago": row.metodo_pago,
+                "propina": float(row.propina or 0),
+                "total": float(row.total or 0),
+                "mesa": row.mesa_nombre,
+                "mesero": row.mesero,
+            }
+            for row in db.session.execute(query_lista, params).fetchall()
+        ]
+
+        return jsonify({
+            "success": True,
+            "inicio": fecha_inicio,
+            "fin": fecha_fin,
+            "total_propinas": total_propinas,
+            "por_metodo": por_metodo,
+            "serie_diaria": serie_diaria,
+            "lista": lista,
+        })
+    except Exception as e:  # noqa: BLE001
         return jsonify({"success": False, "message": str(e)}), 500
 
 

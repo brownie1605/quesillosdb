@@ -1,32 +1,25 @@
 // productos.js
 let productosList = [];
 let categoriasList = [];
-let marcasList = [];
 let unidadesList = [];
 let proveedoresList = [];
+const pagProductos = crearPaginador('paginacionProductos', 20);
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarSelects();
     cargarProductos();
 
     // Filtros
-    document.getElementById('searchInput').addEventListener('input', renderizarTabla);
-    document.getElementById('tipoFilter').addEventListener('change', renderizarTabla);
-    document.getElementById('catFilter').addEventListener('change', renderizarTabla);
-    document.getElementById('estadoFilter').addEventListener('change', renderizarTabla);
-    document.getElementById('impuestoFilter').addEventListener('change', renderizarTabla);
+    const reiniciarYRenderizar = () => { pagProductos.reset(); renderizarTabla(); };
+    document.getElementById('searchInput').addEventListener('input', reiniciarYRenderizar);
+    document.getElementById('tipoFilter').addEventListener('change', reiniciarYRenderizar);
+    document.getElementById('catFilter').addEventListener('change', reiniciarYRenderizar);
+    document.getElementById('estadoFilter').addEventListener('change', reiniciarYRenderizar);
+    document.getElementById('impuestoFilter').addEventListener('change', reiniciarYRenderizar);
 
     // Botones de Modales
     document.getElementById('btnNuevoProducto').addEventListener('click', abrirModalCrear);
     document.getElementById('btnCerrarModalProducto').addEventListener('click', cerrarModalProducto);
-    document.getElementById('btnCerrarModalEntrada').addEventListener('click', cerrarModalEntrada);
-    document.getElementById('btnNuevaMarca').addEventListener('click', () => {
-        document.getElementById('formNuevaMarca').reset();
-        document.getElementById('modalNuevaMarca').style.display = 'flex';
-    });
-    document.getElementById('btnCerrarModalMarca').addEventListener('click', () => {
-        document.getElementById('modalNuevaMarca').style.display = 'none';
-    });
     document.getElementById('btnNuevaCategoria').addEventListener('click', () => {
         document.getElementById('formNuevaCategoria').reset();
         document.getElementById('modalNuevaCategoria').style.display = 'flex';
@@ -45,8 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Formularios
     document.getElementById('formProducto').addEventListener('submit', guardarProducto);
-    document.getElementById('formEntrada').addEventListener('submit', guardarEntrada);
-    document.getElementById('formNuevaMarca').addEventListener('submit', guardarNuevaMarca);
 
     // Preview de imagen al seleccionar archivo
     document.getElementById('prod_imagen').addEventListener('change', function() {
@@ -63,15 +54,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function cargarSelects() {
     try {
-        const [catRes, marRes, uniRes, provRes] = await Promise.all([
+        const [catRes, uniRes, provRes] = await Promise.all([
             fetch('/productos/api/categorias'),
-            fetch('/productos/api/marcas'),
             fetch('/productos/api/unidades'),
-            fetch('/proveedores/api/list')
+            fetch('/productos/api/proveedores')
         ]);
 
         categoriasList = await catRes.json();
-        marcasList = await marRes.json();
         unidadesList = await uniRes.json();
         proveedoresList = await provRes.json();
 
@@ -84,13 +73,10 @@ async function cargarSelects() {
             prodCategoria.innerHTML += `<option value="${c.id_categoria}">${c.nombre}</option>`;
         });
 
-        // Marca va ligada a un Proveedor: mostramos "Marca — Proveedor" para
-        // que quede claro a quien comprarle cuando se repone stock.
-        const prodMarca = document.getElementById('prod_marca');
-        prodMarca.innerHTML = '<option value="">Sin Marca</option>';
-        marcasList.forEach(m => {
-            const etiqueta = m.proveedor_nombre ? `${m.nombre} — ${m.proveedor_nombre}` : m.nombre;
-            prodMarca.innerHTML += `<option value="${m.id_marca}">${etiqueta}</option>`;
+        const prodProveedor = document.getElementById('prod_proveedor');
+        prodProveedor.innerHTML = '<option value="">Sin Proveedor</option>';
+        proveedoresList.forEach(p => {
+            prodProveedor.innerHTML += `<option value="${p.id_proveedor}">${p.nombre}</option>`;
         });
 
         const prodUnidad = document.getElementById('prod_unidad');
@@ -98,14 +84,6 @@ async function cargarSelects() {
         unidadesList.forEach(u => {
             prodUnidad.innerHTML += `<option value="${u.id_unidad}">${u.nombre} (${u.abreviatura})</option>`;
         });
-
-        const nuevaMarcaProveedor = document.getElementById('nueva_marca_proveedor');
-        if (nuevaMarcaProveedor) {
-            nuevaMarcaProveedor.innerHTML = '<option value="">Sin proveedor</option>';
-            proveedoresList.forEach(p => {
-                nuevaMarcaProveedor.innerHTML += `<option value="${p.id_proveedor}">${p.nombre}</option>`;
-            });
-        }
 
     } catch (error) {
         console.error("Error cargando selects:", error);
@@ -141,16 +119,16 @@ function renderizarTabla() {
         return matchSearch && matchTipo && matchCat && matchEstado && matchImpuesto;
     });
     
-    filtrados.forEach(p => {
+    pagProductos.paginar(filtrados, renderizarTabla).forEach(p => {
         const tr = document.createElement('tr');
         
-        let badgeClass = p.estado === 'activo' ? 'badge-active' : 'badge-inactive';
         let stockStyle = p.stock <= 0 ? 'color: red; font-weight: bold;' : '';
         let imgHtml = p.imagen_url
             ? `<img src="${p.imagen_url}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #e1e7f0;">`
             : `<span style="font-size: 26px;">📦</span>`;
-        
+
         const tipoChip = {final: 'final', insumo: 'insumo', material: 'material'}[p.tipo_producto] || 'final';
+
         tr.innerHTML = `
             <td>${imgHtml}</td>
             <td>${p.codigo || '-'}</td>
@@ -160,11 +138,14 @@ function renderizarTabla() {
             <td>C$ ${p.precio_compra.toFixed(2)}</td>
             <td>C$ ${p.precio_venta.toFixed(2)}</td>
             <td style="${stockStyle}">${p.stock}</td>
-            <td><span class="badge ${badgeClass}">${p.estado}</span></td>
+            <td>
+                <select class="form-control estado-select ${p.estado === 'activo' ? 'badge-active' : 'badge-inactive'}" style="padding: 4px 6px; font-size: 12px; width: auto;" data-id="${p.id_producto}" data-anterior="${p.estado}" onchange="cambiarEstadoProducto(this)">
+                    <option value="activo" ${p.estado === 'activo' ? 'selected' : ''}>Activo</option>
+                    <option value="inactivo" ${p.estado === 'inactivo' ? 'selected' : ''}>Inactivo</option>
+                </select>
+            </td>
             <td>
                 <button class="btn-icon" onclick="abrirModalEditar(${p.id_producto})" title="Editar">✏️</button>
-                <button class="btn-icon" style="color: #28a745;" onclick="abrirModalEntrada(${p.id_producto}, '${p.nombre.replace(/'/g, "\\'")}')" title="Ingresar Stock">➕</button>
-                <button class="btn-icon delete" onclick="eliminarProducto(${p.id_producto})" title="Eliminar">🗑️</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -224,7 +205,8 @@ function abrirModalEditar(id) {
     document.getElementById('prod_descripcion').value = p.descripcion || '';
     document.getElementById('prod_tipo_producto').value = p.tipo_producto || 'final';
     document.getElementById('prod_categoria').value = p.id_categoria || '';
-    document.getElementById('prod_marca').value = p.id_marca || '';
+    document.getElementById('prod_proveedor').value = p.id_proveedor || '';
+    document.getElementById('prod_impresora').value = p.impresora || '';
     document.getElementById('prod_unidad').value = p.id_unidad || '';
     document.getElementById('prod_precio_compra').value = p.precio_compra.toFixed(2);
     document.getElementById('prod_precio_venta').value = p.precio_venta.toFixed(2);
@@ -264,7 +246,8 @@ async function guardarProducto(e) {
     formData.append('descripcion', document.getElementById('prod_descripcion').value);
     formData.append('tipo_producto', document.getElementById('prod_tipo_producto').value);
     formData.append('id_categoria', document.getElementById('prod_categoria').value);
-    formData.append('id_marca', document.getElementById('prod_marca').value);
+    formData.append('id_proveedor', document.getElementById('prod_proveedor').value);
+    formData.append('impresora', document.getElementById('prod_impresora').value);
     formData.append('id_unidad', document.getElementById('prod_unidad').value);
     formData.append('precio_compra', document.getElementById('prod_precio_compra').value);
     formData.append('precio_venta', document.getElementById('prod_precio_venta').value);
@@ -296,69 +279,6 @@ async function guardarProducto(e) {
     }
 }
 
-// --- MODAL ENTRADA STOCK ---
-
-function abrirModalEntrada(id, nombre) {
-    document.getElementById('entrada_prod_id').value = id;
-    document.getElementById('entradaProductName').textContent = "Ingresando stock a: " + nombre;
-    document.getElementById('entrada_cantidad').value = '';
-    document.getElementById('modalEntrada').style.display = 'flex';
-}
-
-function cerrarModalEntrada() {
-    document.getElementById('modalEntrada').style.display = 'none';
-}
-
-async function guardarEntrada(e) {
-    e.preventDefault();
-    
-    const id = document.getElementById('entrada_prod_id').value;
-    const cantidad = document.getElementById('entrada_cantidad').value;
-    
-    try {
-        const response = await fetch(`/productos/api/entrada/${id}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({cantidad: cantidad})
-        });
-        const result = await response.json();
-        if (result.success) {
-            cerrarModalEntrada();
-            cargarProductos(); // Refrescar para ver el nuevo stock
-        } else {
-            showCustomAlert('Error al ingresar stock: ' + result.message);
-        }
-    } catch (error) {
-        console.error("Error en entrada de stock:", error);
-        showCustomAlert('Ocurrió un error en el servidor');
-    }
-}
-
-async function guardarNuevaMarca(e) {
-    e.preventDefault();
-
-    const nombre = document.getElementById('nueva_marca_nombre').value;
-    const id_proveedor = document.getElementById('nueva_marca_proveedor').value || null;
-
-    try {
-        const response = await fetch(`/productos/api/marcas/crear`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({nombre: nombre, id_proveedor: id_proveedor})
-        });
-        const result = await response.json();
-        if (result.success) {
-            document.getElementById('modalNuevaMarca').style.display = 'none';
-            cargarSelects(); // Reload selects to show the new brand
-        } else {
-            showCustomAlert('Error al crear marca: ' + result.message);
-        }
-    } catch (error) {
-        console.error("Error al crear marca:", error);
-        showCustomAlert('Ocurrió un error en el servidor');
-    }
-}
-
 async function guardarNuevaCategoria(e) {
     e.preventDefault();
 
@@ -383,23 +303,42 @@ async function guardarNuevaCategoria(e) {
     }
 }
 
-// --- ELIMINAR ---
+// --- ESTADO (activo/inactivo) ---
 
-async function eliminarProducto(id) {
-    showCustomConfirm('¿Está seguro de eliminar (desactivar) este producto?', async () => {
+function cambiarEstadoProducto(select) {
+    const id = select.dataset.id;
+    const anterior = select.dataset.anterior;
+    const nuevo = select.value;
+    if (nuevo === anterior) return;
+
+    // showCustomConfirm no tiene callback de "cancelar": el select se
+    // regresa al valor anterior de inmediato y solo se aplica el cambio
+    // (visual + API) si el usuario confirma.
+    select.value = anterior;
+
+    const accion = nuevo === 'activo' ? 'activar' : 'desactivar';
+    showCustomConfirm(`¿Está seguro de ${accion} este producto?`, async () => {
         try {
-            const response = await fetch(`/productos/api/eliminar/${id}`, {
-                method: 'DELETE'
+            const response = await fetch(`/productos/api/estado/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({estado: nuevo})
             });
             const result = await response.json();
             if (result.success) {
-                cargarProductos();
+                select.value = nuevo;
+                select.dataset.anterior = nuevo;
+                select.classList.toggle('badge-active', nuevo === 'activo');
+                select.classList.toggle('badge-inactive', nuevo === 'inactivo');
+                const idx = productosList.findIndex(p => p.id_producto == id);
+                if (idx !== -1) productosList[idx].estado = nuevo;
             } else {
-                showCustomAlert('Error al eliminar: ' + result.message);
+                showCustomAlert('Error al cambiar estado: ' + result.message);
             }
         } catch (error) {
-            console.error("Error al eliminar:", error);
+            console.error("Error al cambiar estado:", error);
             showCustomAlert('Ocurrió un error en el servidor');
         }
     });
 }
+

@@ -3,7 +3,7 @@
 {% block page_title %}Configuración{% endblock %}
 
 {% block content %}
-<div style="display: grid; grid-template-columns: {% if current_user.rol.nombre == 'Administrador' %}1fr 1fr{% else %}1fr{% endif %}; gap: 20px;">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
     <!-- Preferencias -->
     <div class="panel" style="padding: 20px;">
         <h3>Preferencias del Sistema</h3>
@@ -54,12 +54,11 @@
         </div>
     </div>
 
-    {% if current_user.rol.nombre == 'Administrador' %}
     <!-- Seguridad -->
     <div class="panel" style="padding: 20px;">
         <h3>Seguridad</h3>
         <hr style="border: 1px solid #eee; margin-bottom: 20px;">
-        
+
         <form id="formPassword">
             <div style="margin-bottom: 15px;">
                 <label>Contraseña Actual</label>
@@ -73,11 +72,51 @@
                 <label>Confirmar Nueva Contraseña</label>
                 <input type="password" id="pass_confirmar" class="form-control" style="width: 100%;" required>
             </div>
-            
+
             <button type="submit" class="btn btn-primary" style="width: 100%;">Actualizar Contraseña</button>
         </form>
+
+        <hr style="border: 1px solid #eee; margin: 24px 0 20px;">
+
+        <h4 style="margin: 0 0 4px;">Verificación en dos pasos (2FA)</h4>
+        <p style="font-size: 13px; color: #6a768d; margin: 0 0 15px;">Con esto activo, además de tu contraseña te va a pedir un código de 6 dígitos de una app como Google Authenticator cada vez que inicies sesión.</p>
+
+        <div id="twofaOff">
+            <button type="button" id="btn2faIniciar" class="btn btn-primary" style="width: 100%;">Activar 2FA</button>
+        </div>
+
+        <div id="twofaOn" style="display: none;">
+            <p style="color: #1e7e34; font-weight: 600;">✓ El 2FA está activado en tu cuenta.</p>
+            <div style="margin-bottom: 10px;">
+                <label>Confirma tu contraseña para desactivarlo</label>
+                <input type="password" id="twofa_pass_desactivar" class="form-control" style="width: 100%;">
+            </div>
+            <button type="button" id="btn2faDesactivar" class="btn" style="width: 100%; background: #e0e0e0; color: #333;">Desactivar 2FA</button>
+        </div>
+
+        <!-- Paso 1: escanear QR -->
+        <div id="twofaSetup" style="display: none; margin-top: 15px; border: 1px solid #e1e7f0; border-radius: 8px; padding: 15px;">
+            <p style="font-size: 13px;">1. Escanea este código con tu app de autenticación:</p>
+            <div style="text-align: center; margin-bottom: 10px;">
+                <img id="twofaQr" src="" alt="Código QR" style="max-width: 200px;">
+            </div>
+            <p style="font-size: 11.5px; color: #6a768d;">¿No puedes escanear? Ingresa esta clave a mano: <code id="twofaSecreto"></code></p>
+            <p style="font-size: 13px; margin-top: 12px;">2. Escribe el código de 6 dígitos que te muestra la app:</p>
+            <input type="text" id="twofa_codigo" class="form-control" maxlength="6" inputmode="numeric" placeholder="000000" style="width: 100%; margin-bottom: 10px; text-align: center; letter-spacing: 4px; font-size: 18px;">
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="btn2faCancelar" class="btn" style="flex:1; background: #e0e0e0; color: #333;">Cancelar</button>
+                <button type="button" id="btn2faConfirmar" class="btn btn-primary" style="flex:1;">Confirmar</button>
+            </div>
+        </div>
+
+        <!-- Codigos de recuperacion (se muestran UNA sola vez) -->
+        <div id="twofaRecovery" style="display: none; margin-top: 15px; border: 1px solid #ffc107; background: #fff8e1; border-radius: 8px; padding: 15px;">
+            <p style="font-weight: 600; margin-top: 0;">⚠️ Guarda estos códigos de recuperación</p>
+            <p style="font-size: 12.5px; color: #6a768d;">Si pierdes tu teléfono, cualquiera de estos códigos te deja entrar una sola vez cada uno. No se van a volver a mostrar.</p>
+            <div id="twofaRecoveryLista" style="font-family: monospace; font-size: 14px; line-height: 1.8;"></div>
+            <button type="button" id="btn2faRecoveryListo" class="btn btn-primary" style="width: 100%; margin-top: 12px;">Ya los guardé</button>
+        </div>
     </div>
-    {% endif %}
 </div>
 
 <!-- Modal de Selección de Colores -->

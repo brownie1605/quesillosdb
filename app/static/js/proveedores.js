@@ -1,9 +1,10 @@
 let proveedoresList = [];
+const pagProveedores = crearPaginador('paginacionProveedores', 20);
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarProveedores();
 
-    document.getElementById('searchInput').addEventListener('input', renderizarTabla);
+    document.getElementById('searchInput').addEventListener('input', () => { pagProveedores.reset(); renderizarTabla(); });
 
     document.getElementById('btnNuevoProveedor').addEventListener('click', () => {
         document.getElementById('modalProveedorTitle').textContent = 'Nuevo Proveedor';
@@ -42,14 +43,14 @@ function renderizarTabla() {
                (p.telefono && p.telefono.toLowerCase().includes(q));
     });
 
-    filtrados.forEach(p => {
+    pagProveedores.paginar(filtrados, renderizarTabla).forEach(p => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${p.nombre}</td>
-            <td>${p.ruc || '-'}</td>
-            <td>${p.telefono || '-'}</td>
-            <td>${p.correo || '-'}</td>
-            <td>${p.direccion || '-'}</td>
+            <td>${escapeHtml(p.nombre)}</td>
+            <td>${escapeHtml(p.ruc) || '-'}</td>
+            <td>${escapeHtml(p.telefono) || '-'}</td>
+            <td>${escapeHtml(p.correo) || '-'}</td>
+            <td>${escapeHtml(p.direccion) || '-'}</td>
             <td><span class="badge badge-active">Activo</span></td>
             <td>
                 <button class="btn-icon" onclick="editarProveedor(${p.id_proveedor})">✏️</button>

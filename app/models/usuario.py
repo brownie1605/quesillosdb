@@ -37,6 +37,20 @@ class Usuario(UserMixin, db.Model):
     # Recuperacion de contrasena por codigo de 6 digitos enviado al correo
     codigo_recuperacion = db.Column(db.String(6), nullable=True)
     codigo_expiry = db.Column(db.DateTime, nullable=True)
+    intentos_codigo = db.Column(db.Integer, nullable=False, default=0)
+
+    # Bloqueo temporal por intentos fallidos de login (distinto de
+    # `estado='bloqueado'`, que es un bloqueo manual y permanente del Admin).
+    intentos_fallidos = db.Column(db.Integer, nullable=False, default=0)
+    bloqueado_hasta = db.Column(db.DateTime, nullable=True)
+
+    # 2FA (TOTP, ej. Google Authenticator). totp_secret solo se guarda una
+    # vez CONFIRMADO (ver TwoFAService) -- mientras se esta activando, el
+    # secreto pendiente vive solo en la sesion, nunca a medias en la BD.
+    totp_secret = db.Column(db.String(64), nullable=True)
+    totp_habilitado = db.Column(db.Boolean, nullable=False, default=False)
+    totp_recovery_codes = db.Column(db.Text, nullable=True)  # JSON: lista de codigos ya hasheados
+
     estado_sync = db.Column(db.Enum("pendiente", "sinc_local", "sinc_remoto"), default="pendiente")
 
     empresa = db.relationship("Empresa", lazy=True)

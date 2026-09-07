@@ -50,22 +50,19 @@ class CajaService:
 
     # -----------------------------------------------------------------
     @staticmethod
-    def registrar_movimiento(usuario, tipo_movimiento, monto, descripcion=None, referencia=None):
+    def exigir_abierta():
+        """Usado antes de cobrar: sin turno abierto, no se puede vender.
+
+        Los ingresos/egresos manuales de caja se quitaron del sistema (quedaban
+        redundantes con el registro de ventas); `MovimientoCaja` se conserva solo
+        por los turnos historicos ya cerrados, no se crean filas nuevas.
+        """
         apertura = CajaService.apertura_actual()
         if not apertura:
-            raise CajaError("No hay un turno de caja abierto")
-        mov = MovimientoCaja(
-            id_apertura=apertura.id_apertura,
-            id_usuario=usuario.id_usuario,
-            tipo_movimiento=tipo_movimiento,
-            monto=Decimal(str(monto)),
-            descripcion=descripcion,
-            referencia=referencia,
-            fecha_movimiento=nicaragua_now(),
-        )
-        db.session.add(mov)
-        db.session.commit()
-        return mov
+            raise CajaError(
+                "No hay un turno de caja abierto. Un cajero debe abrir caja antes de poder cobrar."
+            )
+        return apertura
 
     # -----------------------------------------------------------------
     @staticmethod
@@ -105,7 +102,11 @@ class CajaService:
 
     # -----------------------------------------------------------------
     @staticmethod
-    def cerrar_turno(usuario, monto_real, observacion=None):
+    def cerrar_turno(usuario, monto_real, observacion=None, detalle_conteo=None, tipo_cambio=None):
+        """`detalle_conteo`: dict con el arqueo fisico por denominacion
+        (cordobas y dolares), tal como lo arma el formulario de cierre --
+        se guarda tal cual para auditoria, no se reinterpreta aqui. `monto_real`
+        ya debe venir sumado en cordobas (dolares convertidos con `tipo_cambio`)."""
         apertura = CajaService.apertura_actual()
         if not apertura:
             raise CajaError("No hay un turno de caja abierto")
@@ -125,6 +126,8 @@ class CajaService:
             monto_real=monto_real,
             diferencia=diferencia,
             observacion=observacion,
+            detalle_conteo=detalle_conteo,
+            tipo_cambio=Decimal(str(tipo_cambio)) if tipo_cambio not in (None, "") else None,
             fecha_cierre=nicaragua_now(),
         )
         db.session.add(cierre)

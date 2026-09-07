@@ -1,17 +1,13 @@
 let inventarioList = [];
+const pagInventario = crearPaginador('paginacionInventario', 20);
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarInventario();
 
-    document.getElementById('searchInput').addEventListener('input', renderizarTabla);
-    document.getElementById('stockFilter').addEventListener('change', renderizarTabla);
+    const reiniciarYRenderizar = () => { pagInventario.reset(); renderizarTabla(); };
+    document.getElementById('searchInput').addEventListener('input', reiniciarYRenderizar);
+    document.getElementById('stockFilter').addEventListener('change', reiniciarYRenderizar);
     document.getElementById('btnExportarExcel').addEventListener('click', exportarExcel);
-
-    document.getElementById('btnCerrarModalStock').addEventListener('click', () => {
-        document.getElementById('modalStock').style.display = 'none';
-    });
-
-    document.getElementById('formStock').addEventListener('submit', guardarAjusteStock);
 });
 
 async function cargarInventario() {
@@ -41,10 +37,14 @@ function renderizarTabla() {
                (p.codigo && p.codigo.toLowerCase().includes(q));
     });
 
+    // El total del KPI y el filtro de stock deben reflejar TODO lo filtrado,
+    // no solo la pagina visible -- por eso se calcula antes de paginar.
     let totalUnidades = 0;
+    filtrados.forEach(p => { totalUnidades += parseFloat(p.stock_actual); });
+    const kpi = document.getElementById('kpiTotalInventario');
+    if (kpi) kpi.textContent = totalUnidades;
 
-    filtrados.forEach(p => {
-        totalUnidades += parseFloat(p.stock_actual);
+    pagInventario.paginar(filtrados, renderizarTabla).forEach(p => {
         let estado = 'Óptimo';
         let badgeClass = 'badge-active';
 
@@ -58,20 +58,14 @@ function renderizarTabla() {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${p.codigo || 'N/A'}</td>
-            <td><strong>${p.nombre}</strong></td>
+            <td>${escapeHtml(p.codigo) || 'N/A'}</td>
+            <td><strong>${escapeHtml(p.nombre)}</strong></td>
             <td>${p.stock_actual}</td>
             <td>${p.stock_minimo}</td>
             <td><span class="badge ${badgeClass}">${estado}</span></td>
-            <td>
-                <button class="btn-icon" title="Entrada / Ajuste" onclick="abrirModalStock(${p.id_producto}, '${p.nombre}', ${p.stock_actual}, ${p.stock_minimo})">📦</button>
-            </td>
         `;
         tbody.appendChild(tr);
     });
-
-    const kpi = document.getElementById('kpiTotalInventario');
-    if (kpi) kpi.textContent = totalUnidades;
 }
 
 function exportarExcel() {
@@ -87,42 +81,7 @@ function exportarExcel() {
     XLSX.writeFile(wb, "Inventario.xlsx");
 }
 
-function abrirModalStock(id_prod, nombre, actual, minimo) {
-    const p = inventarioList.find(x => x.id_producto === id_prod);
-    if (!p) return;
-
-    document.getElementById('inv_producto_id').value = p.id_producto;
-    document.getElementById('inv_nombre_producto').value = p.nombre;
-    document.getElementById('inv_stock_actual').value = p.stock_actual.toFixed(2);
-    document.getElementById('inv_stock_minimo').value = p.stock_minimo.toFixed(2);
-
-    document.getElementById('modalStock').style.display = 'flex';
-}
-
-async function guardarAjusteStock(e) {
-    e.preventDefault();
-    const id = document.getElementById('inv_producto_id').value;
-
-    const payload = {
-        stock_actual: document.getElementById('inv_stock_actual').value,
-        stock_minimo: document.getElementById('inv_stock_minimo').value
-    };
-
-    try {
-        const res = await fetch(`/inventario/api/editar_stock/${id}`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
-        });
-        const result = await res.json();
-        if (result.success) {
-            document.getElementById('modalStock').style.display = 'none';
-            cargarInventario();
-        } else {
-            showCustomAlert('Error: ' + result.message);
-        }
-    } catch (error) {
-        console.error(error);
-        showCustomAlert('Error en el servidor');
-    }
-}
+// El inventario ya no se ajusta manualmente desde aqui -- toda entrada de
+// stock nuevo debe pasar por Compras, para que el costo quede ligado a lo
+// que de verdad se pago. Las bajas por rotura/merma se seguiran viendo en
+// el Historial de movimientos (kardex).

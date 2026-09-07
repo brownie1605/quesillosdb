@@ -109,6 +109,48 @@ class InventarioService:
 
     # -----------------------------------------------------------------
     @staticmethod
+    def registrar_compra(id_producto, cantidad, costo_unitario, usuario_id,
+                          referencia=None, observacion=None, commit=False):
+        """Punto unico de "se compro algo": suma el stock dejando un
+        movimiento auditado (tipo 'compra') y actualiza `precio_compra` al
+        ultimo costo pagado -- los precios cambian cuando se compra, es el
+        mismo criterio que en el alta normal de producto. Usado por
+        Compras (alta, edicion e importacion masiva) para no reimplementar
+        esta logica en cada endpoint.
+        """
+        mov = InventarioService.mover(
+            id_producto, cantidad, "compra", usuario_id,
+            referencia=referencia, observacion=observacion, commit=False,
+        )
+        if costo_unitario:
+            producto = Producto.query.get(id_producto)
+            if producto:
+                producto.precio_compra = costo_unitario
+        if commit:
+            db.session.commit()
+        return mov
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def ajustar_absoluto(id_producto, nuevo_stock, usuario_id, motivo, commit=False):
+        """Ajuste manual de inventario (ej. conteo fisico, rotura, merma).
+
+        A diferencia de sobreescribir `stock_actual` a lo bruto, esto calcula
+        el delta real y lo deja auditado como movimiento tipo 'ajuste' con un
+        motivo obligatorio -- para poder responder despues "por que cambio
+        este numero" en vez de perder el dato de por que se corrigio.
+        """
+        actual = InventarioService.stock_de(id_producto)
+        delta = Decimal(str(nuevo_stock)) - actual
+        if delta == 0:
+            return None
+        return InventarioService.mover(
+            id_producto, delta, "ajuste", usuario_id,
+            observacion=motivo, commit=commit,
+        )
+
+    # -----------------------------------------------------------------
+    @staticmethod
     def revertir_venta(venta, motivo="Reversion de venta"):
         """Devuelve al stock todo lo que la venta habia descontado."""
         from app.services.receta_service import RecetaService

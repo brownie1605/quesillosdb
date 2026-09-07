@@ -55,6 +55,26 @@ async function cargarResumenFinanciero(inicio = '', fin = '') {
         console.error("Error al cargar resumen financiero:", error);
     }
 
+    // Propinas del mismo rango: efectivo vs tarjeta.
+    try {
+        let urlProp = '/reportes/api/propinas';
+        if (inicio && fin) urlProp += `?inicio=${inicio}&fin=${fin}`;
+        const resProp = await fetch(urlProp);
+        const dataProp = await resProp.json();
+        if (dataProp.success) {
+            const fPropinas = document.getElementById('fPropinas');
+            const fPropinasDetalle = document.getElementById('fPropinasDetalle');
+            if (fPropinas) fPropinas.textContent = _moneyFmt(dataProp.total_propinas);
+            if (fPropinasDetalle) {
+                fPropinasDetalle.textContent = (dataProp.por_metodo || []).length
+                    ? dataProp.por_metodo.map(m => `${m.metodo}: ${_moneyFmt(m.total)}`).join(' · ')
+                    : 'No cuenta como ganancia';
+            }
+        }
+    } catch (error) {
+        console.error("Error al cargar propinas:", error);
+    }
+
     // Top productos (cantidad + ingresos), mismo rango
     try {
         let urlTop = '/reportes/api/productos_top';

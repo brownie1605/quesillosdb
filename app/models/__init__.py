@@ -5,7 +5,6 @@ from app.models.permiso import Permiso, RolPermiso
 from app.models.usuario import Usuario, RecuperacionPassword
 from app.models.producto import Producto
 from .categoria import Categoria
-from .marca import Marca
 from .proveedor import Proveedor
 from .unidad_medida import UnidadMedida
 from app.models.cliente import Cliente
@@ -25,7 +24,7 @@ from app.models.caja import Caja, AperturaCaja, MovimientoCaja, CierreCaja
 
 __all__ = [
     "Empresa", "Sucursal", "Rol", "Permiso", "RolPermiso", "Usuario",
-    "RecuperacionPassword", "Producto", "Categoria", "Marca", "Proveedor",
+    "RecuperacionPassword", "Producto", "Categoria", "Proveedor",
     "UnidadMedida", "Cliente", "Mesa", "Venta", "DetalleVenta", "Inventario",
     "MovimientoInventario", "Compra", "DetalleCompra", "Auditoria",
     "Receta", "RecetaIngrediente", "RecetaOpcionGrupo", "RecetaOpcionItem",

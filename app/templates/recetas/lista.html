@@ -29,6 +29,7 @@
         </thead>
         <tbody><tr><td colspan="8">Cargando…</td></tr></tbody>
     </table>
+    <div id="paginacionRecetas" class="pagination"></div>
 </div>
 
 <!-- ------------------------------------------------------------ modal -->
@@ -172,6 +173,8 @@ let UNIDADES = [
     {% for u in unidades %}{id: {{ u.id_unidad }}, nombre: "{{ u.abreviatura }}"},{% endfor %}
 ];
 let modoProducto = 'existente';
+let recetasList = [];
+const pagRecetas = crearPaginador('paginacionRecetas', 20);
 
 async function cargar() {
     const [recetas, insumos, categorias] = await Promise.all([
@@ -179,15 +182,20 @@ async function cargar() {
         fetch('/recetas/api/insumos').then(r => r.json()),
         fetch('/recetas/api/categorias').then(r => r.json()),
     ]);
+    recetasList = recetas;
     INSUMOS = insumos;
     CATEGORIAS = categorias;
+    renderTablaRecetas();
+}
 
+function renderTablaRecetas() {
     const tb = document.querySelector('#tabla-recetas tbody');
-    if (!recetas.length) {
+    if (!recetasList.length) {
+        document.getElementById('paginacionRecetas').innerHTML = '';
         tb.innerHTML = '<tr><td colspan="8" style="text-align:center;opacity:.6">Aún no hay recetas registradas.</td></tr>';
         return;
     }
-    tb.innerHTML = recetas.map(r => `
+    tb.innerHTML = pagRecetas.paginar(recetasList, renderTablaRecetas).map(r => `
         <tr>
             <td><strong>${r.producto_nombre || r.nombre}</strong><br><small style="opacity:.6">${r.ingredientes.length} ingredientes${r.tiene_personalizacion ? ' · ✎ personalizable' : ''}</small></td>
             <td style="font-size:12.5px">${r.ingredientes.map(i => `${i.producto_nombre} ×${i.cantidad_necesaria}${i.unidad ? ' ' + i.unidad : ''}${i.excluible ? ' <span class="q-chip ok" style="padding:1px 6px;font-size:10px">quitable</span>' : ''}`).join('<br>')}</td>
@@ -325,7 +333,7 @@ function agregarFila(datos) {
                 ${UNIDADES.map(u => `<option value="${u.id}" ${datos.id_unidad == u.id ? 'selected' : ''}>${u.nombre}</option>`).join('')}
             </select>
         </td>
-        <td style="text-align:center"><input type="checkbox" class="ing-excluible" ${datos.excluible ? 'checked' : ''} title="El cliente puede pedir que se lo quiten"></td>
+        <td style="text-align:center"><input type="checkbox" class="ing-excluible" ${datos.excluible !== false ? 'checked' : ''} title="El cliente puede pedir que se lo quiten"></td>
         <td class="ing-stock" style="font-size:12.5px;opacity:.7">—</td>
         <td class="ing-costo">0.00</td>
         <td><button class="q-btn small danger" onclick="this.closest('tr').remove();recalcular()">✕</button></td>`;

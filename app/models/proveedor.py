@@ -23,5 +23,5 @@ class Proveedor(db.Model):
             "telefono": self.telefono,
             "correo": self.correo,
             "direccion": self.direccion,
-            "estado": self.estado
+            "estado": self.estado,
         }

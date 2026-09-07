@@ -12,6 +12,14 @@
     .stat-card { background:#fff; border-radius:12px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,.06); text-align:center; }
     .stat-card .valor { font-size:22px; font-weight:800; color:#3e2723; }
     .stat-card .etiqueta { font-size:12px; color:#8d6e63; text-transform:uppercase; letter-spacing:.5px; }
+    .arqueo-tabla { width:100%; border-collapse:collapse; font-size:13.5px; }
+    .arqueo-tabla th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#8d6e63; padding:4px 6px; border-bottom:1px solid #eee; }
+    .arqueo-tabla td { padding:4px 6px; vertical-align:middle; }
+    .arqueo-tabla input[type=number] { width:80px; padding:5px 8px; text-align:right; }
+    .arqueo-subtotal { text-align:right; font-weight:700; color:#5d4037; white-space:nowrap; }
+    .arqueo-resumen { background:#fbf6f2; border-radius:10px; padding:12px 14px; font-size:13.5px; }
+    .arqueo-resumen .fila { display:flex; justify-content:space-between; padding:3px 0; }
+    .arqueo-resumen .fila.total { border-top:1px dashed #d7c4b8; margin-top:6px; padding-top:8px; font-weight:800; font-size:16px; color:#3e2723; }
 </style>
 {% endblock %}
 
@@ -29,45 +37,50 @@
 
 <div id="conTurno" style="display:none;">
     <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="valor" id="statVentas">0</div><div class="etiqueta">Ventas</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="valor" id="statTotal">C$0</div><div class="etiqueta">Total vendido</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="valor" id="statIngresos">C$0</div><div class="etiqueta">Ingresos manuales</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="valor" id="statEsperado">C$0</div><div class="etiqueta">Esperado en caja</div></div></div>
+        <div class="col-6 col-md-4"><div class="stat-card"><div class="valor" id="statVentas">0</div><div class="etiqueta">Ventas</div></div></div>
+        <div class="col-6 col-md-4"><div class="stat-card"><div class="valor" id="statTotal">C$0</div><div class="etiqueta">Total vendido</div></div></div>
+        <div class="col-6 col-md-4"><div class="stat-card"><div class="valor" id="statEsperado">C$0</div><div class="etiqueta">Esperado en caja</div></div></div>
     </div>
 
     <div class="row g-3">
-        <div class="col-lg-5">
+        <div class="col-lg-9">
             <div class="card p-3">
-                <h6 class="fw-bold" style="color:#5d4037;">Registrar movimiento</h6>
-                <select class="form-select mb-2" id="movTipo">
-                    <option value="egreso">Gasto (egreso)</option>
-                    <option value="ingreso">Ingreso manual</option>
-                    <option value="retiro">Retiro</option>
-                    <option value="ajuste">Ajuste</option>
-                </select>
-                <input type="number" class="form-control mb-2" id="movMonto" placeholder="Monto (C$)" min="0.01" step="0.01">
-                <input type="text" class="form-control mb-2" id="movDescripcion" placeholder="Descripción (ej. compra de servilletas)">
-                <button class="btn btn-cafe w-100" onclick="registrarMovimiento()">Registrar</button>
-            </div>
+                <h6 class="fw-bold mb-3" style="color:#5d4037;">Cerrar turno · arqueo de caja</h6>
 
-            <div class="card p-3 mt-3">
-                <h6 class="fw-bold" style="color:#5d4037;">Cerrar turno</h6>
-                <label class="form-label">Efectivo contado (C$)</label>
-                <input type="number" class="form-control mb-2" id="montoReal" min="0" step="0.01">
-                <textarea class="form-control mb-2" id="observacion" placeholder="Observación (opcional)" rows="2"></textarea>
-                <button class="btn" style="background:#8B2E2E;color:#fff;" onclick="cerrarTurno()">Cerrar caja</button>
-            </div>
-        </div>
-
-        <div class="col-lg-7">
-            <div class="card p-3">
-                <h6 class="fw-bold" style="color:#5d4037;">Movimientos del turno</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th class="text-end">Monto</th></tr></thead>
-                        <tbody id="tbodyMov"></tbody>
-                    </table>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong style="color:#5d4037;">🇳🇮 Córdobas</strong>
+                        </div>
+                        <table class="arqueo-tabla">
+                            <thead><tr><th>Denominación</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
+                            <tbody id="arqueoCordobasBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong style="color:#5d4037;">🇺🇸 Dólares</strong>
+                        </div>
+                        <table class="arqueo-tabla">
+                            <thead><tr><th>Billete</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
+                            <tbody id="arqueoDolaresBody"></tbody>
+                        </table>
+                        <label class="form-label mt-2 mb-1" style="font-size:12.5px;">Tipo de cambio (C$ por US$1)</label>
+                        <input type="number" class="form-control form-control-sm" id="tipoCambio" min="0" step="0.01" placeholder="Ej. 36.60" style="max-width:140px;">
+                    </div>
                 </div>
+
+                <div class="arqueo-resumen mt-3">
+                    <div class="fila"><span>Total en córdobas contado</span><strong id="resSubtotalCordobas">C$ 0.00</strong></div>
+                    <div class="fila"><span>Total en dólares contado</span><strong id="resSubtotalDolares">US$ 0.00</strong></div>
+                    <div class="fila"><span>Dólares convertidos a córdobas</span><strong id="resDolaresConvertidos">C$ 0.00</strong></div>
+                    <div class="fila"><span>Esperado en caja (sistema)</span><strong id="resEsperado">C$ 0.00</strong></div>
+                    <div class="fila total"><span>Total contado</span><strong id="resTotalContado">C$ 0.00</strong></div>
+                    <div class="fila"><span>Diferencia</span><strong id="resDiferencia">C$ 0.00</strong></div>
+                </div>
+
+                <textarea class="form-control mt-3 mb-2" id="observacion" placeholder="Observación (opcional)" rows="2"></textarea>
+                <button class="btn" style="background:#8B2E2E;color:#fff;" onclick="cerrarTurno()">Cerrar caja</button>
             </div>
         </div>
     </div>
@@ -76,6 +89,80 @@
 
 {% block scripts %}
 <script>
+// Denominaciones reales que circulan -- monedas de C$1 y C$5 (las de
+// centavos no se cuentan, no se usan en la practica), billetes de C$10 a
+// C$1000, y dolares de US$1 a US$100.
+const DENOM_CORDOBAS = [
+    { tipo: 'Moneda', valor: 1 },
+    { tipo: 'Moneda', valor: 5 },
+    { tipo: 'Billete', valor: 10 },
+    { tipo: 'Billete', valor: 20 },
+    { tipo: 'Billete', valor: 50 },
+    { tipo: 'Billete', valor: 100 },
+    { tipo: 'Billete', valor: 200 },
+    { tipo: 'Billete', valor: 500 },
+    { tipo: 'Billete', valor: 1000 },
+];
+const DENOM_DOLARES = [1, 5, 10, 20, 50, 100];
+
+let montoEsperadoActual = 0;
+
+function construirFilasArqueo() {
+    const bodyCordobas = document.getElementById('arqueoCordobasBody');
+    bodyCordobas.innerHTML = DENOM_CORDOBAS.map(d => `
+        <tr>
+            <td>${d.tipo} C$${d.valor}</td>
+            <td><input type="number" class="form-control form-control-sm" id="cord_${d.valor}" min="0" step="1" value="0" oninput="recalcularArqueo()"></td>
+            <td class="arqueo-subtotal" id="cord_sub_${d.valor}">C$ 0.00</td>
+        </tr>
+    `).join('');
+
+    const bodyDolares = document.getElementById('arqueoDolaresBody');
+    bodyDolares.innerHTML = DENOM_DOLARES.map(v => `
+        <tr>
+            <td>US$${v}</td>
+            <td><input type="number" class="form-control form-control-sm" id="usd_${v}" min="0" step="1" value="0" oninput="recalcularArqueo()"></td>
+            <td class="arqueo-subtotal" id="usd_sub_${v}">US$ 0.00</td>
+        </tr>
+    `).join('');
+
+    document.getElementById('tipoCambio').addEventListener('input', recalcularArqueo);
+}
+
+function recalcularArqueo() {
+    let subtotalCordobas = 0;
+    DENOM_CORDOBAS.forEach(d => {
+        const cant = parseInt(document.getElementById(`cord_${d.valor}`).value, 10) || 0;
+        const sub = cant * d.valor;
+        subtotalCordobas += sub;
+        document.getElementById(`cord_sub_${d.valor}`).textContent = 'C$ ' + sub.toFixed(2);
+    });
+
+    let subtotalDolares = 0;
+    DENOM_DOLARES.forEach(v => {
+        const cant = parseInt(document.getElementById(`usd_${v}`).value, 10) || 0;
+        const sub = cant * v;
+        subtotalDolares += sub;
+        document.getElementById(`usd_sub_${v}`).textContent = 'US$ ' + sub.toFixed(2);
+    });
+
+    const tipoCambio = parseFloat(document.getElementById('tipoCambio').value) || 0;
+    const dolaresConvertidos = subtotalDolares * tipoCambio;
+    const totalContado = subtotalCordobas + dolaresConvertidos;
+    const diferencia = totalContado - montoEsperadoActual;
+
+    document.getElementById('resSubtotalCordobas').textContent = 'C$ ' + subtotalCordobas.toFixed(2);
+    document.getElementById('resSubtotalDolares').textContent = 'US$ ' + subtotalDolares.toFixed(2);
+    document.getElementById('resDolaresConvertidos').textContent = 'C$ ' + dolaresConvertidos.toFixed(2);
+    document.getElementById('resEsperado').textContent = 'C$ ' + montoEsperadoActual.toFixed(2);
+    document.getElementById('resTotalContado').textContent = 'C$ ' + totalContado.toFixed(2);
+    const elDif = document.getElementById('resDiferencia');
+    elDif.textContent = (diferencia < 0 ? '- ' : '') + 'C$ ' + Math.abs(diferencia).toFixed(2);
+    elDif.style.color = diferencia < 0 ? '#c0392b' : (diferencia > 0 ? '#1e7e34' : '#3e2723');
+
+    return { subtotalCordobas, subtotalDolares, tipoCambio, dolaresConvertidos, totalContado };
+}
+
 async function cargar() {
     const estado = await fetch('/caja/api/estado').then(r => r.json());
     if (!estado.abierta) {
@@ -88,17 +175,9 @@ async function cargar() {
 
     document.getElementById('statVentas').textContent = estado.cantidad_ventas;
     document.getElementById('statTotal').textContent = 'C$ ' + estado.total_ventas.toFixed(2);
-    document.getElementById('statIngresos').textContent = 'C$ ' + estado.total_ingresos.toFixed(2);
     document.getElementById('statEsperado').textContent = 'C$ ' + estado.monto_esperado.toFixed(2);
-
-    const tipoLabel = {ingreso:'Ingreso', egreso:'Gasto', retiro:'Retiro', ajuste:'Ajuste', venta:'Venta'};
-    document.getElementById('tbodyMov').innerHTML = (estado.movimientos||[]).map(m => `
-        <tr>
-            <td>${m.fecha}</td>
-            <td><span class="badge ${m.tipo==='ingreso'?'bg-success':(m.tipo==='egreso'||m.tipo==='retiro'?'bg-danger':'bg-secondary')}">${tipoLabel[m.tipo]||m.tipo}</span></td>
-            <td>${m.descripcion||'-'}</td>
-            <td class="text-end">C$ ${m.monto.toFixed(2)}</td>
-        </tr>`).join('') || '<tr><td colspan="4" class="text-center text-muted py-3">Sin movimientos aún.</td></tr>';
+    montoEsperadoActual = estado.monto_esperado;
+    recalcularArqueo();
 }
 
 async function abrirTurno() {
@@ -107,22 +186,30 @@ async function abrirTurno() {
     if (r.success) cargar(); else showCustomAlert(r.message);
 }
 
-async function registrarMovimiento() {
-    const payload = {
-        tipo_movimiento: document.getElementById('movTipo').value,
-        monto: parseFloat(document.getElementById('movMonto').value) || 0,
-        descripcion: document.getElementById('movDescripcion').value,
-    };
-    if (payload.monto <= 0) { showCustomAlert('El monto debe ser mayor a cero'); return; }
-    const r = await fetch('/caja/api/movimiento', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}).then(r=>r.json());
-    if (r.success) { document.getElementById('movMonto').value=''; document.getElementById('movDescripcion').value=''; cargar(); }
-    else showCustomAlert(r.message);
-}
-
 async function cerrarTurno() {
-    const monto = parseFloat(document.getElementById('montoReal').value) || 0;
-    showCustomConfirm('¿Cerrar el turno de caja con C$ ' + monto.toFixed(2) + ' contados?', async () => {
-        const r = await fetch('/caja/api/cerrar', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({monto_real: monto, observacion: document.getElementById('observacion').value})}).then(r=>r.json());
+    const arqueo = recalcularArqueo();
+
+    if (arqueo.subtotalDolares > 0 && arqueo.tipoCambio <= 0) {
+        showCustomAlert('Contaste dólares: escribe el tipo de cambio (C$ por US$1) para poder convertirlos.');
+        return;
+    }
+
+    const detalleConteo = {
+        cordoba: Object.fromEntries(DENOM_CORDOBAS.map(d => [d.valor, parseInt(document.getElementById(`cord_${d.valor}`).value, 10) || 0])),
+        dolar: Object.fromEntries(DENOM_DOLARES.map(v => [v, parseInt(document.getElementById(`usd_${v}`).value, 10) || 0])),
+    };
+
+    showCustomConfirm('¿Cerrar el turno de caja con C$ ' + arqueo.totalContado.toFixed(2) + ' contados en total?', async () => {
+        const r = await fetch('/caja/api/cerrar', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                monto_real: arqueo.totalContado,
+                observacion: document.getElementById('observacion').value,
+                detalle_conteo: detalleConteo,
+                tipo_cambio: arqueo.tipoCambio || null,
+            }),
+        }).then(r => r.json());
         if (r.success) {
             showCustomAlert('Turno cerrado. Diferencia: C$ ' + r.diferencia.toFixed(2), false);
             cargar();
@@ -130,6 +217,7 @@ async function cerrarTurno() {
     });
 }
 
+construirFilasArqueo();
 cargar();
 </script>
 {% endblock %}

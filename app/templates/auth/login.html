@@ -8,6 +8,40 @@
 
     <title>POS Inventario - Login</title>
 
+    {{ csrf_meta_tag() }}
+    <script>
+        (function () {
+            var metaToken = document.querySelector('meta[name="csrf-token"]');
+            var token = metaToken ? metaToken.getAttribute('content') : null;
+            var original = window.fetch;
+            window.fetch = function (input, init) {
+                init = init || {};
+                var method = (init.method || 'GET').toUpperCase();
+                var esMismoOrigen = true;
+                try {
+                    var url = new URL(typeof input === 'string' ? input : input.url, window.location.href);
+                    esMismoOrigen = url.origin === window.location.origin;
+                } catch (e) { /* URL relativa: mismo origen */ }
+                if (token && esMismoOrigen && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+                    init.headers = new Headers(init.headers || {});
+                    if (!init.headers.has('X-CSRFToken')) {
+                        init.headers.set('X-CSRFToken', token);
+                    }
+                }
+                return original(input, init);
+            };
+        })();
+    </script>
+
+    <!-- PWA -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#8B2E2E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Quesillos POS">
+    <link rel="icon" href="{{ url_for('static', filename='icons/favicon-32.png') }}" sizes="32x32">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
 
 </head>
@@ -88,6 +122,7 @@
 
             <!-- FORM LOGIN -->
             <form method="POST" action="{{ url_for('auth.login') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <!-- USUARIO -->
                 <label>
@@ -337,6 +372,12 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
         btn.textContent = "Guardar";
     }
 });
+
+if ('serviceWorker' in navigator && window.isSecureContext) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+}
 </script>
 
 </body>

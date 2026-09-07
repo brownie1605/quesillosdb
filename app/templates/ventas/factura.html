@@ -93,6 +93,12 @@
                 <td class="bold">Descuento:</td>
                 <td class="text-right">- C$ {{ venta.descuento }}</td>
             </tr>
+            {% if venta.propina and venta.propina > 0 %}
+            <tr>
+                <td class="bold">Propina:</td>
+                <td class="text-right">+ C$ {{ venta.propina }}</td>
+            </tr>
+            {% endif %}
             <tr>
                 <td colspan="2"><div class="divider" style="margin: 5px 0;"></div></td>
             </tr>
@@ -103,7 +109,15 @@
         </table>
         
         <div class="divider"></div>
-        
+
+        {% if venta.notas %}
+        <div class="text-left">
+            <p class="bold">Nota:</p>
+            <p>{{ venta.notas }}</p>
+        </div>
+        <div class="divider"></div>
+        {% endif %}
+
         <div class="text-center">
             <p>Método de pago: {{ venta.metodo_pago }}</p>
             <p>¡Gracias por su compra!</p>

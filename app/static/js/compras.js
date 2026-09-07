@@ -4,11 +4,12 @@ let productosList = [];
 let itemsNuevaCompra = [];
 let choiceProveedor = null;
 let choiceProducto = null;
+const pagCompras = crearPaginador('paginacionCompras', 20);
 
 document.addEventListener('DOMContentLoaded', () => {
     cargarDatosIniciales();
-    
-    document.getElementById('searchInput').addEventListener('input', renderizarTablaCompras);
+
+    document.getElementById('searchInput').addEventListener('input', () => { pagCompras.reset(); renderizarTablaCompras(); });
     
     // Modal Nueva Compra
     document.getElementById('btnNuevaCompra').addEventListener('click', abrirModalCompra);
@@ -121,12 +122,12 @@ function renderizarTablaCompras() {
         (c.proveedor_nombre && c.proveedor_nombre.toLowerCase().includes(query))
     );
 
-    filtrados.forEach(c => {
+    pagCompras.paginar(filtrados, renderizarTablaCompras).forEach(c => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><strong>${c.numero_compra}</strong></td>
+            <td><strong>${escapeHtml(c.numero_compra)}</strong></td>
             <td>${c.fecha_compra}</td>
-            <td>${c.proveedor_nombre}</td>
+            <td>${escapeHtml(c.proveedor_nombre)}</td>
             <td><strong>C$ ${c.total.toFixed(2)}</strong></td>
             <td><span class="badge badge-active">${c.estado}</span></td>
             <td>
@@ -390,23 +391,22 @@ function abrirModalImportarCompra() {
 
 function descargarPlantillaCompra() {
     const datos = [
-        { "Código": "", "Nombre": "Quesillo Lo Nuestro", "Tipo": "final", "Categoría": "Quesillos", "Marca": "", "Proveedor": "Distribuidora El Sol", "Unidad": "Unidad", "Precio Venta": 40, "Costo Unitario": 25, "Cantidad": 20, "Stock Mínimo": 5, "Aplica IVA": "No" },
-        { "Código": "", "Nombre": "Tortilla", "Tipo": "insumo", "Categoría": "", "Marca": "", "Proveedor": "Tortillería Doña Chepa", "Unidad": "Unidad", "Precio Venta": "", "Costo Unitario": 3, "Cantidad": 200, "Stock Mínimo": 20, "Aplica IVA": "" },
+        { "Código": "", "Nombre": "Quesillo Lo Nuestro", "Tipo": "final", "Categoría": "Quesillos", "Proveedor": "Distribuidora El Sol", "Unidad": "Unidad", "Precio Venta": 40, "Costo Unitario": 25, "Cantidad": 20, "Stock Mínimo": 5, "Aplica IVA": "No" },
+        { "Código": "", "Nombre": "Tortilla", "Tipo": "insumo", "Categoría": "", "Proveedor": "Tortillería Doña Chepa", "Unidad": "Unidad", "Precio Venta": "", "Costo Unitario": 3, "Cantidad": 200, "Stock Mínimo": 20, "Aplica IVA": "" },
     ];
     const wsDatos = XLSX.utils.json_to_sheet(datos);
-    wsDatos['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 10 }, { wch: 16 }, { wch: 14 }, { wch: 22 }, { wch: 10 }, { wch: 13 }, { wch: 13 }, { wch: 10 }, { wch: 13 }, { wch: 10 }];
+    wsDatos['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 10 }, { wch: 16 }, { wch: 22 }, { wch: 10 }, { wch: 13 }, { wch: 13 }, { wch: 10 }, { wch: 13 }, { wch: 10 }];
 
     const instrucciones = [
         ["Cómo llenar esta plantilla"],
         ["- Cada fila es una línea de compra: cuánto compraste de qué producto, a qué proveedor y a qué costo."],
         ["- Proveedor: OBLIGATORIO por fila (a quién se le compró). Si no existe todavía, se crea automáticamente."],
-        ["  Excepción: si pones una Marca que ya tiene un proveedor asignado, puedes dejar Proveedor vacío y se usa el de esa Marca."],
         ["- Cantidad y Costo Unitario: obligatorios. La Cantidad es lo que se SUMA al stock actual del producto (no lo reemplaza)."],
         ["- Código: opcional. Si coincide con un producto que ya existe, se actualiza ese producto en vez de crear uno nuevo."],
         ["- Nombre: obligatorio. Si no hay código y el nombre coincide con uno existente (sin importar mayúsculas), también se actualiza ese producto."],
         ["- Tipo: final, insumo o material. Solo 'final' se vende al cliente."],
         ["- Categoría, Precio Venta y Aplica IVA solo aplican si Tipo = final."],
-        ["- Categoría y Marca: si escribes un nombre que no existe todavía, se crea automáticamente."],
+        ["- Categoría: si escribes un nombre que no existe todavía, se crea automáticamente."],
         ["- Unidad: debe coincidir con una unidad ya existente en el sistema (nombre o abreviatura); si no coincide, se deja sin unidad."],
         ["- Stock Mínimo: opcional, solo se actualiza si lo llenas."],
         ["- Aplica IVA: escribe Sí o No."],
@@ -440,7 +440,6 @@ async function leerArchivoImportarCompra(e) {
             nombre: String(f['Nombre'] ?? '').trim(),
             tipo: String(f['Tipo'] ?? 'final').trim().toLowerCase(),
             categoria: String(f['Categoría'] ?? '').trim(),
-            marca: String(f['Marca'] ?? '').trim(),
             proveedor: String(f['Proveedor'] ?? '').trim(),
             unidad: String(f['Unidad'] ?? '').trim(),
             precio_venta: f['Precio Venta'],

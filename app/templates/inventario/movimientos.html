@@ -1,0 +1,49 @@
+{% extends 'layouts/base.html' %}
+
+{% block page_title %}Historial de Movimientos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="filter-group">
+        <div class="search-bar">
+            <input type="text" id="searchInput" class="form-control" placeholder="Buscar producto...">
+        </div>
+        <select id="tipoFilter" class="form-control" style="width: 170px;">
+            <option value="">Tipo: Todos</option>
+            <option value="entrada">Entrada manual</option>
+            <option value="compra">Compra</option>
+            <option value="ajuste">Ajuste</option>
+            <option value="venta">Venta</option>
+            <option value="receta">Consumo de receta</option>
+            <option value="devolucion">Devolución</option>
+            <option value="salida">Salida</option>
+        </select>
+    </div>
+
+    <a href="{{ url_for('inventario.lista') }}" class="btn btn-secondary">← Volver a Inventario</a>
+</div>
+
+<div class="panel">
+    <table id="tablaMovimientos">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Producto</th>
+                <th>Tipo</th>
+                <th>Cantidad</th>
+                <th>Antes → Después</th>
+                <th>Motivo / Referencia</th>
+                <th>Usuario</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="7" style="text-align:center;">Cargando…</td></tr>
+        </tbody>
+    </table>
+    <div id="paginacionMovimientos" class="pagination"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/movimientos.js') }}"></script>
+{% endblock %}

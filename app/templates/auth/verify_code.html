@@ -8,6 +8,7 @@
    Es válido por 15 minutos.</p>
 
 <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="codigo">Código de verificación</label>
     <input type="text" id="codigo" name="codigo" class="codigo" required autofocus
            maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="000000"

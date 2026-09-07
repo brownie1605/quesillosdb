@@ -35,19 +35,7 @@ def api_estado():
         "usuario": apertura.usuario.nombre_completo if apertura.usuario else None,
         "total_ventas": float(resumen["total_ventas"]),
         "cantidad_ventas": resumen["cantidad_ventas"],
-        "total_ingresos": float(resumen["total_ingresos"]),
-        "total_egresos": float(resumen["total_egresos"]),
         "monto_esperado": float(resumen["monto_esperado"]),
-        "movimientos": [
-            {
-                "id": m.id_movimiento_caja,
-                "tipo": m.tipo_movimiento,
-                "monto": float(m.monto),
-                "descripcion": m.descripcion,
-                "fecha": m.fecha_movimiento.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            for m in sorted(resumen["movimientos"], key=lambda m: m.fecha_movimiento, reverse=True)
-        ],
     })
 
 
@@ -63,36 +51,17 @@ def api_abrir():
         return jsonify({"success": False, "message": str(e)}), 400
 
 
-@caja_bp.route("/api/movimiento", methods=["POST"])
-@login_required
-def api_movimiento():
-    data = request.get_json(silent=True) or {}
-    tipo = data.get("tipo_movimiento")
-    monto = data.get("monto")
-    if tipo not in ("ingreso", "egreso", "retiro", "ajuste"):
-        return jsonify({"success": False, "message": "Tipo de movimiento invalido"}), 400
-    if not monto or float(monto) <= 0:
-        return jsonify({"success": False, "message": "El monto debe ser mayor a cero"}), 400
-    try:
-        mov = CajaService.registrar_movimiento(
-            current_user, tipo, monto, data.get("descripcion"), data.get("referencia")
-        )
-        registrar_auditoria(
-            "MOVIMIENTO CAJA", "Caja",
-            {"tipo": tipo, "monto": float(mov.monto), "descripcion": mov.descripcion},
-        )
-        return jsonify({"success": True})
-    except CajaError as e:
-        return jsonify({"success": False, "message": str(e)}), 400
-
-
 @caja_bp.route("/api/cerrar", methods=["POST"])
 @login_required
 def api_cerrar():
     data = request.get_json(silent=True) or {}
     try:
         cierre = CajaService.cerrar_turno(
-            current_user, data.get("monto_real", 0), data.get("observacion")
+            current_user,
+            data.get("monto_real", 0),
+            data.get("observacion"),
+            detalle_conteo=data.get("detalle_conteo"),
+            tipo_cambio=data.get("tipo_cambio"),
         )
         registrar_auditoria(
             "CERRAR CAJA", "Caja",

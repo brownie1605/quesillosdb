@@ -56,6 +56,11 @@ class CierreCaja(db.Model):
     monto_real = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     diferencia = db.Column(db.Numeric(12, 2), nullable=False, default=0)
     observacion = db.Column(db.Text)
+    # Arqueo detallado: cuantas monedas/billetes de cada denominacion se
+    # contaron (cordobas y dolares) -- ver CajaService.cerrar_turno. Queda
+    # guardado tal cual para poder auditar despues como pidio finanzas.
+    detalle_conteo = db.Column(db.JSON, nullable=True)
+    tipo_cambio = db.Column(db.Numeric(10, 4), nullable=True)
     fecha_cierre = db.Column(db.DateTime, default=nicaragua_now)
 
     apertura = db.relationship("AperturaCaja", lazy=True)

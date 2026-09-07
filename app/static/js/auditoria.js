@@ -1,11 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
     cargarAuditoria();
 
-    document.getElementById('searchInput').addEventListener('input', filtrarTabla);
-    document.getElementById('moduloFilter').addEventListener('change', filtrarTabla);
+    const reiniciarYFiltrar = () => { pagAuditoria.reset(); filtrarTabla(); };
+    document.getElementById('searchInput').addEventListener('input', reiniciarYFiltrar);
+    document.getElementById('moduloFilter').addEventListener('change', reiniciarYFiltrar);
 });
 
 let auditoriasGlobal = [];
+let auditoriasFiltradasGlobal = [];
+const pagAuditoria = crearPaginador('paginacionAuditoria', 25);
 
 async function cargarAuditoria() {
     try {
@@ -25,15 +28,18 @@ async function cargarAuditoria() {
 }
 
 function renderTabla(datos) {
+    auditoriasFiltradasGlobal = datos;
     const tbody = document.querySelector('#tablaAuditoria tbody');
     tbody.innerHTML = '';
-    
+
     if (datos.length === 0) {
+        document.getElementById('paginacionAuditoria').innerHTML = '';
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No se encontraron registros.</td></tr>';
         return;
     }
-    
-    datos.forEach(row => {
+
+    const pagina = pagAuditoria.paginar(datos, () => renderTabla(auditoriasFiltradasGlobal));
+    pagina.forEach(row => {
         const tr = document.createElement('tr');
         
         // Formatear detalles para vista previa
@@ -46,10 +52,10 @@ function renderTabla(datos) {
 
         tr.innerHTML = `
             <td>${row.fecha}</td>
-            <td><strong>${row.nombre_usuario}</strong></td>
-            <td><span class="badge" style="background: #e0e0e0; color: #333; padding: 3px 8px; border-radius: 4px;">${row.modulo}</span></td>
-            <td>${row.accion}</td>
-            <td>${row.ip_address || 'N/A'}</td>
+            <td><strong>${escapeHtml(row.nombre_usuario)}</strong></td>
+            <td><span class="badge" style="background: #e0e0e0; color: #333; padding: 3px 8px; border-radius: 4px;">${escapeHtml(row.modulo)}</span></td>
+            <td>${escapeHtml(row.accion)}</td>
+            <td>${escapeHtml(row.ip_address) || 'N/A'}</td>
             <td>${detallesBtn}</td>
         `;
         tbody.appendChild(tr);
