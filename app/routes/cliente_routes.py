@@ -1,6 +1,8 @@
 """Clientes: alta rapida (se usa tambien desde el selector del POS)."""
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
+from sqlalchemy import text
+from datetime import datetime
 
 from app.extensions import db
 from app.models import Cliente
@@ -93,4 +95,74 @@ def api_eliminar(id_cliente):
         return jsonify({"success": True})
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@cliente_bp.route("/api/platillos_por_cliente", methods=["GET"])
+@login_required
+def api_platillos_por_cliente():
+    """Reportería: platillos consumidos por cliente en un rango de fechas."""
+    try:
+        inicio = request.args.get('inicio')
+        fin = request.args.get('fin')
+
+        if not inicio or not fin:
+            return jsonify({"success": False, "message": "Fechas requeridas"}), 400
+
+        # Query: clientes y sus platillos consumidos
+        query = text("""
+            SELECT
+                c.id_cliente,
+                c.nombre as cliente_nombre,
+                c.tipo_cliente,
+                p.nombre as platillo_nombre,
+                SUM(dv.cantidad) as cantidad
+            FROM clientes c
+            LEFT JOIN ventas v ON c.id_cliente = v.id_cliente AND v.id_empresa = :empresa AND v.estado = 'completada'
+                AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            LEFT JOIN detalle_ventas dv ON v.id_venta = dv.id_venta
+            LEFT JOIN productos p ON dv.id_producto = p.id_producto
+            WHERE c.id_empresa = :empresa AND c.estado = 'activo'
+            GROUP BY c.id_cliente, c.nombre, c.tipo_cliente, p.nombre
+            ORDER BY c.nombre ASC, p.nombre ASC
+        """)
+
+        result = db.session.execute(query, {
+            "empresa": current_user.id_empresa,
+            "inicio": inicio,
+            "fin": fin
+        }).fetchall()
+
+        # Procesar y agrupar por cliente
+        clientes_dict = {}
+        for row in result:
+            cliente_id = row[0]
+            cliente_nombre = row[1]
+            tipo_cliente = row[2]
+            platillo_nombre = row[3]
+            cantidad = row[4]
+
+            if cliente_id not in clientes_dict:
+                clientes_dict[cliente_id] = {
+                    "cliente_nombre": cliente_nombre,
+                    "tipo_cliente": tipo_cliente,
+                    "platillos": []
+                }
+
+            if platillo_nombre:  # Solo agregar si hay platillo
+                clientes_dict[cliente_id]["platillos"].append({
+                    "nombre": platillo_nombre,
+                    "cantidad": int(cantidad or 0)
+                })
+
+        # Convertir a lista
+        data = list(clientes_dict.values())
+
+        return jsonify({
+            "success": True,
+            "data": data,
+            "inicio": inicio,
+            "fin": fin
+        })
+    except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500

@@ -466,3 +466,82 @@ def exportar_inventario():
         )
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
+@reporte_bp.route("/api/kpis_especiales", methods=["GET"])
+@login_required
+def api_kpis_especiales():
+    """KPIs especiales para el dashboard: ventas hoy, platillo más/menos popular, mesero top."""
+    try:
+        inicio = request.args.get('inicio')
+        fin = request.args.get('fin')
+
+        if inicio and fin:
+            fecha_inicio, fecha_fin = inicio, fin
+        else:
+            hoy = nicaragua_now().date()
+            fecha_inicio = str(hoy)
+            fecha_fin = str(hoy)
+
+        params = {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}
+
+        # Ventas de hoy
+        query_hoy = text("""
+            SELECT COALESCE(SUM(total), 0) FROM ventas
+            WHERE id_empresa = :empresa AND estado = 'completada'
+            AND DATE(fecha_venta) >= :inicio AND DATE(fecha_venta) <= :fin
+        """)
+        ventas_hoy = float(db.session.execute(query_hoy, params).scalar() or 0)
+
+        # Platillo más popular (TOP 1)
+        query_top = text("""
+            SELECT p.nombre, SUM(dv.cantidad) as cantidad
+            FROM detalle_ventas dv
+            JOIN productos p ON dv.id_producto = p.id_producto
+            JOIN ventas v ON dv.id_venta = v.id_venta
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada'
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            GROUP BY p.id_producto
+            ORDER BY cantidad DESC
+            LIMIT 1
+        """)
+        fila_top = db.session.execute(query_top, params).fetchone()
+        platillo_top = {"producto": fila_top[0], "cantidad": float(fila_top[1] or 0)} if fila_top else None
+
+        # Platillo menos popular (menos vendido pero que haya vendido)
+        query_bottom = text("""
+            SELECT p.nombre, SUM(dv.cantidad) as cantidad
+            FROM detalle_ventas dv
+            JOIN productos p ON dv.id_producto = p.id_producto
+            JOIN ventas v ON dv.id_venta = v.id_venta
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada'
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            GROUP BY p.id_producto
+            ORDER BY cantidad ASC
+            LIMIT 1
+        """)
+        fila_bottom = db.session.execute(query_bottom, params).fetchone()
+        platillo_bottom = {"producto": fila_bottom[0], "cantidad": float(fila_bottom[1] or 0)} if fila_bottom else None
+
+        # Mesero con más ventas (en ingresos, no cantidad)
+        query_mesero = text("""
+            SELECT u.nombre_completo, SUM(v.total) as total_ventas
+            FROM ventas v
+            JOIN usuarios u ON v.id_usuario = u.id_usuario
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada'
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            GROUP BY v.id_usuario
+            ORDER BY total_ventas DESC
+            LIMIT 1
+        """)
+        fila_mesero = db.session.execute(query_mesero, params).fetchone()
+        mesero_top = {"mesero": fila_mesero[0], "total": float(fila_mesero[1] or 0)} if fila_mesero else None
+
+        return jsonify({
+            "success": True,
+            "ventas_hoy": ventas_hoy,
+            "platillo_top": platillo_top,
+            "platillo_bottom": platillo_bottom,
+            "mesero_top": mesero_top,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500

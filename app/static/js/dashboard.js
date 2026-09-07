@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     cargarChartsDashboard();
     cargarResumenFinanciero();
+    cargarKPIsEspeciales();
 
     const aplicarFiltroDashboard = () => {
         const inicio = document.getElementById('filterDesde').value;
@@ -8,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inicio && fin) {
             cargarChartsDashboard(inicio, fin);
             cargarResumenFinanciero(inicio, fin);
+            cargarKPIsEspeciales(inicio, fin);
         }
     };
 
@@ -22,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('filterHasta').value = '';
             cargarChartsDashboard(); // Carga por defecto (últimos 7 días)
             cargarResumenFinanciero();
+            cargarKPIsEspeciales();
         });
     }
 });
@@ -174,12 +177,12 @@ function renderProductosDonutChart(data) {
             onClick: (event, elements, chart) => {
                 if (elements.length > 0) {
                     const index = elements[0].index;
-                    
+
                     // Resaltar seleccionado y volver los demas opacos
                     const nuevosColores = coloresBase.map((color, i) => {
                         return i === index ? color : color + '40'; // 40 es la opacidad en hex (~25%)
                     });
-                    
+
                     chart.data.datasets[0].backgroundColor = nuevosColores;
                     chart.update();
                 } else {
@@ -190,4 +193,46 @@ function renderProductosDonutChart(data) {
             }
         }
     });
+}
+
+async function cargarKPIsEspeciales(inicio = '', fin = '') {
+    try {
+        let url = '/reportes/api/kpis_especiales';
+        if (inicio && fin) url += `?inicio=${inicio}&fin=${fin}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        // Ventas de hoy
+        if (data.ventas_hoy !== undefined) {
+            const el = document.getElementById('ventasHoyKPI');
+            if (el) el.textContent = _moneyFmt(data.ventas_hoy);
+        }
+
+        // Platillo más popular
+        if (data.platillo_top) {
+            const el = document.getElementById('platilloTopKPI');
+            const det = document.getElementById('platilloTopDetalle');
+            if (el) el.textContent = data.platillo_top.producto || '-';
+            if (det) det.textContent = `${data.platillo_top.cantidad} vendido${data.platillo_top.cantidad !== 1 ? 's' : ''}`;
+        }
+
+        // Platillo menos popular
+        if (data.platillo_bottom) {
+            const el = document.getElementById('platilloBottomKPI');
+            const det = document.getElementById('platilloBottomDetalle');
+            if (el) el.textContent = data.platillo_bottom.producto || '-';
+            if (det) det.textContent = `${data.platillo_bottom.cantidad} vendido${data.platillo_bottom.cantidad !== 1 ? 's' : ''}`;
+        }
+
+        // Mesero con más ventas
+        if (data.mesero_top) {
+            const el = document.getElementById('meseroTopKPI');
+            const det = document.getElementById('meseroTopDetalle');
+            if (el) el.textContent = data.mesero_top.mesero || '-';
+            if (det) det.textContent = `${_moneyFmt(data.mesero_top.total)} en ventas`;
+        }
+    } catch (error) {
+        console.error("Error al cargar KPIs especiales:", error);
+    }
 }

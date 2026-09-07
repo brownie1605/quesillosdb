@@ -24,14 +24,28 @@
 {% endblock %}
 
 {% block content %}
-<h3 class="titulo mb-3">🧾 Turno de caja</h3>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h3 class="titulo mb-0">🧾 Turno de caja</h3>
+    <div id="estadoCaja" style="display:none; padding: 8px 16px; background: #d4edda; border-radius: 6px; color: #155724; font-size: 14px; font-weight: 500;">
+        ✅ Turno abierto
+    </div>
+</div>
 
 <div id="sinTurno" style="display:none;">
-    <div class="card p-4" style="max-width:420px;">
-        <p>No hay un turno abierto. Registra el monto inicial para empezar a vender.</p>
-        <label class="form-label">Monto inicial (C$)</label>
-        <input type="number" class="form-control mb-3" id="montoInicial" value="0" min="0" step="0.01">
-        <button class="btn btn-cafe" onclick="abrirTurno()">Abrir turno</button>
+    <div class="panel" style="max-width: 480px; padding: 30px; text-align: center;">
+        <div style="font-size: 48px; margin-bottom: 15px;">🏪</div>
+        <h4 style="color: #5d4037; margin-bottom: 10px;">Abriendo turno de caja</h4>
+        <p style="color: #999; margin-bottom: 25px;">Registra el monto inicial en efectivo para comenzar el turno de ventas</p>
+
+        <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <label style="display: block; font-size: 12px; color: #666; font-weight: 500; margin-bottom: 8px;">Monto inicial (C$)</label>
+            <input type="number" class="form-control" id="montoInicial" value="0.00" min="0" step="0.01" style="font-size: 18px; padding: 12px; text-align: right;">
+            <small style="display: block; margin-top: 8px; color: #999;">Ingresa el dinero que llevás en caja al iniciar</small>
+        </div>
+
+        <button class="btn btn-cafe" onclick="abrirTurno()" style="width: 100%; padding: 12px; font-size: 16px;">
+            🔓 Abrir turno
+        </button>
     </div>
 </div>
 
@@ -44,8 +58,13 @@
 
     <div class="row g-3">
         <div class="col-lg-9">
-            <div class="card p-3">
-                <h6 class="fw-bold mb-3" style="color:#5d4037;">Cerrar turno · arqueo de caja</h6>
+            <div class="panel p-3">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h6 class="fw-bold mb-0" style="color:#5d4037; font-size: 16px;">🔐 Cerrar turno · Arqueo de caja</h6>
+                    <button class="btn btn-danger" onclick="cerrarTurno()" style="padding: 8px 16px; font-size: 14px;">
+                        🔒 Cerrar caja
+                    </button>
+                </div>
 
                 <div class="row g-3">
                     <div class="col-md-6">
@@ -80,7 +99,6 @@
                 </div>
 
                 <textarea class="form-control mt-3 mb-2" id="observacion" placeholder="Observación (opcional)" rows="2"></textarea>
-                <button class="btn" style="background:#8B2E2E;color:#fff;" onclick="cerrarTurno()">Cerrar caja</button>
             </div>
         </div>
     </div>
@@ -168,10 +186,12 @@ async function cargar() {
     if (!estado.abierta) {
         document.getElementById('sinTurno').style.display = 'block';
         document.getElementById('conTurno').style.display = 'none';
+        document.getElementById('estadoCaja').style.display = 'none';
         return;
     }
     document.getElementById('sinTurno').style.display = 'none';
     document.getElementById('conTurno').style.display = 'block';
+    document.getElementById('estadoCaja').style.display = 'block';
 
     document.getElementById('statVentas').textContent = estado.cantidad_ventas;
     document.getElementById('statTotal').textContent = 'C$ ' + estado.total_ventas.toFixed(2);

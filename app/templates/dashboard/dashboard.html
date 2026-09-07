@@ -6,10 +6,10 @@
 
 <div class="cards-grid">
 
-    <div class="kpi-card">
-        <p>Ventas del día</p>
-        <h2>C$ {{ "{:,.2f}".format(ventas_hoy | default(0.0)) }}</h2>
-        <span class="positive">Datos reales</span>
+    <div class="kpi-card" style="border-left: 4px solid #0b5cff;">
+        <p>💵 Ventas del día</p>
+        <h2 id="ventasHoyKPI">C$ 0.00</h2>
+        <span class="positive">Hoy en tiempo real</span>
     </div>
 
     <div class="kpi-card">
@@ -28,6 +28,24 @@
         <p>Ganancia del mes</p>
         <h2>C$ {{ "{:,.2f}".format((ventas_mes | default(0.0)) - (gastos_mes | default(0.0))) }}</h2>
         <span class="positive">Ventas - Gastos</span>
+    </div>
+
+    <div class="kpi-card">
+        <p>🥇 Platillo más popular</p>
+        <h2 id="platilloTopKPI">-</h2>
+        <span id="platilloTopDetalle">Sin datos</span>
+    </div>
+
+    <div class="kpi-card">
+        <p>📊 Mesero con más ventas</p>
+        <h2 id="meseroTopKPI">-</h2>
+        <span id="meseroTopDetalle">Sin datos</span>
+    </div>
+
+    <div class="kpi-card">
+        <p>⬇️ Platillo menos popular</p>
+        <h2 id="platilloBottomKPI">-</h2>
+        <span id="platilloBottomDetalle">Sin datos</span>
     </div>
 
     <div class="kpi-card">
