@@ -12,6 +12,8 @@
     .stat-card { background:#fff; border-radius:12px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,.06); text-align:center; }
     .stat-card .valor { font-size:22px; font-weight:800; color:#3e2723; }
     .stat-card .etiqueta { font-size:12px; color:#8d6e63; text-transform:uppercase; letter-spacing:.5px; }
+    .stat-card.destacado { background: linear-gradient(135deg,#8d6e63,#5d4037); }
+    .stat-card.destacado .valor, .stat-card.destacado .etiqueta { color:#fff; }
     .arqueo-tabla { width:100%; border-collapse:collapse; font-size:13.5px; }
     .arqueo-tabla th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#8d6e63; padding:4px 6px; border-bottom:1px solid #eee; }
     .arqueo-tabla td { padding:4px 6px; vertical-align:middle; }
@@ -20,6 +22,14 @@
     .arqueo-resumen { background:#fbf6f2; border-radius:10px; padding:12px 14px; font-size:13.5px; }
     .arqueo-resumen .fila { display:flex; justify-content:space-between; padding:3px 0; }
     .arqueo-resumen .fila.total { border-top:1px dashed #d7c4b8; margin-top:6px; padding-top:8px; font-weight:800; font-size:16px; color:#3e2723; }
+    .modo-btn { flex:1; padding:12px; border-radius:10px; border:2px solid #e0d5cc; background:#fff; color:#8d6e63; font-weight:700; cursor:pointer; transition:.15s; text-align:center; }
+    .modo-btn.activo { border-color:#5d4037; background:#5d4037; color:#fff; }
+    .conteo-rapido-input { font-size:32px; font-weight:800; text-align:center; padding:20px; border-radius:12px; border:2px solid #d7c4b8; color:#3e2723; width:100%; }
+    .conteo-rapido-input:focus { outline:none; border-color:#8d6e63; box-shadow:0 0 0 4px rgba(141,110,99,.15); }
+    .diferencia-box { border-radius:12px; padding:16px; text-align:center; margin-top:14px; }
+    .diferencia-box.ok { background:#e8f5e9; color:#1e7e34; }
+    .diferencia-box.falta { background:#fdecea; color:#c0392b; }
+    .diferencia-box.sobra { background:#fff8e1; color:#8d6e00; }
 </style>
 {% endblock %}
 
@@ -40,7 +50,13 @@
         <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
             <label style="display: block; font-size: 12px; color: #666; font-weight: 500; margin-bottom: 8px;">Monto inicial (C$)</label>
             <input type="number" class="form-control" id="montoInicial" value="0.00" min="0" step="0.01" style="font-size: 18px; padding: 12px; text-align: right;">
-            <small style="display: block; margin-top: 8px; color: #999;">Ingresa el dinero que llevás en caja al iniciar</small>
+            <div style="display:flex; gap:8px; margin-top:10px; justify-content:center;">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setMontoInicial(0)">C$0</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setMontoInicial(500)">C$500</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setMontoInicial(1000)">C$1,000</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setMontoInicial(2000)">C$2,000</button>
+            </div>
+            <small style="display: block; margin-top: 10px; color: #999;">Ingresa el dinero que llevás en caja al iniciar</small>
         </div>
 
         <button class="btn btn-cafe" onclick="abrirTurno()" style="width: 100%; padding: 12px; font-size: 16px;">
@@ -53,52 +69,73 @@
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-4"><div class="stat-card"><div class="valor" id="statVentas">0</div><div class="etiqueta">Ventas</div></div></div>
         <div class="col-6 col-md-4"><div class="stat-card"><div class="valor" id="statTotal">C$0</div><div class="etiqueta">Total vendido</div></div></div>
-        <div class="col-6 col-md-4"><div class="stat-card"><div class="valor" id="statEsperado">C$0</div><div class="etiqueta">Esperado en caja</div></div></div>
+        <div class="col-6 col-md-4"><div class="stat-card destacado"><div class="valor" id="statEsperado">C$0</div><div class="etiqueta">💰 Esperado en caja</div></div></div>
     </div>
 
     <div class="row g-3">
         <div class="col-lg-9">
             <div class="panel p-3">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h6 class="fw-bold mb-0" style="color:#5d4037; font-size: 16px;">🔐 Cerrar turno · Arqueo de caja</h6>
-                    <button class="btn btn-danger" onclick="cerrarTurno()" style="padding: 8px 16px; font-size: 14px;">
-                        🔒 Cerrar caja
+                <h6 class="fw-bold mb-3" style="color:#5d4037; font-size: 17px;">🔐 Cerrar turno de caja</h6>
+
+                <!-- Selector de modo -->
+                <div style="display:flex; gap:10px; margin-bottom:18px;">
+                    <button type="button" id="btnModoRapido" class="modo-btn activo" onclick="cambiarModoConteo('rapido')">
+                        ⚡ Conteo rápido
+                    </button>
+                    <button type="button" id="btnModoDetallado" class="modo-btn" onclick="cambiarModoConteo('detallado')">
+                        🔢 Desglose por billete
                     </button>
                 </div>
 
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <strong style="color:#5d4037;">🇳🇮 Córdobas</strong>
+                <!-- MODO RAPIDO: un solo campo -->
+                <div id="modoRapido">
+                    <label class="form-label" style="font-weight:600; color:#5d4037;">¿Cuánto contaste en caja? (C$)</label>
+                    <input type="number" id="montoContadoRapido" class="conteo-rapido-input" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
+                    <p style="text-align:center; color:#999; font-size:13px; margin-top:8px;">Sumá todo el efectivo (córdobas + dólares convertidos) y escribí el total aquí</p>
+
+                    <div id="diferenciaRapida" class="diferencia-box" style="display:none;"></div>
+                </div>
+
+                <!-- MODO DETALLADO: desglose por denominacion (oculto por defecto) -->
+                <div id="modoDetallado" style="display:none;">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong style="color:#5d4037;">🇳🇮 Córdobas</strong>
+                            </div>
+                            <table class="arqueo-tabla">
+                                <thead><tr><th>Denominación</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
+                                <tbody id="arqueoCordobasBody"></tbody>
+                            </table>
                         </div>
-                        <table class="arqueo-tabla">
-                            <thead><tr><th>Denominación</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
-                            <tbody id="arqueoCordobasBody"></tbody>
-                        </table>
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <strong style="color:#5d4037;">🇺🇸 Dólares</strong>
+                            </div>
+                            <table class="arqueo-tabla">
+                                <thead><tr><th>Billete</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
+                                <tbody id="arqueoDolaresBody"></tbody>
+                            </table>
+                            <label class="form-label mt-2 mb-1" style="font-size:12.5px;">Tipo de cambio (C$ por US$1)</label>
+                            <input type="number" class="form-control form-control-sm" id="tipoCambio" min="0" step="0.01" placeholder="Ej. 36.60" style="max-width:140px;">
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <strong style="color:#5d4037;">🇺🇸 Dólares</strong>
-                        </div>
-                        <table class="arqueo-tabla">
-                            <thead><tr><th>Billete</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
-                            <tbody id="arqueoDolaresBody"></tbody>
-                        </table>
-                        <label class="form-label mt-2 mb-1" style="font-size:12.5px;">Tipo de cambio (C$ por US$1)</label>
-                        <input type="number" class="form-control form-control-sm" id="tipoCambio" min="0" step="0.01" placeholder="Ej. 36.60" style="max-width:140px;">
+
+                    <div class="arqueo-resumen mt-3">
+                        <div class="fila"><span>Total en córdobas contado</span><strong id="resSubtotalCordobas">C$ 0.00</strong></div>
+                        <div class="fila"><span>Total en dólares contado</span><strong id="resSubtotalDolares">US$ 0.00</strong></div>
+                        <div class="fila"><span>Dólares convertidos a córdobas</span><strong id="resDolaresConvertidos">C$ 0.00</strong></div>
+                        <div class="fila"><span>Esperado en caja (sistema)</span><strong id="resEsperado">C$ 0.00</strong></div>
+                        <div class="fila total"><span>Total contado</span><strong id="resTotalContado">C$ 0.00</strong></div>
+                        <div class="fila"><span>Diferencia</span><strong id="resDiferencia">C$ 0.00</strong></div>
                     </div>
                 </div>
 
-                <div class="arqueo-resumen mt-3">
-                    <div class="fila"><span>Total en córdobas contado</span><strong id="resSubtotalCordobas">C$ 0.00</strong></div>
-                    <div class="fila"><span>Total en dólares contado</span><strong id="resSubtotalDolares">US$ 0.00</strong></div>
-                    <div class="fila"><span>Dólares convertidos a córdobas</span><strong id="resDolaresConvertidos">C$ 0.00</strong></div>
-                    <div class="fila"><span>Esperado en caja (sistema)</span><strong id="resEsperado">C$ 0.00</strong></div>
-                    <div class="fila total"><span>Total contado</span><strong id="resTotalContado">C$ 0.00</strong></div>
-                    <div class="fila"><span>Diferencia</span><strong id="resDiferencia">C$ 0.00</strong></div>
-                </div>
+                <textarea class="form-control mt-3 mb-3" id="observacion" placeholder="Observación (opcional) — ej. faltante, billete falso, etc." rows="2"></textarea>
 
-                <textarea class="form-control mt-3 mb-2" id="observacion" placeholder="Observación (opcional)" rows="2"></textarea>
+                <button class="btn btn-danger" onclick="cerrarTurno()" style="width:100%; padding:14px; font-size:16px; font-weight:700;">
+                    🔒 Cerrar caja
+                </button>
             </div>
         </div>
     </div>
@@ -124,6 +161,44 @@ const DENOM_CORDOBAS = [
 const DENOM_DOLARES = [1, 5, 10, 20, 50, 100];
 
 let montoEsperadoActual = 0;
+let modoConteoActual = 'rapido';
+
+function cambiarModoConteo(modo) {
+    modoConteoActual = modo;
+    const esRapido = modo === 'rapido';
+    document.getElementById('modoRapido').style.display = esRapido ? 'block' : 'none';
+    document.getElementById('modoDetallado').style.display = esRapido ? 'none' : 'block';
+    document.getElementById('btnModoRapido').classList.toggle('activo', esRapido);
+    document.getElementById('btnModoDetallado').classList.toggle('activo', !esRapido);
+    if (esRapido) {
+        document.getElementById('montoContadoRapido').focus();
+    }
+}
+
+function recalcularConteoRapido() {
+    const input = document.getElementById('montoContadoRapido');
+    const box = document.getElementById('diferenciaRapida');
+    const monto = parseFloat(input.value);
+
+    if (isNaN(monto) || input.value === '') {
+        box.style.display = 'none';
+        return;
+    }
+
+    const diferencia = monto - montoEsperadoActual;
+    box.style.display = 'block';
+
+    if (Math.abs(diferencia) < 0.01) {
+        box.className = 'diferencia-box ok';
+        box.innerHTML = '✅ <strong>¡Caja cuadrada!</strong> No hay diferencia.';
+    } else if (diferencia < 0) {
+        box.className = 'diferencia-box falta';
+        box.innerHTML = `⚠️ <strong>Falta C$ ${Math.abs(diferencia).toFixed(2)}</strong>`;
+    } else {
+        box.className = 'diferencia-box sobra';
+        box.innerHTML = `ℹ️ <strong>Sobra C$ ${diferencia.toFixed(2)}</strong>`;
+    }
+}
 
 function construirFilasArqueo() {
     const bodyCordobas = document.getElementById('arqueoCordobasBody');
@@ -198,6 +273,11 @@ async function cargar() {
     document.getElementById('statEsperado').textContent = 'C$ ' + estado.monto_esperado.toFixed(2);
     montoEsperadoActual = estado.monto_esperado;
     recalcularArqueo();
+    recalcularConteoRapido();
+}
+
+function setMontoInicial(valor) {
+    document.getElementById('montoInicial').value = valor.toFixed(2);
 }
 
 async function abrirTurno() {
@@ -207,35 +287,54 @@ async function abrirTurno() {
 }
 
 async function cerrarTurno() {
-    const arqueo = recalcularArqueo();
+    let totalContado, detalleConteo, tipoCambio;
 
-    if (arqueo.subtotalDolares > 0 && arqueo.tipoCambio <= 0) {
-        showCustomAlert('Contaste dólares: escribe el tipo de cambio (C$ por US$1) para poder convertirlos.');
-        return;
+    if (modoConteoActual === 'rapido') {
+        const monto = parseFloat(document.getElementById('montoContadoRapido').value);
+        if (isNaN(monto) || monto < 0) {
+            showCustomAlert('Escribe cuánto contaste en caja antes de cerrar.');
+            document.getElementById('montoContadoRapido').focus();
+            return;
+        }
+        totalContado = monto;
+        detalleConteo = { modo: 'rapido', total_ingresado: monto };
+        tipoCambio = null;
+    } else {
+        const arqueo = recalcularArqueo();
+        if (arqueo.subtotalDolares > 0 && arqueo.tipoCambio <= 0) {
+            showCustomAlert('Contaste dólares: escribe el tipo de cambio (C$ por US$1) para poder convertirlos.');
+            return;
+        }
+        totalContado = arqueo.totalContado;
+        detalleConteo = {
+            modo: 'detallado',
+            cordoba: Object.fromEntries(DENOM_CORDOBAS.map(d => [d.valor, parseInt(document.getElementById(`cord_${d.valor}`).value, 10) || 0])),
+            dolar: Object.fromEntries(DENOM_DOLARES.map(v => [v, parseInt(document.getElementById(`usd_${v}`).value, 10) || 0])),
+        };
+        tipoCambio = arqueo.tipoCambio || null;
     }
 
-    const detalleConteo = {
-        cordoba: Object.fromEntries(DENOM_CORDOBAS.map(d => [d.valor, parseInt(document.getElementById(`cord_${d.valor}`).value, 10) || 0])),
-        dolar: Object.fromEntries(DENOM_DOLARES.map(v => [v, parseInt(document.getElementById(`usd_${v}`).value, 10) || 0])),
-    };
-
-    showCustomConfirm('¿Cerrar el turno de caja con C$ ' + arqueo.totalContado.toFixed(2) + ' contados en total?', async () => {
+    showCustomConfirm('¿Cerrar el turno de caja con C$ ' + totalContado.toFixed(2) + ' contados en total?', async () => {
         const r = await fetch('/caja/api/cerrar', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
-                monto_real: arqueo.totalContado,
+                monto_real: totalContado,
                 observacion: document.getElementById('observacion').value,
                 detalle_conteo: detalleConteo,
-                tipo_cambio: arqueo.tipoCambio || null,
+                tipo_cambio: tipoCambio,
             }),
         }).then(r => r.json());
         if (r.success) {
             showCustomAlert('Turno cerrado. Diferencia: C$ ' + r.diferencia.toFixed(2), false);
+            document.getElementById('montoContadoRapido').value = '';
+            document.getElementById('diferenciaRapida').style.display = 'none';
             cargar();
         } else showCustomAlert(r.message);
     });
 }
+
+document.getElementById('montoContadoRapido').addEventListener('input', recalcularConteoRapido);
 
 construirFilasArqueo();
 cargar();

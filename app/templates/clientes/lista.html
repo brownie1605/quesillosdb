@@ -11,31 +11,60 @@
     .btn-cafe { background: linear-gradient(45deg,#8d6e63,#bcaaa4); color:#fff; border:none; }
     .btn-cafe:hover { color:#fff; opacity:.9; }
     table thead { background:#f5efe9; }
+    .btn-tab-clientes { background:#1abc9c; color:#fff; border:none; font-weight:600; }
+    .btn-tab-clientes:hover { background:#17a589; color:#fff; }
+    .btn-tab-clientes.inactive { background:#e9ecef; color:#6c757d; }
+    .btn-tab-clientes.inactive:hover { background:#dee2e6; color:#495057; }
+    .btn-tab-reporte { background:#ff5722; color:#fff; border:none; font-weight:600; }
+    .btn-tab-reporte:hover { background:#e64a19; color:#fff; }
+    .btn-tab-reporte.inactive { background:#e9ecef; color:#6c757d; }
+    .btn-tab-reporte.inactive:hover { background:#dee2e6; color:#495057; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3 class="titulo">🙂 Clientes</h3>
-    <button class="btn btn-cafe" data-bs-toggle="modal" data-bs-target="#modalCliente" onclick="abrirNuevo()">
-        <i class="bi bi-plus-circle"></i> Nuevo cliente
-    </button>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h3 class="titulo mb-0">🙂 Clientes</h3>
+    <div style="display: flex; gap: 10px;">
+        <button id="btnTabClientes" class="btn btn-tab-clientes" onclick="cambiarTab('clientes')">
+            <i class="bi bi-people-fill"></i> Clientes
+        </button>
+        <button id="btnTabReporte" class="btn btn-tab-reporte inactive" onclick="cambiarTab('reporte')">
+            <i class="bi bi-clipboard-data"></i> Reportería
+        </button>
+    </div>
 </div>
 
-<div class="d-flex gap-2 mb-3 flex-wrap">
-    <input type="text" class="form-control" style="max-width:320px;" id="buscar" placeholder="Buscar por nombre o cédula...">
-    <select class="form-select" style="max-width:180px;" id="filtroTipo">
-        <option value="">Tipo: Todos</option>
-        <option value="interno">Interno</option>
-        <option value="externo">Externo</option>
-    </select>
+<!-- SECCION: Clientes -->
+<div id="seccionClientes">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div class="d-flex gap-2 flex-wrap">
+            <input type="text" class="form-control" style="max-width:320px;" id="buscar" placeholder="Buscar por nombre o cédula...">
+            <select class="form-select" style="max-width:180px;" id="filtroTipo">
+                <option value="">Tipo: Todos</option>
+                <option value="interno">Interno</option>
+                <option value="externo">Externo</option>
+            </select>
+        </div>
+        <button class="btn btn-cafe" data-bs-toggle="modal" data-bs-target="#modalCliente" onclick="abrirNuevo()">
+            <i class="bi bi-plus-circle"></i> Nuevo cliente
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle bg-white">
+            <thead><tr><th>Nombre</th><th>Tipo</th><th>Cédula</th><th>Teléfono</th><th>Dirección</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="7" class="text-center py-4">Cargando…</td></tr></tbody>
+        </table>
+        <div id="paginacionClientes" class="pagination"></div>
+    </div>
 </div>
 
-<!-- Reportería: Platillos por cliente -->
-<div class="mb-4">
+<!-- SECCION: Reportería de Platillos -->
+<div id="seccionReporte" style="display:none;">
     <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-        <h4 style="margin-top: 0; color: #5d4037; display: flex; align-items: center; gap: 8px;">
-            📋 Reportería de Platillos
+        <h4 style="margin-top: 0; color: #5d4037; display: flex; align-items: center; gap: 8px; font-size: 16px;">
+            📋 Platillos consumidos por cliente
         </h4>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
             <div style="flex: 1; min-width: 200px;">
@@ -58,14 +87,6 @@
         </table>
         <div id="paginacionReporte" class="pagination"></div>
     </div>
-</div>
-
-<div class="table-responsive">
-    <table class="table table-hover align-middle bg-white">
-        <thead><tr><th>Nombre</th><th>Tipo</th><th>Cédula</th><th>Teléfono</th><th>Dirección</th><th>Estado</th><th></th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="7" class="text-center py-4">Cargando…</td></tr></tbody>
-    </table>
-    <div id="paginacionClientes" class="pagination"></div>
 </div>
 
 <div class="modal fade" id="modalCliente" tabindex="-1">
@@ -107,6 +128,25 @@ let reporteData = [];
 let modal;
 const pagClientes = crearPaginador('paginacionClientes', 20);
 const pagReporte = crearPaginador('paginacionReporte', 20);
+
+function cambiarTab(tab) {
+    const btnClientes = document.getElementById('btnTabClientes');
+    const btnReporte = document.getElementById('btnTabReporte');
+    const secClientes = document.getElementById('seccionClientes');
+    const secReporte = document.getElementById('seccionReporte');
+
+    if (tab === 'clientes') {
+        secClientes.style.display = 'block';
+        secReporte.style.display = 'none';
+        btnClientes.classList.remove('inactive');
+        btnReporte.classList.add('inactive');
+    } else {
+        secClientes.style.display = 'none';
+        secReporte.style.display = 'block';
+        btnClientes.classList.add('inactive');
+        btnReporte.classList.remove('inactive');
+    }
+}
 
 async function cargar() {
     clientes = await fetch('/clientes/api/list').then(r => r.json());

@@ -24,6 +24,13 @@ class Config:
 
     SECRET_KEY = os.getenv("SECRET_KEY") or _SECRET_KEY_FALLBACK
 
+    # Sin esto, con FLASK_ENV=production (debug=False) Jinja cachea las
+    # plantillas compiladas en memoria y un cambio en un .html no se ve
+    # hasta reiniciar el proceso -- confundio varias veces durante
+    # desarrollo. Costo en produccion real: nulo para este tamano de app
+    # (una sola maquina, trafico bajo), y evita ese reinicio manual.
+    TEMPLATES_AUTO_RELOAD = True
+
     # ------------------------------------------------------------------
     # Cookie de sesion: sin esto, Flask usa los defaults del navegador
     # (razonables, pero mejor fijarlos explicitos). SESSION_COOKIE_SECURE
