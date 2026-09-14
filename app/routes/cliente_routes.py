@@ -109,14 +109,16 @@ def api_platillos_por_cliente():
         if not inicio or not fin:
             return jsonify({"success": False, "message": "Fechas requeridas"}), 400
 
-        # Query: clientes y sus platillos consumidos
+        # Query: clientes y sus platillos consumidos, con el descuento
+        # aplicado a cada linea (dv.descuento) sumado por platillo.
         query = text("""
             SELECT
                 c.id_cliente,
                 c.nombre as cliente_nombre,
                 c.tipo_cliente,
                 p.nombre as platillo_nombre,
-                SUM(dv.cantidad) as cantidad
+                SUM(dv.cantidad) as cantidad,
+                SUM(dv.descuento) as descuento_platillo
             FROM clientes c
             LEFT JOIN ventas v ON c.id_cliente = v.id_cliente AND v.id_empresa = :empresa AND v.estado = 'completada'
                 AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
@@ -133,6 +135,24 @@ def api_platillos_por_cliente():
             "fin": fin
         }).fetchall()
 
+        # Descuento total a nivel de pedido (venta), aparte del de cada
+        # linea -- un pedido puede llevar descuento general ademas del
+        # de cada platillo, y aqui se suma sin duplicar por cada linea.
+        query_descuento_pedido = text("""
+            SELECT v.id_cliente, COALESCE(SUM(v.descuento), 0) as descuento_pedidos
+            FROM ventas v
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada'
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            AND v.id_cliente IS NOT NULL
+            GROUP BY v.id_cliente
+        """)
+        descuentos_pedido = {
+            row[0]: float(row[1] or 0)
+            for row in db.session.execute(query_descuento_pedido, {
+                "empresa": current_user.id_empresa, "inicio": inicio, "fin": fin
+            }).fetchall()
+        }
+
         # Procesar y agrupar por cliente
         clientes_dict = {}
         for row in result:
@@ -141,18 +161,21 @@ def api_platillos_por_cliente():
             tipo_cliente = row[2]
             platillo_nombre = row[3]
             cantidad = row[4]
+            descuento_platillo = row[5]
 
             if cliente_id not in clientes_dict:
                 clientes_dict[cliente_id] = {
                     "cliente_nombre": cliente_nombre,
                     "tipo_cliente": tipo_cliente,
-                    "platillos": []
+                    "platillos": [],
+                    "descuento_pedido": descuentos_pedido.get(cliente_id, 0.0),
                 }
 
             if platillo_nombre:  # Solo agregar si hay platillo
                 clientes_dict[cliente_id]["platillos"].append({
                     "nombre": platillo_nombre,
-                    "cantidad": int(cantidad or 0)
+                    "cantidad": int(cantidad or 0),
+                    "descuento": float(descuento_platillo or 0),
                 })
 
         # Convertir a lista

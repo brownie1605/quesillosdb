@@ -82,8 +82,8 @@
 
     <div class="table-responsive">
         <table class="table table-hover align-middle bg-white" style="font-size: 14px;">
-            <thead><tr><th style="width: 30%;">Cliente</th><th style="width: 15%;">Tipo</th><th style="width: 55%;">Platillos Consumidos</th></tr></thead>
-            <tbody id="tbodyReporte"><tr><td colspan="3" class="text-center py-4">Cargando…</td></tr></tbody>
+            <thead><tr><th style="width: 25%;">Cliente</th><th style="width: 12%;">Tipo</th><th style="width: 48%;">Platillos Consumidos</th><th style="width: 15%;">Descuento</th></tr></thead>
+            <tbody id="tbodyReporte"><tr><td colspan="4" class="text-center py-4">Cargando…</td></tr></tbody>
         </table>
         <div id="paginacionReporte" class="pagination"></div>
     </div>
@@ -282,21 +282,28 @@ function renderizarReporte() {
     const tbody = document.getElementById('tbodyReporte');
     if (!reporteData.length) {
         document.getElementById('paginacionReporte').innerHTML = '';
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Sin datos en el rango seleccionado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">Sin datos en el rango seleccionado.</td></tr>';
         return;
     }
+
+    const fmtC = (n) => 'C$ ' + (n || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     const pagina = pagReporte.paginar(reporteData, renderizarReporte);
     tbody.innerHTML = pagina.map(item => {
         const platillosHtml = item.platillos.length
-            ? item.platillos.map(p => `<div style="padding: 2px 0;"><small>${p.nombre} <strong>×${p.cantidad}</strong></small></div>`).join('')
+            ? item.platillos.map(p => `<div style="padding: 2px 0;"><small>${p.nombre} <strong>×${p.cantidad}</strong>${p.descuento > 0 ? ` <span style="color:#e63946;">(-${fmtC(p.descuento)})</span>` : ''}</small></div>`).join('')
             : '<small style="color: #999;">Sin platillos registrados</small>';
+
+        const descuentoTotal = (item.platillos.reduce((s, p) => s + (p.descuento || 0), 0)) + (item.descuento_pedido || 0);
 
         return `<tr>
             <td><strong>${escapeHtml(item.cliente_nombre)}</strong></td>
             <td><span class="badge ${item.tipo_cliente==='interno'?'bg-info text-dark':'bg-light text-dark border'}">${item.tipo_cliente==='interno'?'Interno':'Externo'}</span></td>
             <td>
                 ${item.platillos.length > 0 ? `<div style="max-height: 120px; overflow-y: auto; padding: 5px; background: #f9f9f9; border-radius: 4px;">${platillosHtml}</div>` : platillosHtml}
+            </td>
+            <td>
+                ${descuentoTotal > 0 ? `<strong style="color:#e63946;">${fmtC(descuentoTotal)}</strong>` : '<small style="color:#999;">—</small>'}
             </td>
         </tr>`;
     }).join('');
