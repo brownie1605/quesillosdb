@@ -71,26 +71,40 @@ class BackupService:
         # mismo archivo temporal a la vez.
         ruta_tmp = ruta + f".{uuid.uuid4().hex[:8]}.tmp"
 
+        tablas_fallidas = []
         with engine.connect() as conn:
             tablas = BackupService._tablas(conn)
             with gzip.open(ruta_tmp, "wt", encoding="utf-8") as f:
                 f.write(f"-- Respaldo Quesillos POS ({nombre_bind}) - {datetime.now().isoformat()}\n")
                 f.write("SET FOREIGN_KEY_CHECKS=0;\n\n")
                 for tabla in tablas:
-                    crear = conn.execute(text(f"SHOW CREATE TABLE `{tabla}`")).fetchone()
-                    f.write(f"DROP TABLE IF EXISTS `{tabla}`;\n{crear[1]};\n\n")
+                    # Una tabla/vista individual rota (ej. una VIEW con
+                    # definer sin permisos) no debe tumbar TODO el
+                    # respaldo -- se salta esa y se sigue con las demas,
+                    # mejor un respaldo parcial que ninguno.
+                    try:
+                        crear = conn.execute(text(f"SHOW CREATE TABLE `{tabla}`")).fetchone()
+                        f.write(f"DROP TABLE IF EXISTS `{tabla}`;\n{crear[1]};\n\n")
 
-                    filas = conn.execute(text(f"SELECT * FROM `{tabla}`")).mappings().fetchall()
-                    if not filas:
-                        continue
-                    columnas = list(filas[0].keys())
-                    cols_sql = ", ".join(f"`{c}`" for c in columnas)
-                    f.write(f"-- {len(filas)} filas\n")
-                    for fila in filas:
-                        valores = ", ".join(BackupService._escapar_valor(fila[c]) for c in columnas)
-                        f.write(f"INSERT INTO `{tabla}` ({cols_sql}) VALUES ({valores});\n")
-                    f.write("\n")
+                        filas = conn.execute(text(f"SELECT * FROM `{tabla}`")).mappings().fetchall()
+                        if not filas:
+                            continue
+                        columnas = list(filas[0].keys())
+                        cols_sql = ", ".join(f"`{c}`" for c in columnas)
+                        f.write(f"-- {len(filas)} filas\n")
+                        for fila in filas:
+                            valores = ", ".join(BackupService._escapar_valor(fila[c]) for c in columnas)
+                            f.write(f"INSERT INTO `{tabla}` ({cols_sql}) VALUES ({valores});\n")
+                        f.write("\n")
+                    except Exception as e:  # noqa: BLE001
+                        conn.rollback()  # limpia la transaccion abortada por el error antes de seguir
+                        tablas_fallidas.append(tabla)
+                        f.write(f"-- OMITIDA '{tabla}': {e}\n\n")
+                        log.warning("Respaldo: se omitio '%s' por error: %s", tabla, e)
                 f.write("SET FOREIGN_KEY_CHECKS=1;\n")
+
+        if tablas_fallidas:
+            log.warning("Respaldo con %d tabla(s) omitida(s): %s", len(tablas_fallidas), tablas_fallidas)
 
         # Escribir a .tmp y renombrar al final: si el proceso se corta a
         # medias (se va la luz, etc.), nunca queda un backup a medio
