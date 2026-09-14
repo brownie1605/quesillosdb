@@ -135,7 +135,13 @@ def iniciar_scheduler(app):
         id="respaldo_automatico",
         replace_existing=True,
         max_instances=1,
-        next_run_time=datetime.now(),  # tambien corre uno al arrancar, no solo 24h despues
+        # tambien corre uno al arrancar, no solo 24h despues. OJO: tiene
+        # que ser un datetime "aware" en el MISMO timezone del scheduler
+        # (America/Managua) -- un datetime.now() naive aqui hace que
+        # APScheduler nunca pueda calcular cuando correrlo (comparacion
+        # naive vs aware falla en silencio dentro del scheduler, ni
+        # siquiera llega a ejecutar _job_backup ni a loguear el error).
+        next_run_time=datetime.now(scheduler.timezone),
     )
     scheduler.start()
     log.info(
