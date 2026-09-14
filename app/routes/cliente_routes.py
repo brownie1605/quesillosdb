@@ -110,7 +110,8 @@ def api_platillos_por_cliente():
             return jsonify({"success": False, "message": "Fechas requeridas"}), 400
 
         # Query: clientes y sus platillos consumidos, con el descuento
-        # aplicado a cada linea (dv.descuento) sumado por platillo.
+        # aplicado a cada linea (dv.descuento) sumado por platillo, y el
+        # subtotal bruto (antes de descuento) para poder calcular el %.
         query = text("""
             SELECT
                 c.id_cliente,
@@ -118,7 +119,8 @@ def api_platillos_por_cliente():
                 c.tipo_cliente,
                 p.nombre as platillo_nombre,
                 SUM(dv.cantidad) as cantidad,
-                SUM(dv.descuento) as descuento_platillo
+                SUM(dv.descuento) as descuento_platillo,
+                SUM(dv.subtotal) as subtotal_platillo
             FROM clientes c
             LEFT JOIN ventas v ON c.id_cliente = v.id_cliente AND v.id_empresa = :empresa AND v.estado = 'completada'
                 AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
@@ -162,6 +164,7 @@ def api_platillos_por_cliente():
             platillo_nombre = row[3]
             cantidad = row[4]
             descuento_platillo = row[5]
+            subtotal_platillo = row[6]
 
             if cliente_id not in clientes_dict:
                 clientes_dict[cliente_id] = {
@@ -169,6 +172,7 @@ def api_platillos_por_cliente():
                     "tipo_cliente": tipo_cliente,
                     "platillos": [],
                     "descuento_pedido": descuentos_pedido.get(cliente_id, 0.0),
+                    "subtotal_bruto": 0.0,
                 }
 
             if platillo_nombre:  # Solo agregar si hay platillo
@@ -177,6 +181,21 @@ def api_platillos_por_cliente():
                     "cantidad": int(cantidad or 0),
                     "descuento": float(descuento_platillo or 0),
                 })
+                clientes_dict[cliente_id]["subtotal_bruto"] += float(subtotal_platillo or 0)
+
+        # Descuento total (lineas + pedido) y su % sobre lo consumido,
+        # calculado aqui para que el frontend no tenga que rehacer la
+        # cuenta -- % = descuento_total / (subtotal_bruto + descuento_total).
+        # subtotal_bruto ya es el subtotal DESPUES de aplicar el descuento
+        # de linea (dv.subtotal = cantidad*precio - descuento), por eso se
+        # sim vuelve a sumar el descuento para reconstruir el bruto real.
+        for c in clientes_dict.values():
+            descuento_lineas = sum(p["descuento"] for p in c["platillos"])
+            descuento_total = descuento_lineas + c["descuento_pedido"]
+            base = c["subtotal_bruto"] + descuento_lineas  # bruto antes de descuento de linea
+            c["descuento_total"] = round(descuento_total, 2)
+            c["descuento_pct"] = round((descuento_total / base * 100), 1) if base > 0 else 0.0
+            del c["subtotal_bruto"]
 
         # Convertir a lista
         data = list(clientes_dict.values())

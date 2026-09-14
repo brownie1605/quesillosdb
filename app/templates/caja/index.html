@@ -162,6 +162,20 @@ const DENOM_DOLARES = [1, 5, 10, 20, 50, 100];
 
 let montoEsperadoActual = 0;
 let modoConteoActual = 'rapido';
+let idAperturaActual = null;
+
+// Limpia todos los campos de conteo (rapido + desglose por billete +
+// observacion). Se llama SOLO cuando se detecta un turno distinto al
+// que ya se estaba mostrando -- nunca en un refresh normal del mismo
+// turno, para no borrarle al cajero lo que ya iba contando.
+function limpiarConteo() {
+    document.getElementById('montoContadoRapido').value = '';
+    document.getElementById('diferenciaRapida').style.display = 'none';
+    document.getElementById('tipoCambio').value = '';
+    document.getElementById('observacion').value = '';
+    DENOM_CORDOBAS.forEach(d => { const el = document.getElementById(`cord_${d.valor}`); if (el) el.value = '0'; });
+    DENOM_DOLARES.forEach(v => { const el = document.getElementById(`usd_${v}`); if (el) el.value = '0'; });
+}
 
 function cambiarModoConteo(modo) {
     modoConteoActual = modo;
@@ -272,6 +286,15 @@ async function cargar() {
     document.getElementById('statTotal').textContent = 'C$ ' + estado.total_ventas.toFixed(2);
     document.getElementById('statEsperado').textContent = 'C$ ' + estado.monto_esperado.toFixed(2);
     montoEsperadoActual = estado.monto_esperado;
+
+    // Si es un turno distinto al que ya se estaba mostrando (recien
+    // abierto), limpiar todo el conteo -- si no, los billetes/monto
+    // contados del turno ANTERIOR se quedaban pegados en el nuevo.
+    if (estado.id_apertura !== idAperturaActual) {
+        idAperturaActual = estado.id_apertura;
+        limpiarConteo();
+    }
+
     recalcularArqueo();
     recalcularConteoRapido();
 }
