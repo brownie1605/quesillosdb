@@ -475,22 +475,27 @@ def api_kpis_especiales():
         inicio = request.args.get('inicio')
         fin = request.args.get('fin')
 
-        if inicio and fin:
-            fecha_inicio, fecha_fin = inicio, fin
-        else:
-            hoy = nicaragua_now().date()
-            fecha_inicio = str(hoy)
-            fecha_fin = str(hoy)
-
-        params = {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}
-
-        # Ventas de hoy
+        # "Ventas de hoy" es SIEMPRE literal hoy, sin importar el filtro --
+        # ese numero no tendria sentido con un rango de varios dias.
+        hoy = nicaragua_now().date()
         query_hoy = text("""
             SELECT COALESCE(SUM(total), 0) FROM ventas
             WHERE id_empresa = :empresa AND estado = 'completada'
-            AND DATE(fecha_venta) >= :inicio AND DATE(fecha_venta) <= :fin
+            AND DATE(fecha_venta) = :hoy
         """)
-        ventas_hoy = float(db.session.execute(query_hoy, params).scalar() or 0)
+        ventas_hoy = float(db.session.execute(query_hoy, {"empresa": current_user.id_empresa, "hoy": str(hoy)}).scalar() or 0)
+
+        # El resto (platillo top/bottom, mesero top) usa el rango pedido, o
+        # por defecto los ultimos 7 dias -- igual que el resumen financiero.
+        # "Solo hoy" como default los dejaba vacios casi siempre, ya que la
+        # mayoria de ventas no caen justo en el dia de hoy.
+        if inicio and fin:
+            fecha_inicio, fecha_fin = inicio, fin
+        else:
+            fecha_inicio = str(hoy - timedelta(days=6))
+            fecha_fin = str(hoy)
+
+        params = {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}
 
         # Platillo más popular (TOP 1)
         query_top = text("""
