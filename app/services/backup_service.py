@@ -14,6 +14,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
+from flask import current_app
 from sqlalchemy import text
 
 from app.extensions import db
@@ -99,6 +100,79 @@ class BackupService:
         tamano_kb = os.path.getsize(ruta) / 1024
         log.info("Respaldo creado: %s (%.1f KB, %d tablas)", ruta, tamano_kb, len(tablas))
         return ruta
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _cliente_r2():
+        """Cliente S3 (boto3) apuntando a Cloudflare R2, o None si las
+        variables R2_* no estan configuradas -- en ese caso el resto del
+        flujo sigue funcionando igual, solo sin copia fuera del disco."""
+        cfg = current_app.config
+        account_id = cfg.get("R2_ACCOUNT_ID")
+        access_key = cfg.get("R2_ACCESS_KEY_ID")
+        secret_key = cfg.get("R2_SECRET_ACCESS_KEY")
+        bucket = cfg.get("R2_BUCKET_NAME")
+        if not (account_id and access_key and secret_key and bucket):
+            return None, None
+
+        import boto3  # import perezoso: solo si de verdad se va a usar
+
+        cliente = boto3.client(
+            "s3",
+            endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name="auto",
+        )
+        return cliente, bucket
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def subir_a_r2(ruta_local):
+        """Sube un respaldo ya creado a Cloudflare R2 (bucket R2_BUCKET_NAME,
+        prefijo 'respaldos/'). No lanza excepcion si R2 no esta configurado
+        o si falla la subida -- un respaldo es "mejor que nada" incluso si
+        solo quedo en disco local; se registra el error y sigue."""
+        try:
+            cliente, bucket = BackupService._cliente_r2()
+            if cliente is None:
+                return False
+            clave = f"respaldos/{os.path.basename(ruta_local)}"
+            cliente.upload_file(ruta_local, bucket, clave)
+            log.info("Respaldo subido a R2: s3://%s/%s", bucket, clave)
+            return True
+        except Exception:  # noqa: BLE001
+            log.exception("No se pudo subir el respaldo a R2 (queda solo en disco local)")
+            return False
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def limpiar_viejos_r2(dias_retener=14, prefijo=None):
+        """Borra en R2 los respaldos mas viejos que `dias_retener`, igual
+        que `limpiar_viejos` pero en el bucket en vez del disco local."""
+        try:
+            cliente, bucket = BackupService._cliente_r2()
+            if cliente is None:
+                return []
+            limite = datetime.now(tz=None) - timedelta(days=dias_retener)
+            eliminados = []
+            paginator = cliente.get_paginator("list_objects_v2")
+            for pagina in paginator.paginate(Bucket=bucket, Prefix="respaldos/"):
+                for obj in pagina.get("Contents", []):
+                    nombre = obj["Key"].rsplit("/", 1)[-1]
+                    if prefijo and not nombre.startswith(prefijo):
+                        continue
+                    # LastModified de R2 viene con tzinfo; comparar en naive UTC.
+                    modificado = obj["LastModified"].replace(tzinfo=None)
+                    if modificado < limite:
+                        cliente.delete_object(Bucket=bucket, Key=obj["Key"])
+                        eliminados.append(obj["Key"])
+            if eliminados:
+                log.info("Respaldos eliminados en R2 por retencion (%s dias): %s", dias_retener, eliminados)
+            return eliminados
+        except Exception:  # noqa: BLE001
+            log.exception("No se pudo limpiar respaldos viejos en R2")
+            return []
 
     # -----------------------------------------------------------------
     @staticmethod

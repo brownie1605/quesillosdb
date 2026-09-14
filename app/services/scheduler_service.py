@@ -28,12 +28,19 @@ def _job_notificaciones(app):
 def _job_backup(app):
     """Respaldo diario de la base LOCAL (la que de verdad puede perderse
     si falla el disco de esta maquina). No depende de que haya internet
-    ni de que la sincronizacion este activada."""
+    ni de que la sincronizacion este activada.
+
+    Tambien sube una copia a Cloudflare R2 si esta configurado (R2_*):
+    en Railway el disco es efimero, asi que el respaldo local solo no
+    sobrevive a un redeploy -- la copia en R2 si."""
     with app.app_context():
         try:
-            BackupService.crear_backup(nombre_bind="local")
+            ruta = BackupService.crear_backup(nombre_bind="local")
             dias = app.config.get("BACKUP_RETENCION_DIAS", 14)
             BackupService.limpiar_viejos(dias_retener=dias, prefijo="local")
+
+            BackupService.subir_a_r2(ruta)
+            BackupService.limpiar_viejos_r2(dias_retener=dias, prefijo="local")
         except Exception:  # noqa: BLE001
             log.exception("Fallo el respaldo automatico")
 

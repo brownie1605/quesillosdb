@@ -112,6 +112,18 @@ class Config:
     BACKUP_INTERVALO_HORAS = int(os.getenv("BACKUP_INTERVALO_HORAS", 24))
     BACKUP_RETENCION_DIAS = int(os.getenv("BACKUP_RETENCION_DIAS", 14))
 
+    # ------------------------------------------------------------------
+    # Cloudflare R2 (almacenamiento del respaldo fuera del contenedor).
+    # En Railway el disco es efimero -- se borra en cada redeploy -- asi
+    # que el respaldo local por si solo no sirve de red de seguridad ahi.
+    # Si estas variables no estan configuradas, el respaldo simplemente
+    # se queda solo en disco local (como antes); no rompe nada.
+    # ------------------------------------------------------------------
+    R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
+    R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "")
+    R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
+    R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "")
+
     # Empresa / sucursal fijas (instalacion de 1 sola sucursal)
     ID_EMPRESA = int(os.getenv("ID_EMPRESA", 1))
     ID_SUCURSAL = int(os.getenv("ID_SUCURSAL", 1))

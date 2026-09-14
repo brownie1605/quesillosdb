@@ -174,11 +174,17 @@ def sync_status():
 @click.option("--bind", default="local", help="'local' o 'cloud'. Por defecto 'local'.")
 @with_appcontext
 def backup_ahora(bind):
-    """Crea un respaldo ahora mismo (fuera del automatico diario)."""
+    """Crea un respaldo ahora mismo (fuera del automatico diario). Si
+    R2_* esta configurado, tambien lo sube a Cloudflare R2."""
     from app.services.backup_service import BackupService
 
     ruta = BackupService.crear_backup(nombre_bind=bind)
     click.echo(f"Respaldo creado: {ruta}")
+
+    if BackupService.subir_a_r2(ruta):
+        click.echo("Subido a R2.")
+    else:
+        click.echo("No se subio a R2 (revisa las variables R2_* o el log si estaban configuradas).")
 
 
 # ==================================================================
