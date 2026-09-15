@@ -9,7 +9,13 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.min.css">
 <style>
     .pedido-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-    @media (max-width: 991px) { .pedido-layout { grid-template-columns: 1fr; } }
+    @media (max-width: 991px) {
+        .pedido-layout { grid-template-columns: 1fr; }
+        /* En movil, la cuenta (lo que ya se agrego + cobrar) va primero;
+           el menu de productos para seguir agregando queda debajo. */
+        .pedido-layout .menu-panel { order: 2; }
+        .pedido-layout .cuenta-panel { order: 1; }
+    }
     .cat-tabs { display:flex; gap:8px; overflow-x:auto; padding:4px 2px 10px; }
     .cat-tab { flex:0 0 auto; padding:6px 16px; border-radius:20px; border:1px solid #d7ccc8; background:#fff; color:#5d4037; font-size:13px; font-weight:600; cursor:pointer; }
     .cat-tab.active { background: linear-gradient(45deg,#8d6e63,#bcaaa4); color:#fff; border-color:transparent; }
@@ -58,7 +64,7 @@
 
 {% block content %}
 <div class="pedido-layout">
-    <div>
+    <div class="menu-panel">
         <input type="text" class="form-control mb-2" id="buscar" placeholder="Buscar producto...">
         <div class="cat-tabs" id="catTabs"></div>
         <div class="prod-grid" id="prodGrid"></div>
