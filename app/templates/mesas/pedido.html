@@ -20,6 +20,13 @@
     .cat-tab { flex:0 0 auto; padding:6px 16px; border-radius:20px; border:1px solid #d7ccc8; background:#fff; color:#5d4037; font-size:13px; font-weight:600; cursor:pointer; }
     .cat-tab.active { background: linear-gradient(45deg,#8d6e63,#bcaaa4); color:#fff; border-color:transparent; }
     .prod-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap:12px; max-height: 62vh; overflow-y:auto; padding-right:4px; }
+    @media (max-width: 991px) {
+        /* Forzar 2 columnas fijas en movil -- auto-fill con minmax(150px) se
+           desbordaba del viewport y recortaba la 2da columna y las pestanas. */
+        .prod-grid { grid-template-columns: repeat(2, 1fr); max-height: none; overflow-y: visible; }
+        .cat-tabs { flex-wrap: wrap; overflow-x: visible; }
+        .cat-tab { flex: 0 0 auto; }
+    }
     .prod-card { background:#fff; border:1px solid #eee; border-radius:12px; padding:14px 10px; text-align:center; cursor:pointer; transition: all .2s; }
     .prod-card:hover { transform: translateY(-3px); box-shadow: 0 8px 18px rgba(0,0,0,.08); border-color:#bcaaa4; }
     .prod-card.agotado { opacity:.45; pointer-events:none; }
