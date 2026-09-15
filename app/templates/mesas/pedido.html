@@ -257,7 +257,9 @@ async function init() {
 }
 
 async function cargarProductos() {
-    productos = await fetch('/ventas/api/productos').then(r => r.json());
+    // contexto=mesas: solo platos terminados (grupo "POS"), sin insumos
+    // sueltos vendibles por separado -- esos son para el POS de mostrador.
+    productos = await fetch('/ventas/api/productos?contexto=mesas').then(r => r.json());
     renderTabs();
     renderProductos();
 }

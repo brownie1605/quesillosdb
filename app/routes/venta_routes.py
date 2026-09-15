@@ -80,10 +80,17 @@ def api_historial_detalles(id_venta):
 @venta_bp.route("/api/productos", methods=["GET"])
 @login_required
 def api_productos():
-    """Catalogo vendible: productos finales + insumos marcados como vendibles."""
+    """Catalogo vendible: productos finales + insumos marcados como vendibles.
+
+    `?contexto=mesas`: la pantalla de Mesas es para pedidos de comida en
+    mesa -- solo debe ofrecer platos terminados (tipo_producto='final',
+    el grupo "POS" del Inventario), no insumos sueltos vendibles por
+    separado (ej. una docena de tortillas) que si aparecen en el POS
+    general de mostrador."""
+    tipos = ["final"] if request.args.get("contexto") == "mesas" else ["final", "insumo"]
     productos = (
         Producto.query.filter_by(estado="activo", id_empresa=current_user.id_empresa)
-        .filter(Producto.tipo_producto.in_(["final", "insumo"]))
+        .filter(Producto.tipo_producto.in_(tipos))
         .order_by(Producto.nombre)
         .all()
     )

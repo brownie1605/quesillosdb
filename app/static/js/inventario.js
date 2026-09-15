@@ -1,4 +1,5 @@
 let inventarioList = [];
+let grupoInventarioActivo = '';
 const pagInventario = crearPaginador('paginacionInventario', 20);
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,6 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('searchInput').addEventListener('input', reiniciarYRenderizar);
     document.getElementById('stockFilter').addEventListener('change', reiniciarYRenderizar);
     document.getElementById('btnExportarExcel').addEventListener('click', exportarExcel);
+
+    document.querySelectorAll('.btn-tab-inventario').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.btn-tab-inventario').forEach(b => b.classList.remove('activo'));
+            btn.classList.add('activo');
+            grupoInventarioActivo = btn.dataset.grupo;
+            reiniciarYRenderizar();
+        });
+    });
 });
 
 async function cargarInventario() {
@@ -27,6 +37,8 @@ function renderizarTabla() {
     tbody.innerHTML = '';
 
     const filtrados = inventarioList.filter(p => {
+
+        if (grupoInventarioActivo && p.grupo_inventario !== grupoInventarioActivo) return false;
 
         if (stockFilter === 'out' && p.stock_actual > 0) return false;
         if (stockFilter === 'low' && (p.stock_actual <= 0 || p.stock_actual > p.stock_minimo)) return false;

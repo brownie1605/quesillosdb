@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import Inventario, Producto
+from app.models import Inventario, Producto, Categoria
 from app.services.inventario_service import InventarioService
 
 from app.utils.decorators import require_roles
@@ -27,11 +27,31 @@ def _inventarios_por_producto(productos):
     return {inv.id_producto: inv for inv in Inventario.query.filter(Inventario.id_producto.in_(ids)).all()}
 
 
+def _grupo_inventario(producto, categoria_nombre):
+    """Agrupa cada producto en una de 4 vistas de Inventario:
+    Limpieza / Lacteos / POS / Varios.
+
+    'POS' = lo que se vende como plato terminado (tipo_producto='final'
+    y se_vende) -- es exactamente lo mismo que se ofrece para pedir en
+    la pantalla de Mesas (ver /ventas/api/productos?contexto=mesas).
+    No se toca la categorizacion fina existente (Desayunos, Quesillos,
+    etc.) -- este grupo es solo para la vista de Inventario."""
+    if producto.tipo_producto == "final" and producto.se_vende:
+        return "POS"
+    nombre_cat = (categoria_nombre or "").strip().lower()
+    if nombre_cat == "limpieza":
+        return "Limpieza"
+    if nombre_cat in ("lacteos", "lácteos"):
+        return "Lácteos"
+    return "Varios"
+
+
 @inventario_bp.route("/api/list", methods=["GET"])
 @login_required
 def api_list():
     productos = Producto.query.filter_by(estado="activo", id_empresa=current_user.id_empresa).all()
     inventarios = _inventarios_por_producto(productos)
+    categorias = {c.id_categoria: c.nombre for c in Categoria.query.all()}
     res = []
     for p in productos:
         inv = inventarios.get(p.id_producto)
@@ -39,6 +59,9 @@ def api_list():
         d["stock_actual"] = float(inv.stock_actual) if inv else 0.0
         d["stock_minimo"] = float(inv.stock_minimo) if inv else 0.0
         d["id_inventario"] = inv.id_inventario if inv else None
+        categoria_nombre = categorias.get(p.id_categoria)
+        d["categoria_nombre"] = categoria_nombre or "Sin categoría"
+        d["grupo_inventario"] = _grupo_inventario(p, categoria_nombre)
         res.append(d)
     return jsonify(res)
 

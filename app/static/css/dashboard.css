@@ -771,13 +771,36 @@ body.dark-theme .page-btn {
     }
 
     .filter-group {
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
         width: 100%;
-        align-items: stretch;
     }
-    
+
+    /* La barra de busqueda y cualquier select van a lo ancho -- solo los
+       pares de fecha (Desde/Hasta) y campos cortos comparten fila. */
+    .filter-group .search-bar,
+    .filter-group select {
+        grid-column: 1 / -1;
+    }
+
     .search-bar {
         max-width: 100%;
+    }
+
+    /* Tablas en listados (historial, compras, etc): mas compactas y sin
+       columnas secundarias que solo forzaban scroll horizontal feo. */
+    .panel table {
+        font-size: 13px;
+    }
+    .panel table th,
+    .panel table td {
+        padding: 8px 4px;
+        white-space: nowrap;
+    }
+    #tablaVentas th:nth-child(4),
+    #tablaVentas td:nth-child(4) {
+        display: none; /* Subtotal: Total ya alcanza en pantallas chicas */
     }
 
     /* POS Móvil: Apilar carrito debajo de productos */

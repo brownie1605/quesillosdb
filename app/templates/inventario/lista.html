@@ -25,12 +25,37 @@
             <option value="out">Sin Stock</option>
         </select>
     </div>
-    
+
     <div style="display: flex; gap: 10px;">
         <a href="{{ url_for('inventario.movimientos') }}" class="btn btn-secondary">🧾 Historial de movimientos</a>
         <button id="btnExportarExcel" class="btn btn-success">⬇️ Exportar Excel</button>
     </div>
 </div>
+
+<!-- Pestañas por grupo de inventario -->
+<div id="tabsGrupoInventario" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+    <button type="button" class="btn-tab-inventario activo" data-grupo="">Todos</button>
+    <button type="button" class="btn-tab-inventario" data-grupo="POS">🍽️ POS (menú)</button>
+    <button type="button" class="btn-tab-inventario" data-grupo="Limpieza">🧼 Limpieza</button>
+    <button type="button" class="btn-tab-inventario" data-grupo="Lácteos">🥛 Lácteos</button>
+    <button type="button" class="btn-tab-inventario" data-grupo="Varios">📦 Varios</button>
+</div>
+
+<style>
+    .btn-tab-inventario {
+        padding: 8px 16px;
+        border-radius: 20px;
+        border: 1.5px solid #e0d5cc;
+        background: #fff;
+        color: #5d4037;
+        font-weight: 600;
+        font-size: 13.5px;
+        cursor: pointer;
+        transition: .15s;
+    }
+    .btn-tab-inventario:hover { background: #fbf3ef; }
+    .btn-tab-inventario.activo { background: #8d6e63; border-color: #8d6e63; color: #fff; }
+</style>
 
 <div class="panel">
     <table id="tablaInventario">
