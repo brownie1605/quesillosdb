@@ -1,6 +1,6 @@
 <div class="mobile-magic-nav">
     <ul>
-        <li class="list {% if request.blueprint == 'dashboard' %}active{% endif %}">
+        <li class="list {% if request.blueprint == 'dashboard' or request.endpoint == 'venta.historial' %}active{% endif %}">
             <a href="{{ url_for('dashboard.dashboard') if current_user.rol.nombre == 'Administrador' else url_for('venta.historial') }}">
                 <span class="icon"><ion-icon name="home-outline"></ion-icon></span>
                 <span class="text">Inicio</span>
