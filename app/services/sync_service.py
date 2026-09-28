@@ -83,13 +83,30 @@ PK_POR_TABLA = {
     "cierres_caja": "id_cierre",
 }
 
-# Columna de marca temporal usada por el PULL.
+# Columna de marca temporal usada por el PULL para saber que filas de una
+# tabla son "nuevas desde la ultima vez" (WHERE col_ts > ultimo_pull).
+#
+# Auditoria H-04: "ventas" usaba `fecha_venta`, que es la fecha en que se
+# hizo la venta y NUNCA cambia despues -- ni al anularla ni al editar su
+# cliente/metodo de pago (esos solo tocan `timestamp_local_actualizacion`).
+# Efecto: si el push inmediato de una anulacion/edicion llegaba a fallar
+# (ver H-05/H-06), NINGUN pull futuro la iba a recuperar, porque para el
+# filtro por `fecha_venta` esa fila ya habia quedado "vieja" desde su
+# creacion. Con `timestamp_local_actualizacion` (que se fija tanto al
+# crear como en cada anulacion/edicion -- ver venta_service.py) el pull SI
+# puede volver a ver la fila si algo la cambio despues de la ultima vez
+# que se sincronizo, sin depender de que el push inmediato nunca falle.
+#
+# Se confirmo que `fecha_venta` solo se usa en otro lado del pipeline de
+# sync (`conflict_service.verificar_venta_remota`, para detectar VENTAS
+# NUEVAS conflictivas por producto/tiempo) -- ese uso es independiente del
+# watermark del pull y no se toca aqui.
 TIMESTAMP_POR_TABLA = {
     "usuarios": "fecha_creacion",
     "productos": "fecha_actualizacion",
     "recetas": "fecha_actualizacion",
     "inventario": "fecha_actualizacion",
-    "ventas": "fecha_venta",
+    "ventas": "timestamp_local_actualizacion",
     "movimientos_inventario": "fecha_movimiento",
     "compras": "fecha_compra",
     "notificaciones": "fecha_creacion",
@@ -114,6 +131,24 @@ def _json_safe(value):
 
 def _row_to_dict(row_mapping):
     return {k: _json_safe(v) for k, v in dict(row_mapping).items()}
+
+
+def _parse_ts(value):
+    """Convierte a `datetime` un valor de timestamp que puede venir como
+    `datetime` (de una fila leida via ORM/driver) o como string (de un
+    payload ya serializado, ver `_json_safe`). Usado por la resolucion de
+    conflictos del pull (H-05) para poder comparar "cual es mas nuevo"."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return datetime.strptime(value, fmt)
+            except ValueError:
+                continue
+    return None
 
 
 def checksum(payload):
@@ -389,11 +424,50 @@ class SyncService:
     # -----------------------------------------------------------------
     @staticmethod
     def _upsert_local(tabla, datos):
-        """Inserta/actualiza una fila remota en la BD local sin re-encolarla."""
+        """Inserta/actualiza una fila remota en la BD local sin re-encolarla.
+
+        Auditoria H-05 (conflictos de sync): antes esto sobreescribia SIEMPRE
+        con lo que trajera el pull -- "el ultimo que llega gana", sin
+        importar si el dato local era mas reciente. Asi fue exactamente
+        como una venta anulada localmente pudo "revivir": si el push de la
+        anulacion no habia llegado a tiempo, un pull que trajera la
+        version vieja de la nube (todavia 'completada') la volvia a
+        escribir encima.
+
+        Politica de conflicto (LAST WRITE WINS por tiempo real, documentada
+        aqui a proposito, no implicita): para las tablas que tienen una
+        columna de timestamp registrada en TIMESTAMP_POR_TABLA, si la fila
+        YA existe en local se compara su timestamp contra el que trae el
+        pull -- gana quien sea mas reciente. En empate exacto se queda el
+        local (ya esta aplicado, no hace falta re-escribirlo). Las tablas
+        sin timestamp registrado (categorias, clientes, detalle_ventas,
+        etc.) no tienen como compararse por ahora y mantienen el
+        comportamiento anterior -- son de menor riesgo porque no se anulan
+        ni editan despues de creadas de la misma forma que una venta.
+        """
         pk = PK_POR_TABLA.get(tabla, "id")
         datos = {k: v for k, v in datos.items() if v is not None}
         if pk not in datos:
             return False
+
+        col_ts = TIMESTAMP_POR_TABLA.get(tabla)
+        if col_ts and col_ts in datos:
+            ts_remoto = _parse_ts(datos[col_ts])
+            if ts_remoto is not None:
+                fila_local = db.session.execute(
+                    text(f"SELECT `{col_ts}` FROM `{tabla}` WHERE `{pk}` = :pk"),
+                    {"pk": datos[pk]},
+                ).fetchone()
+                if fila_local is not None and fila_local[0] is not None:
+                    ts_local = _parse_ts(fila_local[0])
+                    if ts_local is not None and ts_local > ts_remoto:
+                        log.info(
+                            "Pull descartado por conflicto (local mas nuevo): %s#%s "
+                            "(local=%s > remoto=%s)",
+                            tabla, datos[pk], ts_local, ts_remoto,
+                        )
+                        return False
+
         datos["estado_sync"] = "sinc_remoto"
 
         def _construir(d):
