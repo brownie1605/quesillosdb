@@ -1,6 +1,8 @@
 """Apertura/cierre de turno de caja y movimientos de efectivo (gastos/ingresos)."""
 from decimal import Decimal
 
+from sqlalchemy import text
+
 from app.extensions import db
 from app.models.caja import Caja, AperturaCaja, MovimientoCaja, CierreCaja
 from app.models.venta import Venta
@@ -34,9 +36,27 @@ class CajaService:
     # -----------------------------------------------------------------
     @staticmethod
     def abrir_turno(usuario, monto_inicial):
+        caja = CajaService.caja_principal()
+
+        # Auditoria H-03 (race condition): antes esto hacia un SELECT ("hay
+        # turno abierto?") y luego un INSERT por separado -- dos cajeros
+        # abriendo turno en el mismo instante podian pasar AMBOS el chequeo
+        # y terminar con dos turnos "abiertos" a la vez, descuadrando la
+        # caja esperada. Como solo existe una fila de Caja, bloquearla con
+        # FOR UPDATE antes de revisar/crear serializa cualquier apertura
+        # concurrente: la segunda transaccion queda esperando hasta que la
+        # primera termine (commit o rollback), y para entonces ya ve el
+        # turno recien abierto por la otra. SQLite (usado en los tests) no
+        # soporta FOR UPDATE, pero tampoco tiene este problema: serializa
+        # todas las escrituras a nivel de archivo.
+        if db.engine.dialect.name != "sqlite":
+            db.session.execute(
+                text("SELECT id_caja FROM cajas WHERE id_caja = :id FOR UPDATE"),
+                {"id": caja.id_caja},
+            )
+
         if CajaService.apertura_actual():
             raise CajaError("Ya hay un turno de caja abierto")
-        caja = CajaService.caja_principal()
         apertura = AperturaCaja(
             id_caja=caja.id_caja,
             id_usuario=usuario.id_usuario,
