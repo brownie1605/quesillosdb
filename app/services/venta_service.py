@@ -44,10 +44,25 @@ class VentaService:
         """
         id_producto = int(item["id_producto"])
         cantidad = Decimal(str(item["cantidad"]))
-        precio = Decimal(str(item["precio"]))
+        if cantidad <= 0:
+            # Sin este chequeo, una cantidad negativa produce una linea con
+            # subtotal negativo (baja el total de la venta sin pasar por
+            # anulacion) y ademas le devuelve stock al insumo en vez de
+            # descontarlo (ver RecetaService.descontar_ingredientes, que
+            # multiplica el requerimiento por esta misma cantidad).
+            raise VentaError("La cantidad de cada producto debe ser mayor a cero")
+
+        # El precio SIEMPRE se recalcula aqui, del producto en la BD -- nunca
+        # se confia en el "precio" que manda el cliente. Si se usara el del
+        # request, cualquiera con sesion de Mesero/Cajero podria editar el
+        # payload (ej. con las herramientas del navegador) y cobrar
+        # cualquier plato al precio que quisiera antes de enviar la venta.
+        producto = Producto.query.get(id_producto)
+        if not producto or producto.estado != "activo":
+            raise VentaError(f"El producto (id {id_producto}) no existe o ya no esta activo")
+        precio = Decimal(str(producto.precio_venta or 0))
         sub_item = (cantidad * precio).quantize(Decimal("0.01"))
 
-        producto = Producto.query.get(id_producto)
         excluidos = item.get("excluidos") or []
         opciones = item.get("opciones") or []
         comentario = item.get("comentario") or RecetaService.comentario_de_personalizacion(
@@ -194,6 +209,13 @@ class VentaService:
             MesaService.liberar(venta.id_mesa)
 
         db.session.commit()
+
+        # Sin este push inmediato, la anulacion se queda "pendiente" hasta
+        # el proximo ciclo de sincronizacion. Si en ese rato entra un PULL
+        # (que sobrescribe sin comparar fechas -- ver sync_service),
+        # jala la version vieja de la nube ("completada") y la venta
+        # anulada vuelve a aparecer activa sola, sin que nadie lo note.
+        VentaService._push_si_hay_internet()
         return venta
 
     # -----------------------------------------------------------------
@@ -257,6 +279,7 @@ class VentaService:
         venta.estado_sync = "pendiente"
         venta.timestamp_local_actualizacion = nicaragua_now()
         db.session.commit()
+        VentaService._push_si_hay_internet()
         return venta, cambios
 
     # =================================================================

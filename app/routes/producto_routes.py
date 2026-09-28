@@ -263,6 +263,7 @@ def api_cambiar_estado(id):
 
 
 @producto_bp.route("/imagen/<int:id>", methods=["GET"])
+@login_required
 def obtener_imagen(id):
     prod = Producto.query.get_or_404(id)
     if prod.imagen_datos and prod.imagen_mimetype:

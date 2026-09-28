@@ -467,6 +467,118 @@ def exportar_inventario():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
+@reporte_bp.route("/api/descuentos", methods=["GET"])
+@login_required
+def api_descuentos():
+    """Reporte detallado de ventas con descuento: quien lo dio (usuario que
+    cobro), a que cliente, cuanto (monto y %) y por que (nota de la
+    factura). El dueño pidio poder auditar esto -- los descuentos en si no
+    tienen tope (es su decision de negocio), pero deben quedar trazables."""
+    fecha_inicio = request.args.get("inicio", "")
+    fecha_fin = request.args.get("fin", "")
+
+    filtro_fechas = ""
+    params = {"empresa": current_user.id_empresa}
+    if fecha_inicio and fecha_fin:
+        filtro_fechas = "AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin"
+        params["inicio"] = fecha_inicio
+        params["fin"] = fecha_fin
+
+    query = text(f"""
+        SELECT v.numero_venta, v.fecha_venta, v.subtotal, v.descuento, v.total,
+               v.metodo_pago, v.notas,
+               COALESCE(c.nombre, 'Público general') AS cliente,
+               COALESCE(u.nombre_completo, 'Desconocido') AS usuario
+        FROM ventas v
+        LEFT JOIN clientes c ON c.id_cliente = v.id_cliente
+        LEFT JOIN usuarios u ON u.id_usuario = v.id_usuario
+        WHERE v.id_empresa = :empresa AND v.estado = 'completada' AND v.descuento > 0
+        {filtro_fechas}
+        ORDER BY v.fecha_venta DESC
+    """)
+    filas = db.session.execute(query, params).fetchall()
+
+    resultado = []
+    total_descuento = 0.0
+    for f in filas:
+        subtotal = float(f.subtotal or 0)
+        descuento = float(f.descuento or 0)
+        base = subtotal + descuento  # subtotal ya viene con el descuento restado
+        pct = round((descuento / base * 100), 1) if base > 0 else 0.0
+        total_descuento += descuento
+        resultado.append({
+            "numero_venta": f.numero_venta,
+            "fecha": f.fecha_venta.strftime("%Y-%m-%d %H:%M:%S"),
+            "cliente": f.cliente,
+            "usuario": f.usuario,
+            "subtotal": subtotal,
+            "descuento": descuento,
+            "descuento_pct": pct,
+            "total": float(f.total or 0),
+            "metodo_pago": f.metodo_pago,
+            "nota": f.notas,
+        })
+
+    return jsonify({"success": True, "data": resultado, "total_descuento": round(total_descuento, 2)})
+
+
+@reporte_bp.route("/api/exportar/descuentos", methods=["GET"])
+@login_required
+def exportar_descuentos():
+    fecha_inicio = request.args.get("inicio", "")
+    fecha_fin = request.args.get("fin", "")
+    if not fecha_inicio or not fecha_fin:
+        return jsonify({"success": False, "message": "Fechas son requeridas"}), 400
+
+    try:
+        query = text("""
+            SELECT v.numero_venta, v.fecha_venta, v.subtotal, v.descuento, v.total,
+                   v.metodo_pago, v.notas,
+                   COALESCE(c.nombre, 'Público general') AS cliente,
+                   COALESCE(u.nombre_completo, 'Desconocido') AS usuario
+            FROM ventas v
+            LEFT JOIN clientes c ON c.id_cliente = v.id_cliente
+            LEFT JOIN usuarios u ON u.id_usuario = v.id_usuario
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada' AND v.descuento > 0
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+            ORDER BY v.fecha_venta DESC
+        """)
+        filas = db.session.execute(
+            query, {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}
+        ).fetchall()
+
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=";")
+        writer.writerow([
+            "No. Venta", "Fecha", "Cliente", "Vendedor/Cajero", "Subtotal (C$)",
+            "Descuento (C$)", "Descuento (%)", "Total (C$)", "Método de pago", "Nota / Motivo",
+        ])
+        total_descuento = 0.0
+        for f in filas:
+            subtotal = float(f.subtotal or 0)
+            descuento = float(f.descuento or 0)
+            base = subtotal + descuento
+            pct = round((descuento / base * 100), 1) if base > 0 else 0.0
+            total_descuento += descuento
+            writer.writerow([
+                f.numero_venta, f.fecha_venta.strftime("%Y-%m-%d %H:%M:%S"), f.cliente, f.usuario,
+                subtotal, descuento, pct, float(f.total or 0), f.metodo_pago, f.notas or "",
+            ])
+
+        writer.writerow([])
+        writer.writerow(["TOTAL DESCONTADO", "", "", "", "", total_descuento])
+
+        output.seek(0)
+        return send_file(
+            io.BytesIO(output.getvalue().encode("utf-8-sig")),
+            mimetype="text/csv",
+            as_attachment=True,
+            download_name=f"Reporte_Descuentos_{fecha_inicio}_al_{fecha_fin}.csv",
+        )
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @reporte_bp.route("/api/kpis_especiales", methods=["GET"])
 @login_required
 def api_kpis_especiales():

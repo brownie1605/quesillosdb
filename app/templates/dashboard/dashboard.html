@@ -192,6 +192,48 @@
     </div>
 </div>
 
+<!-- Auditoria de descuentos: a quien, quien lo dio, cuanto y por que.
+     Los descuentos no tienen tope (decision del dueño) pero deben quedar
+     trazables -- por eso este reporte, separado del CSV general de ventas. -->
+<div class="panel" style="padding: 20px; margin-top: 20px; margin-bottom: 120px;">
+    <h3 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+        🏷️ Descuentos aplicados
+        <small style="font-weight: 400; opacity: .6; font-size: 13px;">Quién lo dio, a quién y por qué</small>
+    </h3>
+
+    <div class="filter-group" style="margin-bottom: 12px;">
+        <input type="date" id="descuentosFechaInicio" class="form-control">
+        <input type="date" id="descuentosFechaFin" class="form-control">
+        <button onclick="cargarDescuentos()" class="btn btn-secondary">🔍 Filtrar</button>
+        <button onclick="descargarReporteDescuentos()" class="btn btn-success">📥 Descargar CSV</button>
+    </div>
+
+    <p style="font-size: 13px; margin-bottom: 10px;">
+        Total descontado en el rango: <strong id="totalDescontadoRango" style="color: #e63946;">C$ 0.00</strong>
+    </p>
+
+    <div class="panel" style="overflow-x: auto; box-shadow: none; border: 1px solid #eee;">
+        <table id="tablaDescuentos">
+            <thead>
+                <tr>
+                    <th>Factura</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Vendedor/Cajero</th>
+                    <th>Subtotal</th>
+                    <th>Descuento</th>
+                    <th>Total</th>
+                    <th>Método</th>
+                    <th>Nota / Motivo</th>
+                </tr>
+            </thead>
+            <tbody id="tbodyDescuentos">
+                <tr><td colspan="9" style="text-align: center;">Cargando…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -205,6 +247,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const fmt = (f) => `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;
     document.getElementById('exportFechaInicio').value = fmt(inicio);
     document.getElementById('exportFechaFin').value = fmt(hoy);
+
+    document.getElementById('descuentosFechaInicio').value = fmt(inicio);
+    document.getElementById('descuentosFechaFin').value = fmt(hoy);
+    cargarDescuentos();
 });
 
 function descargarReporteVentas() {
@@ -212,6 +258,49 @@ function descargarReporteVentas() {
     const fin = document.getElementById('exportFechaFin').value;
     if (!inicio || !fin) { showCustomAlert('Selecciona ambas fechas'); return; }
     window.location.href = `/reportes/api/exportar/ventas?inicio=${inicio}&fin=${fin}`;
+}
+
+async function cargarDescuentos() {
+    const inicio = document.getElementById('descuentosFechaInicio').value;
+    const fin = document.getElementById('descuentosFechaFin').value;
+    const tbody = document.getElementById('tbodyDescuentos');
+    const fmtC = (n) => 'C$ ' + (n || 0).toLocaleString('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    try {
+        const params = (inicio && fin) ? `?inicio=${inicio}&fin=${fin}` : '';
+        const res = await fetch(`/reportes/api/descuentos${params}`);
+        const data = await res.json();
+        if (!data.success) { showCustomAlert(data.message || 'Error al cargar descuentos'); return; }
+
+        document.getElementById('totalDescontadoRango').textContent = fmtC(data.total_descuento);
+
+        if (!data.data.length) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;" class="text-muted">Sin descuentos en el rango seleccionado.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.data.map(v => `<tr>
+            <td>${escapeHtml(v.numero_venta)}</td>
+            <td>${v.fecha}</td>
+            <td>${escapeHtml(v.cliente)}</td>
+            <td>${escapeHtml(v.usuario)}</td>
+            <td>${fmtC(v.subtotal)}</td>
+            <td style="color:#e63946;"><strong>${fmtC(v.descuento)}</strong><br><small>(${v.descuento_pct}%)</small></td>
+            <td>${fmtC(v.total)}</td>
+            <td>${escapeHtml(v.metodo_pago || '')}</td>
+            <td>${escapeHtml(v.nota || '—')}</td>
+        </tr>`).join('');
+    } catch (error) {
+        console.error('Error al cargar descuentos:', error);
+        showCustomAlert('Error al cargar el reporte de descuentos');
+    }
+}
+
+function descargarReporteDescuentos() {
+    const inicio = document.getElementById('descuentosFechaInicio').value;
+    const fin = document.getElementById('descuentosFechaFin').value;
+    if (!inicio || !fin) { showCustomAlert('Selecciona ambas fechas'); return; }
+    window.location.href = `/reportes/api/exportar/descuentos?inicio=${inicio}&fin=${fin}`;
 }
 </script>
 {% endblock %}

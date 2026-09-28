@@ -12,7 +12,16 @@ ADMIN_ALIASES = ("admin", "administrador")
 
 
 def _es_api():
-    return request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json"
+    # Las rutas de API real van bajo el prefijo de cada blueprint
+    # ("/ventas/api/...", "/mesas/api/...", "/productos/api/..."), nunca
+    # bajo "/api/" a secas -- ese prefijo literal no calzaba con nada, asi
+    # que toda falla de sesion/rol en un endpoint AJAX terminaba
+    # devolviendo un redirect HTML (a /login o al dashboard) en vez de un
+    # JSON 401/403, lo que el fetch() del frontend no esperaba y quedaba
+    # colgado o mostraba errores confusos en vez del mensaje real.
+    if "/api/" in request.path:
+        return True
+    return request.accept_mimetypes.best == "application/json"
 
 
 def _normalizar(roles):
