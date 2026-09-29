@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.models import Producto, Cliente, Venta, DetalleVenta, Inventario, Categoria
 from app.services.auditoria_service import registrar_auditoria
 from app.services.venta_service import VentaService, VentaError
@@ -154,6 +154,11 @@ def api_verificar_stock():
 
 
 @venta_bp.route("/api/cobrar", methods=["POST"])
+# 30/min es generoso para el negocio (100-300 tickets/dia entre hasta 5
+# cajeros/meseros -- ni en la hora mas ocupada se acerca a ese ritmo por
+# usuario) pero cierra la puerta a automatizar cobros en bucle con una
+# sesion robada o un script.
+@limiter.limit("30 per minute")
 @login_required
 def api_cobrar():
     data = request.get_json(silent=True) or {}
@@ -200,6 +205,7 @@ def api_cobrar():
 
 
 @venta_bp.route("/api/<int:id_venta>/anular", methods=["POST"])
+@limiter.limit("30 per minute")
 @login_required
 def api_anular(id_venta):
     if not usuario_tiene_rol("Admin", "Administrador", "Cajero"):

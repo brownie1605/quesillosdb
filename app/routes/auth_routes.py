@@ -54,6 +54,21 @@ def _registrar_intento_codigo_fallido(user):
 @auth_bp.route("/", methods=["GET", "POST"])
 @auth_bp.route("/login", methods=["GET", "POST"])
 @limiter.limit("15 per minute")
+# Auditoria: enumeracion de usuarios. El bloqueo por intentos fallidos de
+# abajo (MAX_INTENTOS_LOGIN) solo se activa si `usuario` existe en la BD
+# -- probar un usuario que SI existe, tras 5 intentos, muestra "cuenta
+# bloqueada"; probar uno que NO existe nunca muestra ese mensaje, sin
+# importar cuantas veces se intente. Esa diferencia deja adivinar que
+# usuarios son validos. Este segundo limite, aparte del de arriba, cuenta
+# intentos por el `usuario` que se manda en el formulario (exista o no) --
+# a la 6a vez con el MISMO nombre en la ventana, Flask-Limiter corta con
+# su propia respuesta generica ANTES de que la vista llegue a revelar si
+# la cuenta esta bloqueada o simplemente no existe.
+@limiter.limit(
+    "5 per 15 minutes",
+    key_func=lambda: "login-usuario:" + (request.form.get("usuario") or "").strip().lower(),
+    methods=["POST"],
+)
 def login():
     if request.method == "POST":
         usuario = request.form.get("usuario")
