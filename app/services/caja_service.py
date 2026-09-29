@@ -88,9 +88,16 @@ class CajaService:
     @staticmethod
     def resumen_turno(apertura):
         """Ventas y movimientos del turno, para mostrar antes de cerrar."""
+        # Auditoria M-03: antes solo filtraba por fecha, sin id_empresa ni
+        # id_sucursal -- hoy inofensivo (una sola empresa/sucursal en todo
+        # el sistema), pero si algun dia se agrega una segunda sucursal
+        # compartiendo la misma base, el cierre de una sumaria tambien las
+        # ventas de la otra. Se deja explicito en vez de implicito.
         ventas = Venta.query.filter(
             Venta.estado == "completada",
             Venta.fecha_venta >= apertura.fecha_apertura,
+            Venta.id_empresa == apertura.caja.id_empresa,
+            Venta.id_sucursal == apertura.caja.id_sucursal,
         ).all()
         total_ventas = sum((Decimal(str(v.total or 0)) for v in ventas), Decimal("0"))
 

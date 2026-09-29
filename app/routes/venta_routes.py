@@ -204,6 +204,16 @@ def api_cobrar():
 def api_anular(id_venta):
     if not usuario_tiene_rol("Admin", "Administrador", "Cajero"):
         return jsonify({"success": False, "message": "Sin permiso para anular"}), 403
+
+    # Auditoria M-01 (IDOR): faltaba este chequeo aqui -- api_editar_venta,
+    # justo abajo, ya lo tenia. Hoy no es explotable (una sola empresa en
+    # todo el sistema), pero sin esto, si algun dia se agrega una segunda
+    # empresa, cualquiera con rol Cajero podria anular por ID una venta de
+    # otra empresa con solo cambiar el numero en la URL.
+    venta_previa = Venta.query.get_or_404(id_venta)
+    if venta_previa.id_empresa != current_user.id_empresa:
+        return jsonify({"success": False, "message": "Acceso denegado"}), 403
+
     data = request.get_json(silent=True) or {}
     try:
         venta = VentaService.anular_venta(

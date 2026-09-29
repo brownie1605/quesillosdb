@@ -44,6 +44,24 @@ def create_app(config_class=Config, iniciar_jobs=True):
     if not app.config.get("TESTING"):
         socketio.init_app(app)
 
+        # Auditoria M-04: no habia ningun handler de conexion, asi que
+        # cualquiera podia abrir un WebSocket al servidor SIN haber
+        # iniciado sesion y de todos modos recibir los eventos que se
+        # emiten en broadcast global (comanda_impresion, orden_lista,
+        # sync_status) -- una fuga de informacion de bajo impacto pero
+        # real (se podia ver en tiempo real que se esta pidiendo/cobrando
+        # sin login). Esto no cambia nada del comportamiento de cocina
+        # para un usuario YA autenticado: solo rechaza la conexion si no
+        # hay sesion valida. La cookie de sesion viaja igual en el
+        # handshake HTTP inicial del WebSocket (mismo origen), asi que
+        # `current_user` ya esta disponible aqui sin nada adicional.
+        @socketio.on("connect")
+        def _socketio_requiere_sesion():
+            from flask_login import current_user
+
+            if not current_user.is_authenticated:
+                return False  # Flask-SocketIO: False rechaza la conexion
+
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Debes iniciar sesión para acceder."
@@ -127,8 +145,13 @@ def create_app(config_class=Config, iniciar_jobs=True):
         return resp
 
     # ---------------------------------------------------------- paginas de error
-    def _quiere_json():
-        return request.path.startswith("/api/") or request.accept_mimetypes.best == "application/json"
+    # Auditoria M-02: esto era una segunda copia de la misma logica rota
+    # que ya se habia corregido en app/utils/decorators.py (_es_api) --
+    # buscaba rutas que empezaran literalmente en "/api/", que nunca
+    # calzan con las reales ("/ventas/api/...", "/mesas/api/...", etc.).
+    # Ahora ambas comparten una sola funcion, para no volver a que se
+    # desincronicen entre si.
+    from app.utils.decorators import _es_api as _quiere_json
 
     def _error_response(codigo, mensaje):
         if _quiere_json():
