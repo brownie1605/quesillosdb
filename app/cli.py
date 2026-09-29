@@ -32,6 +32,7 @@ def registrar_comandos(app):
     app.cli.add_command(sync_now)
     app.cli.add_command(sync_status)
     app.cli.add_command(backup_ahora)
+    app.cli.add_command(restaurar_backup)
     app.cli.add_command(demo_quesillo)
     app.cli.add_command(bootstrap_nube)
     app.cli.add_command(aplicar_offset)
@@ -185,6 +186,51 @@ def backup_ahora(bind):
         click.echo("Subido a R2.")
     else:
         click.echo("No se subio a R2 (revisa las variables R2_* o el log si estaban configuradas).")
+
+
+# ==================================================================
+@click.command("restaurar-backup")
+@click.argument("archivo")
+@click.option("--confirmar-produccion", is_flag=True, default=False,
+              help="Obligatorio SOLO si RESTORE_TARGET coincide con una BD que la app ya usa (local o cloud).")
+@click.option("--si-de-verdad", is_flag=True, default=False,
+              help="Segunda confirmacion obligatoria SIEMPRE; sin esto el comando no ejecuta nada.")
+@with_appcontext
+def restaurar_backup(archivo, confirmar_produccion, si_de_verdad):
+    """Restaura un backup (.sql.gz, de disco o de R2) en la BD que indique
+    la variable de entorno RESTORE_TARGET (URI completa, ej.
+    mysql+pymysql://usuario:clave@host:3306/base_de_prueba).
+
+    NUNCA restaura por defecto contra las bases que esta app ya usa
+    (DB_LOCAL_*/DB_REMOTE_*) -- si RESTORE_TARGET apunta ahi de todos
+    modos, hace falta --confirmar-produccion. Crea la BD destino vacia
+    de antemano (este comando no la crea).
+
+    ARCHIVO: nombre o ruta del backup, ej. local_20260101_120000.sql.gz
+    """
+    from app.services.restore_service import RestoreService, RestoreError
+
+    if not si_de_verdad:
+        click.echo(
+            "Nada se ejecuto (falta --si-de-verdad). Este comando reemplaza tablas "
+            "completas en el destino -- vuelve a correrlo con --si-de-verdad cuando "
+            "estes seguro del RESTORE_TARGET configurado."
+        )
+        return
+
+    try:
+        reporte = RestoreService.restaurar(archivo, confirmar_produccion=confirmar_produccion)
+    except RestoreError as e:
+        click.echo(f"ABORTADO: {e}")
+        raise SystemExit(1)
+
+    click.echo(reporte["resumen"])
+    for linea in reporte["detalle"]:
+        click.echo("  " + linea)
+    if reporte.get("vistas_omitidas"):
+        click.echo(f"  Vistas omitidas (rotas en el origen o dependientes de una rota): {reporte['vistas_omitidas']}")
+    if not reporte["ok"]:
+        raise SystemExit(1)
 
 
 # ==================================================================

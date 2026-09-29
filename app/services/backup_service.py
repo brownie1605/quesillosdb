@@ -37,6 +37,29 @@ class BackupService:
 
     # -----------------------------------------------------------------
     @staticmethod
+    def _tablas_y_vistas(conn):
+        """Separa tablas reales de vistas -- descubierto al implementar el
+        restore (auditoria H-01): `crear_backup()` generaba `INSERT INTO`
+        para TODO lo que devolviera `SHOW TABLES`, vistas incluidas. Una
+        vista no tiene datos propios (son las de sus tablas base), y
+        ademas una vista con JOIN ni siquiera acepta INSERT directo --
+        MySQL la rechaza con "Can not modify more than one base table
+        through a join view". El backup se escribia sin error (la vista
+        en si es una sola fila de metadatos por INSERT, rapido), pero
+        quedaba con esos INSERT igual de invalidos adentro, y solo se
+        notaba al intentar restaurar. Devuelve (tablas, vistas)."""
+        filas = conn.execute(
+            text(
+                "SELECT TABLE_NAME, TABLE_TYPE FROM information_schema.TABLES "
+                "WHERE TABLE_SCHEMA = DATABASE()"
+            )
+        ).fetchall()
+        tablas = [f[0] for f in filas if f[1] == "BASE TABLE"]
+        vistas = [f[0] for f in filas if f[1] == "VIEW"]
+        return tablas, vistas
+
+    # -----------------------------------------------------------------
+    @staticmethod
     def _escapar_valor(v):
         if v is None:
             return "NULL"
@@ -73,15 +96,18 @@ class BackupService:
 
         tablas_fallidas = []
         with engine.connect() as conn:
-            tablas = BackupService._tablas(conn)
+            tablas, vistas = BackupService._tablas_y_vistas(conn)
             with gzip.open(ruta_tmp, "wt", encoding="utf-8") as f:
                 f.write(f"-- Respaldo Quesillos POS ({nombre_bind}) - {datetime.now().isoformat()}\n")
                 f.write("SET FOREIGN_KEY_CHECKS=0;\n\n")
+
+                # 1. Tablas reales primero (con sus datos) -- las vistas
+                # dependen de que estas ya existan para poder crearse.
                 for tabla in tablas:
-                    # Una tabla/vista individual rota (ej. una VIEW con
-                    # definer sin permisos) no debe tumbar TODO el
-                    # respaldo -- se salta esa y se sigue con las demas,
-                    # mejor un respaldo parcial que ninguno.
+                    # Una tabla individual rota (ej. datos que ya no
+                    # calzan con una FK) no debe tumbar TODO el respaldo --
+                    # se salta esa y se sigue con las demas, mejor un
+                    # respaldo parcial que ninguno.
                     try:
                         crear = conn.execute(text(f"SHOW CREATE TABLE `{tabla}`")).fetchone()
                         f.write(f"DROP TABLE IF EXISTS `{tabla}`;\n{crear[1]};\n\n")
@@ -101,10 +127,49 @@ class BackupService:
                         tablas_fallidas.append(tabla)
                         f.write(f"-- OMITIDA '{tabla}': {e}\n\n")
                         log.warning("Respaldo: se omitio '%s' por error: %s", tabla, e)
+
+                # Marca clara entre las dos secciones -- el restore la usa
+                # para restaurar las tablas en un solo bloque (rapido) y
+                # las vistas una por una (resiliente: una vista rota o que
+                # depende de otra vista rota no debe tumbar el resto).
+                f.write("-- ==================== VISTAS ====================\n\n")
+
+                # 2. Vistas al final, SOLO su definicion -- nunca datos.
+                # Una vista no tiene filas propias (son de sus tablas
+                # base, que ya se restauraron arriba), y ademas una vista
+                # con JOIN ni siquiera acepta INSERT directo (MySQL: "Can
+                # not modify more than one base table through a join
+                # view"). Antes esto se generaba igual que una tabla y el
+                # .sql.gz quedaba con un INSERT invalido adentro -- nunca
+                # fallaba al *crear* el backup, solo al *restaurarlo*.
+                for vista in vistas:
+                    try:
+                        # `SHOW CREATE TABLE` sobre una vista SIEMPRE tiene
+                        # exito -- MySQL devuelve el texto guardado de la
+                        # vista sin importar si las tablas/columnas que
+                        # referencia todavia existen. Por eso antes (cuando
+                        # se hacia "SELECT * FROM vista" para sacar datos)
+                        # una vista con una tabla borrada detras se
+                        # detectaba sola como rota; al quitar ese SELECT
+                        # (ya no hace falta, no se guardan datos de vistas)
+                        # se perdio esa deteccion. Este SELECT LIMIT 1 se
+                        # deja a proposito, solo como prueba de validez
+                        # (no se escribe su resultado a ningun lado): si la
+                        # vista de verdad funciona, confirma que se podra
+                        # recrear al restaurar.
+                        conn.execute(text(f"SELECT * FROM `{vista}` LIMIT 1")).fetchall()
+                        crear = conn.execute(text(f"SHOW CREATE TABLE `{vista}`")).fetchone()
+                        f.write(f"DROP VIEW IF EXISTS `{vista}`;\n{crear[1]};\n\n")
+                    except Exception as e:  # noqa: BLE001
+                        conn.rollback()
+                        tablas_fallidas.append(vista)
+                        f.write(f"-- OMITIDA (vista) '{vista}': {e}\n\n")
+                        log.warning("Respaldo: se omitio la vista '%s' por error: %s", vista, e)
+
                 f.write("SET FOREIGN_KEY_CHECKS=1;\n")
 
         if tablas_fallidas:
-            log.warning("Respaldo con %d tabla(s) omitida(s): %s", len(tablas_fallidas), tablas_fallidas)
+            log.warning("Respaldo con %d tabla(s)/vista(s) omitida(s): %s", len(tablas_fallidas), tablas_fallidas)
 
         # Escribir a .tmp y renombrar al final: si el proceso se corta a
         # medias (se va la luz, etc.), nunca queda un backup a medio
