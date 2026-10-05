@@ -115,6 +115,55 @@ def api_insumos():
     return jsonify(salida)
 
 
+@receta_bp.route("/api/por-producto/<int:id_producto>", methods=["GET"])
+@login_required
+def api_por_producto(id_producto):
+    """Receta de un producto para la pestaña "Receta" del modal Editar
+    producto: texto plano + ingredientes + si descuenta inventario."""
+    receta = Receta.query.filter_by(id_producto=id_producto).first()
+    if not receta:
+        return jsonify({"existe": False, "texto": "", "descontar": False, "ingredientes": []})
+    return jsonify({
+        "existe": True,
+        "texto": receta.modo_preparacion or "",
+        "descontar": receta.estado == "activo",
+        "ingredientes": [
+            {
+                "id_producto": i.id_producto,
+                "nombre": i.producto.nombre if i.producto else str(i.id_producto),
+                "cantidad_necesaria": float(i.cantidad_necesaria or 0),
+            }
+            for i in receta.ingredientes
+        ],
+    })
+
+
+@receta_bp.route("/api/por-producto/<int:id_producto>/guardar", methods=["POST"])
+@login_required
+def api_guardar_por_producto(id_producto):
+    data = request.get_json(silent=True) or {}
+    try:
+        receta = RecetaService.guardar_desde_producto(
+            id_producto,
+            data.get("texto"),
+            data.get("ingredientes") or [],
+            bool(data.get("descontar")),
+            current_user.id_usuario,
+        )
+        registrar_auditoria(
+            "actualizar", "recetas",
+            {"id_producto": id_producto, "descontar": bool(data.get("descontar")),
+             "eliminada": receta is None},
+        )
+        return jsonify({"success": True, "message": "Receta guardada" if receta else "Receta eliminada"})
+    except RecetaError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:  # noqa: BLE001
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @receta_bp.route("/api/crear", methods=["POST"])
 @login_required
 def api_crear():

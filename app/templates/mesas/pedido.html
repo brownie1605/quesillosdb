@@ -520,7 +520,7 @@ function pzRenderPaso() {
                     </div>`;
                 }).join('')}
             </div>
-            <p class="text-muted small mt-2 mb-0">Toca una opción, o dale "${esUltimo ? 'Agregar al pedido' : 'Continuar'}" para omitirla.</p>
+            <p class="text-muted small mt-2 mb-0">${g.obligatorio ? 'Elige una opción (obligatorio).' : `Toca una opción, o dale "${esUltimo ? 'Agregar al pedido' : 'Continuar'}" para omitirla.`}</p>
         `;
     } else {
         const i = paso.item;
@@ -558,6 +558,11 @@ function pzAtras() {
 }
 
 function pzSiguiente() {
+    const paso = pzPasos[pzIndice];
+    if (paso && paso.tipo === 'grupo' && paso.grupo.obligatorio && pzSeleccion[paso.grupo.id_grupo] === undefined) {
+        showCustomAlert('Elige una opción de ' + paso.grupo.nombre + ': es lo que se descuenta del inventario.');
+        return;
+    }
     if (pzIndice < pzPasos.length - 1) { pzIndice++; pzRenderPaso(); }
     else pzFinalizarPersonalizacion();
 }

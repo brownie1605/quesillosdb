@@ -7,6 +7,7 @@ from app.models import Mesa, Venta, DetalleVenta
 from app.services.mesa_service import MesaService, MesaError
 from app.services.venta_service import VentaService, VentaError
 from app.services.inventario_service import StockInsuficiente
+from app.services.receta_service import RecetaError
 from app.services.auditoria_service import registrar_auditoria
 from app.utils.decorators import require_roles, usuario_tiene_rol
 
@@ -94,7 +95,7 @@ def api_agregar(id_mesa):
     except StockInsuficiente as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e), "faltantes": e.faltantes}), 409
-    except (MesaError, VentaError) as e:
+    except (MesaError, VentaError, RecetaError) as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 400
 

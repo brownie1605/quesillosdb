@@ -71,8 +71,8 @@ class RecetaService:
 
         if Receta.query.filter_by(id_producto=id_producto).first():
             raise RecetaError("Este producto ya tiene una receta")
-        if not ingredientes:
-            raise RecetaError("La receta debe tener al menos un ingrediente")
+        if not ingredientes and not grupos_opciones:
+            raise RecetaError("La receta debe tener al menos un ingrediente o un grupo de opciones")
 
         receta = Receta(
             id_producto=id_producto,
@@ -117,6 +117,13 @@ class RecetaService:
         receta.id_unidad_rendimiento = datos.get("id_unidad_rendimiento") or None
         if datos.get("estado"):
             receta.estado = datos["estado"]
+            # El estado de la receta es el interruptor "descontar inventario
+            # al vender": `es_receta` del producto debe seguirlo, o el POS
+            # calcularia "maximo producible" de una receta apagada.
+            producto = Producto.query.get(receta.id_producto)
+            if producto:
+                producto.es_receta = receta.estado == "activo"
+                producto.estado_sync = "pendiente"
         receta.fecha_actualizacion = nicaragua_now()
         receta.estado_sync = "pendiente"
 
@@ -128,6 +135,71 @@ class RecetaService:
         receta.costo_total = RecetaService.calcular_costo_receta(receta)
         db.session.flush()
 
+        db.session.commit()
+        return receta
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def guardar_desde_producto(id_producto, texto, ingredientes, descontar, usuario_id):
+        """Guarda la receta de un producto desde el modal "Editar producto".
+
+        Dos sectores, un solo registro (`Receta`), para que no se
+        desincronicen con el editor de la pagina Recetas:
+          - `texto`: la receta en texto plano -> `modo_preparacion` (el mismo
+            campo que edita la pagina Recetas; `descripcion` NO se usa porque
+            ese editor no la envia y la borraria al guardar).
+          - `ingredientes` + `descontar`: lo que se resta del inventario al
+            vender. `descontar=False` deja la receta solo como referencia.
+
+        Sin texto ni ingredientes, la receta se elimina. Devuelve la receta
+        o None si quedo eliminada.
+        """
+        producto = Producto.query.get(id_producto)
+        if not producto:
+            raise RecetaError("El producto no existe")
+
+        texto = (texto or "").strip() or None
+        ingredientes = ingredientes or []
+        receta = Receta.query.filter_by(id_producto=id_producto).first()
+        # Recetas de "elige una opcion" (ej. Fajitas bowl) no tienen
+        # ingredientes fijos: descuentan solo la opcion elegida al vender.
+        tiene_opciones = bool(receta and receta.grupos_opciones)
+
+        if descontar and not ingredientes and not tiene_opciones:
+            raise RecetaError(
+                "Para descontar del inventario agrega al menos un ingrediente "
+                "(o desactiva 'Descontar al vender')."
+            )
+
+        if not texto and not ingredientes and not tiene_opciones:
+            if receta:
+                RecetaService.eliminar_receta(receta.id_receta, usuario_id)
+            return None
+
+        if not receta:
+            receta = Receta(
+                id_producto=id_producto,
+                nombre=producto.nombre,
+                rendimiento=Decimal("1"),
+                creado_por=usuario_id,
+            )
+            db.session.add(receta)
+            db.session.flush()
+
+        receta.modo_preparacion = texto
+        receta.estado = "activo" if descontar else "inactivo"
+        receta.fecha_actualizacion = nicaragua_now()
+        receta.estado_sync = "pendiente"
+        RecetaService._reemplazar_ingredientes(receta, ingredientes)
+
+        producto.es_receta = bool(descontar)
+        producto.estado_sync = "pendiente"
+
+        # Los ingredientes nuevos se agregaron por session.add(), no por la
+        # coleccion: se recarga para que el costo se calcule sobre los nuevos.
+        db.session.expire(receta, ["ingredientes"])
+        receta.costo_total = RecetaService.calcular_costo_receta(receta)
+        db.session.flush()
         db.session.commit()
         return receta
 
@@ -402,7 +474,7 @@ class RecetaService:
 
         if producto.es_receta:
             receta = Receta.query.filter_by(id_producto=id_producto, estado="activo").first()
-            if receta and receta.ingredientes:
+            if receta and (receta.ingredientes or receta.grupos_opciones):
                 excluidos_set = set(int(x) for x in (excluidos or []))
                 rendimiento = Decimal(str(receta.rendimiento or 1))
                 if rendimiento <= 0:
@@ -437,10 +509,31 @@ class RecetaService:
 
     # -----------------------------------------------------------------
     @staticmethod
+    def _validar_opciones_obligatorias(id_producto, opciones):
+        """Al ordenar, cada grupo obligatorio debe traer una opcion elegida
+        (ej. Fajitas bowl -> res o pollo): es lo que se descuenta del
+        inventario. Sin esto la venta pasaria sin descontar nada."""
+        producto = Producto.query.get(id_producto)
+        if not producto or not producto.es_receta:
+            return
+        receta = Receta.query.filter_by(id_producto=id_producto, estado="activo").first()
+        if not receta:
+            return
+        elegidas = set(int(x) for x in (opciones or []))
+        for g in receta.grupos_opciones:
+            if g.obligatorio and g.items and not any(i.id_item in elegidas for i in g.items):
+                raise RecetaError(
+                    "Elige " + g.nombre.lower() + " para " + producto.nombre
+                    + " (" + ", ".join(i.nombre for i in g.items) + ")"
+                )
+
+    # -----------------------------------------------------------------
+    @staticmethod
     def requerimiento_de_carrito(items):
         """items: lista de {id_producto, cantidad, excluidos?, opciones?}."""
         total = {}
         for it in items:
+            RecetaService._validar_opciones_obligatorias(int(it["id_producto"]), it.get("opciones"))
             parcial = RecetaService.requerimiento_de_venta(
                 int(it["id_producto"]), it["cantidad"],
                 excluidos=it.get("excluidos"), opciones=it.get("opciones"),
@@ -492,6 +585,22 @@ class RecetaService:
             return float(InventarioService.stock_de(id_producto))
 
         receta = Receta.query.filter_by(id_producto=id_producto, estado="activo").first()
+        if receta and not receta.ingredientes and receta.grupos_opciones:
+            # Receta de "elige una opcion": alcanza para lo que de la opcion
+            # con mas stock de cada grupo obligatorio.
+            rendimiento = Decimal(str(receta.rendimiento or 1)) or Decimal("1")
+            posibles = None
+            for g in receta.grupos_opciones:
+                if not g.obligatorio:
+                    continue
+                mejor = Decimal("0")
+                for it in g.items:
+                    if not it.id_producto_insumo or not it.cantidad:
+                        continue
+                    disponible = Decimal(str(RecetaService.maximo_producible(it.id_producto_insumo)))
+                    mejor = max(mejor, disponible * rendimiento / Decimal(str(it.cantidad)))
+                posibles = mejor if posibles is None else min(posibles, mejor)
+            return float(posibles or 0)
         if not receta or not receta.ingredientes:
             return float(InventarioService.stock_de(id_producto))
 

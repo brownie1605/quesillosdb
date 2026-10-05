@@ -39,6 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Formularios
     document.getElementById('formProducto').addEventListener('submit', guardarProducto);
 
+    // Pestañas Datos / Receta del modal
+    document.querySelectorAll('.prod-tab').forEach(btn => {
+        btn.addEventListener('click', () => mostrarTabProducto(btn.dataset.tab));
+    });
+    document.getElementById('rec_agregar').addEventListener('click', () => agregarFilaReceta());
+
     // Preview de imagen al seleccionar archivo
     document.getElementById('prod_imagen').addEventListener('change', function() {
         const preview = document.getElementById('prod_imagen_preview');
@@ -152,6 +158,80 @@ function renderizarTabla() {
     });
 }
 
+// --- PESTAÑA RECETA (dentro del modal de producto) ---
+// Dos sectores que guardan en el MISMO registro de receta:
+//   - texto plano (modo_preparacion), solo referencia
+//   - ingredientes + "descontar al vender" (lo que resta del inventario)
+
+let insumosReceta = [];
+let recetaEditable = false;   // true solo al editar un producto final
+
+function mostrarTabProducto(tab) {
+    document.getElementById('tab_datos').style.display = tab === 'tab_datos' ? '' : 'none';
+    document.getElementById('tab_receta').style.display = tab === 'tab_receta' ? '' : 'none';
+    document.querySelectorAll('.prod-tab').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
+}
+
+async function cargarInsumosReceta() {
+    if (insumosReceta.length) return;
+    const res = await fetch('/recetas/api/insumos');
+    const lista = await res.json();
+    // Solo insumos/materiales como ingrediente (no otros platos del menu).
+    insumosReceta = lista.filter(p => p.tipo_producto === 'insumo' || p.tipo_producto === 'material');
+}
+
+function agregarFilaReceta(idProducto = '', cantidad = 1) {
+    const fila = document.createElement('div');
+    fila.className = 'rec-fila';
+    const opciones = insumosReceta.map(p =>
+        `<option value="${p.id_producto}" ${p.id_producto === idProducto ? 'selected' : ''}>${escapeHtml(p.nombre)}</option>`
+    ).join('');
+    fila.innerHTML = `
+        <select class="form-control rec-insumo"><option value="">Elegir insumo...</option>${opciones}</select>
+        <input type="number" class="form-control rec-cantidad" min="0.01" step="0.01" value="${cantidad}">
+        <button type="button" class="btn" style="background:#f3e5e5;color:#8B2E2E;padding:4px 10px;" title="Quitar">✕</button>`;
+    fila.querySelector('button').addEventListener('click', () => fila.remove());
+    document.getElementById('rec_filas').appendChild(fila);
+}
+
+function prepararTabReceta(producto) {
+    recetaEditable = !!producto && producto.tipo_producto === 'final';
+    document.getElementById('prod_tabs').style.display = recetaEditable ? 'flex' : 'none';
+    document.getElementById('rec_texto').value = '';
+    document.getElementById('rec_descontar').checked = false;
+    document.getElementById('rec_filas').innerHTML = '';
+    mostrarTabProducto('tab_datos');
+    if (!recetaEditable) return;
+
+    Promise.all([
+        cargarInsumosReceta(),
+        fetch(`/recetas/api/por-producto/${producto.id_producto}`).then(r => r.json()),
+    ]).then(([, receta]) => {
+        document.getElementById('rec_texto').value = receta.texto || '';
+        document.getElementById('rec_descontar').checked = !!receta.descontar;
+        (receta.ingredientes || []).forEach(i => agregarFilaReceta(i.id_producto, i.cantidad_necesaria));
+    }).catch(err => console.error('No se pudo cargar la receta:', err));
+}
+
+async function guardarRecetaProducto(idProducto) {
+    const ingredientes = [];
+    document.querySelectorAll('#rec_filas .rec-fila').forEach(fila => {
+        const id = fila.querySelector('.rec-insumo').value;
+        const cant = parseFloat(fila.querySelector('.rec-cantidad').value);
+        if (id && cant > 0) ingredientes.push({ id_producto: parseInt(id), cantidad_necesaria: cant });
+    });
+    const res = await fetch(`/recetas/api/por-producto/${idProducto}/guardar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            texto: document.getElementById('rec_texto').value,
+            ingredientes: ingredientes,
+            descontar: document.getElementById('rec_descontar').checked,
+        }),
+    });
+    return res.json();
+}
+
 // --- MODAL PRODUCTO (CREAR / EDITAR) ---
 
 function abrirModalCrear() {
@@ -160,6 +240,8 @@ function abrirModalCrear() {
     document.getElementById('prod_id').value = '';
     document.getElementById('prod_tipo_producto').value = 'final';
     document.getElementById('prod_imagen_preview').innerHTML = '';
+    // La receta se arma despues de crear el producto (necesita su id).
+    prepararTabReceta(null);
     document.getElementById('modalProducto').style.display = 'flex';
     actualizarCamposPorTipo();
     calcularIvaEnModal();
@@ -222,6 +304,7 @@ function abrirModalEditar(id) {
     }
     document.getElementById('prod_imagen').value = '';
 
+    prepararTabReceta(p);
     document.getElementById('modalProducto').style.display = 'flex';
     actualizarCamposPorTipo();
     calcularIvaEnModal();
@@ -268,6 +351,16 @@ async function guardarProducto(e) {
         });
         const result = await response.json();
         if (result.success) {
+            // Receta: solo al editar un producto que sigue siendo "final".
+            if (isEdit && recetaEditable && document.getElementById('prod_tipo_producto').value === 'final') {
+                const rec = await guardarRecetaProducto(id);
+                if (!rec.success) {
+                    mostrarTabProducto('tab_receta');
+                    showCustomAlert('El producto se guardó, pero la receta no: ' + rec.message);
+                    cargarProductos();
+                    return;
+                }
+            }
             cerrarModalProducto();
             cargarProductos();
         } else {
