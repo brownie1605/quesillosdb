@@ -23,6 +23,49 @@ Fusiona el diseño de *quesillosdb-main* con el backend de *sistema-pos-pymes*.
 
 ## 2. Instalación
 
+### 2.0 PC del restaurante (instalador)
+
+La PC del restaurante es el **servidor local**: guarda su propia base MySQL y
+a ella se conectan caja, meseros (celulares) y cocina por el Wi-Fi del local.
+Funciona **con o sin internet**; cuando hay señal se sincroniza sola con la
+nube cada 2 minutos y al reconectar.
+
+Requisitos en esa PC: Windows 10/11, **Python 3.12** (marcar *Add python.exe
+to PATH*) y **MySQL Server 8.4 LTS** como servicio automático.
+
+1. Copia la carpeta del sistema a `C:\QuesillosPOS` (sin la carpeta `venv`).
+   Si copias también el `.env` de la laptop, el instalador toma de ahí los
+   datos de la nube y del correo; si no, los pregunta.
+2. Abre PowerShell **como administrador** y corre:
+
+   ```bash
+   powershell -ExecutionPolicy Bypass -File C:\QuesillosPOS\scripts\instalar_restaurante.ps1
+   ```
+
+El instalador (se puede volver a correr; avisa antes de borrar nada):
+
+- crea el entorno de Python e instala las dependencias;
+- crea la base `quesillos_local` y la llena con una **copia completa de la nube**;
+- escribe el `.env` de ese equipo (`MODO_NODO=local`, `ID_NODO=2`,
+  `DEVICE_ID=restaurante-01`, `SECRET_KEY` propia);
+- registra la tarea **"Quesillos POS - Servidor"**: el sistema arranca solo al
+  encender la PC, sin ventana, y se reinicia solo si se cae
+  (`scripts/servidor.ps1`, salida en `logs\servidor.log`);
+- abre el puerto 5000 en el firewall para la red privada del local;
+- pone el ícono **Quesillos POS** en el escritorio: abre el sistema en su
+  propia ventana, como una app (`scripts/abrir_pos.vbs`), y también se abre
+  solo al iniciar sesión;
+- muestra la dirección para los celulares, por ejemplo `http://192.168.1.20:5000`.
+
+Recomendado: reservar en el router la IP de esa PC y conectar PC y router a un
+UPS. Si la PC servidor se apaga, los celulares no tienen a qué conectarse
+(pueden usar la versión web si hay internet).
+
+**Actualizar** el sistema en esa PC: reemplazar los archivos por la versión
+nueva (sin tocar `.env`), correr
+`venv\Scripts\python.exe -m pip install -r requirements.txt` y reiniciar la
+PC (o la tarea "Quesillos POS - Servidor" en el Programador de tareas).
+
 ### 2.1 Requisitos
 
 - Python 3.12
@@ -76,31 +119,29 @@ flask crear-admin      # pide la contraseña del administrador
 > Si es una instalación nueva sin datos en la nube, usa `flask seed` en lugar
 > de `flask bootstrap-nube`.
 
-### 2.4a Rangos de ID: por qué importa
+### 2.4a Numeración de IDs por equipo: por qué importa
 
-`bootstrap-nube` termina reservando un **rango de IDs para esta máquina**
-(desde `LOCAL_ID_OFFSET`, por defecto **1 000 000**).
+Si la nube y el restaurante numeraran igual, la próxima venta de los dos lados
+tendría el mismo ID y al sincronizar una **sobrescribiría a la otra**
+(`INSERT ... ON DUPLICATE KEY UPDATE`).
 
-Sin eso, la caja local crearía un producto con `id_producto = 1` mientras en la
-nube el `id_producto = 1` es otro producto distinto. Al sincronizar, el
-`INSERT ... ON DUPLICATE KEY UPDATE` **sobrescribiría el producto de la nube**.
+Cada equipo numera con su propia terminación: cada conexión a MySQL fija
+`auto_increment_increment = ID_INCREMENTO` (10) y `auto_increment_offset =`
+su número de equipo.
 
-Con el offset:
+| Equipo | `.env` | IDs que genera |
+|---|---|---|
+| Nube (Railway) | `MODO_NODO=nube` (usa `ID_NODO_NUBE=1`) | …1, …11, …21 |
+| PC del restaurante | `MODO_NODO=local`, `ID_NODO=2` | …2, …12, …22 |
+| Otra caja / laptop | `MODO_NODO=local`, `ID_NODO=3` (4, 5…) | …3, …13, …23 |
 
-| | Rango de IDs |
-|---|---|
-| Registros creados en la nube | 1 – 999 999 |
-| Registros creados en esta caja | 1 000 000 en adelante |
+Nunca se repiten aunque cada base reciba filas del otro lado. Cada equipo
+necesita además su propio `DEVICE_ID`.
 
-Comprueba en cualquier momento que no haya riesgo:
-
-```bash
-flask verificar-ids     # avisa si alguna tabla quedó fuera de rango
-flask aplicar-offset    # lo corrige
-```
-
-Si algún día se instala una **segunda caja**, dale otro rango en su `.env`
-(por ejemplo `LOCAL_ID_OFFSET=2000000`) y un `DEVICE_ID` distinto.
+> El rango fijo anterior (`LOCAL_ID_OFFSET`, `flask aplicar-offset`) no
+> alcanzaba: al subir una fila con un ID alto, MySQL adelanta el contador de
+> la nube hasta ese ID y los dos lados terminan generando los mismos números.
+> Los comandos siguen existiendo pero ya no son lo que protege.
 
 ### 2.5 Actualizar la base de datos en la nube
 
@@ -226,17 +267,48 @@ ingredientes, quitables y grupos de opciones — en un solo guardado.
 ## 5. Sincronización
 
 ```
-  ┌───────────────┐   push (cola)   ┌────────────────┐
-  │  MySQL LOCAL  │ ──────────────► │  MySQL NUBE    │
-  │ quesillos_    │ ◄────────────── │ pos_inventario │
-  │   local       │   pull (fecha)  │   _cloud       │
-  └───────────────┘                 └────────────────┘
+  ┌───────────────┐  1. push (cola local)        ┌────────────────┐
+  │  MySQL LOCAL  │ ───────────────────────────► │  MySQL NUBE    │
+  │ quesillos_    │ ◄─────────────────────────── │ pos_inventario │
+  │   local       │  2. pull (registro de        │   _cloud       │
+  └───────────────┘     cambios de la nube)      └────────────────┘
 ```
 
 - **Monitor de red:** cada 30 s hace `SELECT 1` contra la nube.
 - **Sync automático:** cada 2 min si hay conexión, y **de inmediato al reconectar**.
+- **Primero sube, después baja:** lo del restaurante sube antes de bajar lo de
+  la web, así un cambio local que aún no llegaba no se pisa con la versión
+  vieja de la nube.
+- **Bajada por registro de cambios:** en la nube, `sync_queue` es el registro
+  de todo lo que se hace en la web (también los borrados). El restaurante lo
+  lee en orden desde su cursor (`sync_cursor`) y para cada fila tocada trae su
+  estado actual: si existe la escribe, si ya no existe la borra. Llegan todas
+  las tablas: ventas con su detalle, recetas con ingredientes y opciones,
+  mesas, clientes, usuarios (PIN, rol, desactivados), caja…
+- **El stock viaja como movimientos:** cada movimiento de inventario nuevo suma
+  o resta su diferencia en el otro lado, así una compra en la web y una venta
+  en el restaurante al mismo tiempo no se pisan.
+- **Si la misma fila cambió en los dos lados:** en ventas, productos y recetas
+  gana la versión más reciente; una venta anulada se queda anulada.
+- **La nube (`MODO_NODO=nube`) no se sincroniza consigo misma:** su indicador
+  dice "En la nube".
+- **Retención:** la nube borra su registro de cambios de más de 90 días
+  (`RETENCION_COLA_DIAS`). Un restaurante que estuvo desconectado más tiempo
+  se resincroniza completo y solo (`flask resync-nube` hace lo mismo a mano).
+- **Cambios hechos directo en la base de la nube** (SQL a mano, fuera de la
+  app) no pasan por el registro de cambios: después de hacerlos, correr
+  `flask resync-nube` en el restaurante.
 - **Sync manual:** botón ⟳ en la barra superior o panel `/sincronizacion` (Admin).
 - **Indicador:** 🟢 En línea / 🔴 Sin conexión + contador de pendientes.
+
+### Variables de cada equipo
+
+| Variable | Nube (Railway) | PC del restaurante |
+|---|---|---|
+| `MODO_NODO` | `nube` | `local` |
+| `ID_NODO` | (no aplica, usa `ID_NODO_NUBE=1`) | `2` |
+| `DEVICE_ID` | `nube` | `restaurante-01` |
+| `SYNC_ENABLED` | `true` (los respaldos dependen de que arranquen los jobs) | `true` |
 
 ### Resolución de conflictos
 
@@ -305,7 +377,8 @@ El rol **Admin** pasa cualquier verificación.
 
 ```bash
 flask init-local       # crea las tablas locales desde los modelos
-flask bootstrap-nube   # copia la nube -> local y reserva el rango de IDs
+flask bootstrap-nube   # copia la nube -> local y fija desde dónde bajar cambios
+flask resync-nube      # deja la base local igual a la nube (sube lo pendiente primero)
 flask seed             # empresa, sucursal, 4 roles, unidades, categorías
 flask crear-admin      # crea/actualiza el usuario administrador
 flask demo-quesillo    # carga el ejemplo Quesillo + 4 insumos
@@ -325,7 +398,16 @@ python -m pytest tests/ -q
 
 Cubren: recetas y descuento de insumos, venta de insumo suelto, stock
 insuficiente, cola de sincronización, modo offline, resolución de conflictos
-por timestamp, roles y recuperación de contraseña.
+por timestamp, anulaciones que devuelven exactamente lo descontado (opciones
+incluidas), modo nube, roles y recuperación de contraseña.
+
+Prueba de punta a punta de la sincronización con **MySQL real** (crea dos
+bases de prueba en el MySQL de la máquina, una hace de nube y otra de
+restaurante, y las borra al final; no toca la nube real):
+
+```bash
+python tests/sync/nodo_local_nube_real_mysql.py
+```
 
 ---
 

@@ -28,7 +28,15 @@ recibe el aviso del sistema en tiempo real para imprimir.
    }
    ```
 
-3. Cambiar `SERVIDOR_URL` por la URL real del sistema una vez esté en Railway.
+3. Cambiar `SERVIDOR_URL` por la dirección del sistema. Con la PC del
+   restaurante como servidor local (ver README principal, sección 2.0), el
+   agente corre en esa misma PC y usa `http://localhost:5000`: así imprime
+   aunque no haya internet.
+
+> **Pendiente antes de usarlo:** desde el ajuste de seguridad M-04 el
+> servidor rechaza conexiones de tiempo real sin sesión iniciada, y este
+> agente se conecta sin iniciar sesión. Necesita una credencial propia antes
+> de poder recibir las comandas.
 
 Nada más. El resto (qué producto va a cuál impresora, el armado del
 ticket, el aviso en tiempo real) ya está funcionando en el sistema.
