@@ -17,7 +17,7 @@ from app.models.compra import Compra
 from app.models.detalle_compra import DetalleCompra
 from app.models.auditoria import Auditoria
 from app.models.receta import Receta, RecetaIngrediente, RecetaOpcionGrupo, RecetaOpcionItem
-from app.models.sync import SyncQueue, ConflictLog, SyncMetadata
+from app.models.sync import SyncQueue, ConflictLog, SyncMetadata, SyncCursor
 from app.models.notificacion import Notificacion
 from app.models.configuracion import Configuracion
 from app.models.caja import Caja, AperturaCaja, MovimientoCaja, CierreCaja
@@ -28,7 +28,7 @@ __all__ = [
     "UnidadMedida", "Cliente", "Mesa", "Venta", "DetalleVenta", "Inventario",
     "MovimientoInventario", "Compra", "DetalleCompra", "Auditoria",
     "Receta", "RecetaIngrediente", "RecetaOpcionGrupo", "RecetaOpcionItem",
-    "SyncQueue", "ConflictLog", "SyncMetadata",
+    "SyncQueue", "ConflictLog", "SyncMetadata", "SyncCursor",
     "Notificacion", "Configuracion", "Caja", "AperturaCaja", "MovimientoCaja",
     "CierreCaja",
 ]

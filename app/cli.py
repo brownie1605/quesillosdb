@@ -35,6 +35,7 @@ def registrar_comandos(app):
     app.cli.add_command(restaurar_backup)
     app.cli.add_command(demo_quesillo)
     app.cli.add_command(bootstrap_nube)
+    app.cli.add_command(resync_nube)
     app.cli.add_command(aplicar_offset)
     app.cli.add_command(verificar_ids)
 
@@ -324,13 +325,20 @@ def bootstrap_nube(offset):
     """
     from app.services.bootstrap_service import copiar_desde_nube, aplicar_offset_ids
     from app.services.network_service import NetworkService
+    from app.services.sync_service import SyncService
 
     if not NetworkService.check_connectivity():
         click.echo("Sin conexion con la nube. Intenta cuando haya internet.")
         return
 
+    # Punto de partida del pull, tomado ANTES de copiar: lo que cambie en la
+    # nube mientras se copia se vuelve a bajar despues (es seguro repetirlo).
+    with db.engines["cloud"].connect() as conn:
+        ultimo_cambio = SyncService.ultimo_id_nube(conn)
+
     click.echo("Copiando datos desde la nube...")
     resumen = copiar_desde_nube()
+    SyncService.fijar_cursor(ultimo_cambio)
     for tabla, n in resumen["por_tabla"].items():
         if n:
             click.echo("  %-24s %s filas" % (tabla, n))
@@ -343,6 +351,34 @@ def bootstrap_nube(offset):
         r = aplicar_offset_ids()
         click.echo("Rango de IDs local desde %s aplicado a %s tablas."
                    % (r["offset"], len(r["aplicado"])))
+
+
+@click.command("resync-nube")
+@with_appcontext
+def resync_nube():
+    """Deja la base local igual a la nube (primero sube lo pendiente).
+
+    Para cuando este equipo estuvo desconectado mucho tiempo o se cambio
+    algo directo en la base de la nube, fuera de la app.
+    """
+    from app.services.bootstrap_service import resincronizar_desde_nube
+    from app.services.network_service import NetworkService
+    from app.services.sync_service import SyncService
+
+    if not NetworkService.check_connectivity():
+        click.echo("Sin conexion con la nube. Intenta cuando haya internet.")
+        return
+    push = SyncService.push_pending_operations()
+    if SyncService.contar_pendientes():
+        click.echo("No se pudo subir todo lo pendiente (%s errores). Revisa /sincronizacion."
+                   % push.get("errores", 0))
+        return
+    click.echo("Copiando todo desde la nube...")
+    r = resincronizar_desde_nube()
+    click.echo("Copiadas %s filas. Borradas aqui (ya no estan en la nube): %s"
+               % (r["copiados"], r["borrados"] or "ninguna"))
+    for e in r["errores"]:
+        click.echo("  ! %s: %s" % (e["tabla"], e["error"]))
 
 
 @click.command("aplicar-offset")

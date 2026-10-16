@@ -129,6 +129,32 @@ class Config:
     ID_SUCURSAL = int(os.getenv("ID_SUCURSAL", 1))
     DEVICE_ID = os.getenv("DEVICE_ID", "local-01")
 
+    # ------------------------------------------------------------------
+    # Papel de esta instalacion dentro del sistema hibrido:
+    #   "local": la PC del restaurante. Trabaja contra su propia MySQL
+    #            (sigue vendiendo sin internet) y se sincroniza con la nube.
+    #   "nube":  la instancia de Railway. ES la nube: no se sincroniza
+    #            consigo misma; solo deja registro de cada cambio en
+    #            `sync_queue` para que los nodos locales lo bajen.
+    # ------------------------------------------------------------------
+    MODO_NODO = os.getenv("MODO_NODO", "local").strip().lower()
+
+    # Numeracion de IDs por nodo. Cada conexion a MySQL fija
+    # auto_increment_increment = ID_INCREMENTO y auto_increment_offset =
+    # su numero de nodo, asi cada lado genera IDs que nunca se repiten
+    # entre si (nube: ...1, ...11, ...21; restaurante: ...2, ...12, ...22),
+    # aunque las dos bases reciban filas con IDs del otro lado.
+    # El rango fijo de LOCAL_ID_OFFSET no alcanzaba: al subir una fila con
+    # un ID alto, MySQL adelanta el contador de la nube hasta ese ID y los
+    # dos lados terminan generando los mismos numeros.
+    ID_INCREMENTO = int(os.getenv("ID_INCREMENTO", 10))
+    ID_NODO_NUBE = int(os.getenv("ID_NODO_NUBE", 1))
+    ID_NODO = int(os.getenv("ID_NODO", 2))
+
+    # Dias que la nube guarda su registro de cambios (sync_queue). Un nodo
+    # que pase mas tiempo sin conectarse se resincroniza completo.
+    RETENCION_COLA_DIAS = int(os.getenv("RETENCION_COLA_DIAS", 90))
+
     # Rango de IDs reservado para los registros creados en ESTA maquina.
     # La nube usa 1..999999; lo local empieza en LOCAL_ID_OFFSET.
     # Evita que un INSERT local pise un registro distinto con el mismo id

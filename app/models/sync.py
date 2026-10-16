@@ -142,3 +142,18 @@ class SyncMetadata(db.Model):
             "estado": self.estado,
             "mensaje": self.mensaje,
         }
+
+
+class SyncCursor(db.Model):
+    """Hasta donde bajo este nodo el registro de cambios de la nube.
+
+    `ultimo_id` es el `id_sync_queue` (de la nube) del ultimo cambio ya
+    aplicado aqui. Vive solo en la base del nodo local; la nube no lo usa.
+    """
+
+    __tablename__ = "sync_cursor"
+
+    nombre = db.Column(db.String(50), primary_key=True)
+    ultimo_id = db.Column(db.BigInteger, nullable=False, default=0)
+    ultima_fecha = db.Column(db.DateTime)
+    fecha_actualizacion = db.Column(db.DateTime, default=nicaragua_now, onupdate=nicaragua_now)

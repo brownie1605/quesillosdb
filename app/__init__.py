@@ -28,6 +28,56 @@ from app.routes.caja_routes import caja_bp
 from app.models import Usuario
 
 
+def _configurar_ids_por_nodo(app):
+    """Cada nodo genera IDs que no se repiten con los de los demas.
+
+    Ver ID_INCREMENTO / ID_NODO en config.py. Se fija por sesion en cada
+    conexion nueva a MySQL (el pool reconecta solo, por eso va en el evento
+    "connect" y no una sola vez al arrancar). SQLite (los tests) no tiene
+    estas variables y se omite.
+    """
+    from sqlalchemy import event
+
+    incremento = int(app.config.get("ID_INCREMENTO", 10))
+    nodo_nube = int(app.config.get("ID_NODO_NUBE", 1))
+    if app.config.get("MODO_NODO") == "nube":
+        nodo = nodo_nube
+    else:
+        nodo = int(app.config.get("ID_NODO", 2))
+        if nodo == nodo_nube:
+            raise RuntimeError(
+                "ID_NODO=%s es el numero reservado para la nube; este equipo "
+                "necesita otro (2 para el restaurante, 3 en adelante para otros)." % nodo
+            )
+    for valor, nombre in ((nodo, "ID_NODO"), (nodo_nube, "ID_NODO_NUBE")):
+        if not 1 <= valor <= incremento:
+            raise RuntimeError(
+                "%s=%s debe estar entre 1 y ID_INCREMENTO (%s)" % (nombre, valor, incremento)
+            )
+
+    def _fijar(engine, offset):
+        if engine is None or engine.dialect.name != "mysql":
+            return
+
+        @event.listens_for(engine, "connect")
+        def _ids_por_nodo(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute(
+                    "SET SESSION auto_increment_increment = %d, auto_increment_offset = %d"
+                    % (incremento, offset)
+                )
+            finally:
+                cursor.close()
+
+    with app.app_context():
+        _fijar(db.engine, nodo)
+        # Lo que este nodo crea directamente en la nube (el registro de
+        # cambios, las devoluciones por un conflicto) se numera como la nube
+        # y no como el nodo: si no, el mismo numero podria salir aqui y alla.
+        _fijar(db.engines.get("cloud"), nodo_nube)
+
+
 def create_app(config_class=Config, iniciar_jobs=True):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -39,6 +89,7 @@ def create_app(config_class=Config, iniciar_jobs=True):
 
     # ---------------------------------------------------------- extensiones
     db.init_app(app)
+    _configurar_ids_por_nodo(app)
     migrate.init_app(app, db)
     mail.init_app(app)
     if not app.config.get("TESTING"):

@@ -51,32 +51,37 @@ class ConflictService:
         if not venta or venta.estado == "anulada":
             return None
 
+        requerido, ya_descontado = ConflictService._consumo_de_venta(conn, venta)
         faltantes = []
-        for det in venta.detalles:
-            requerido = ConflictService._requerimiento_total(det.id_producto, det.cantidad)
-            for id_producto, cantidad in requerido.items():
-                fila = conn.execute(
-                    text(
-                        "SELECT stock_actual FROM inventario "
-                        "WHERE id_producto = :p ORDER BY id_inventario LIMIT 1"
-                    ),
-                    {"p": id_producto},
-                ).mappings().first()
+        for id_producto, cantidad in requerido.items():
+            fila = conn.execute(
+                text(
+                    "SELECT stock_actual FROM inventario "
+                    "WHERE id_producto = :p ORDER BY id_inventario LIMIT 1"
+                ),
+                {"p": id_producto},
+            ).mappings().first()
 
-                # Sin fila de inventario remota el producto todavia no se ha
-                # subido. Eso no es un conflicto: la propia cola lo creara.
-                if fila is None:
-                    continue
+            # Sin fila de inventario remota el producto todavia no se ha
+            # subido. Eso no es un conflicto: la propia cola lo creara.
+            if fila is None:
+                continue
 
-                stock_remoto = Decimal(str(fila["stock_actual"]))
-                if stock_remoto < Decimal(str(cantidad)):
-                    faltantes.append(
-                        {
-                            "id_producto": id_producto,
-                            "requerido": float(cantidad),
-                            "stock_remoto": float(stock_remoto),
-                        }
-                    )
+            # El stock viaja como movimientos y los de esta venta pueden
+            # haber subido antes que ella: lo que ya desconto alla no cuenta
+            # en su contra.
+            stock_remoto = (
+                Decimal(str(fila["stock_actual"]))
+                + ya_descontado.get(id_producto, Decimal("0"))
+            )
+            if stock_remoto < Decimal(str(cantidad)):
+                faltantes.append(
+                    {
+                        "id_producto": id_producto,
+                        "requerido": float(cantidad),
+                        "stock_remoto": float(stock_remoto),
+                    }
+                )
 
         if not faltantes:
             return None
@@ -122,6 +127,54 @@ class ConflictService:
         db.session.commit()
         log.info("Conflicto detectado en venta local #%s", venta.id_venta)
         return conflicto
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _consumo_de_venta(conn, venta):
+        """({producto: cantidad que consume la venta},
+            {producto: cuanto de eso ya se desconto en la nube}).
+
+        Sale de los movimientos que la venta registro al cobrarse (incluye
+        opciones elegidas e ingredientes quitados). Una venta sin
+        movimientos registrados se calcula con la receta, como antes.
+        """
+        from app.models.movimiento_inventario import MovimientoInventario
+        from app.services.sync_service import _delta_movimiento
+
+        movimientos = MovimientoInventario.query.filter_by(
+            referencia="VENTA-" + str(venta.id_venta)
+        ).all()
+        if not movimientos:
+            requerido = {}
+            for det in venta.detalles:
+                for id_producto, cantidad in ConflictService._requerimiento_total(
+                    det.id_producto, det.cantidad
+                ).items():
+                    requerido[id_producto] = requerido.get(id_producto, Decimal("0")) + cantidad
+            return requerido, {}
+
+        def delta(m):
+            return _delta_movimiento({"stock_nuevo": m.stock_nuevo, "stock_anterior": m.stock_anterior})
+
+        neto = {}
+        for m in movimientos:
+            neto[m.id_producto] = neto.get(m.id_producto, Decimal("0")) + delta(m)
+        requerido = {p: -d for p, d in neto.items() if d < 0}
+
+        ids = [m.id_movimiento for m in movimientos]
+        marcas = ", ".join(":m" + str(i) for i in range(len(ids)))
+        en_nube = {
+            r[0] for r in conn.execute(
+                text("SELECT id_movimiento FROM movimientos_inventario "
+                     "WHERE id_movimiento IN (" + marcas + ")"),
+                {"m" + str(i): v for i, v in enumerate(ids)},
+            )
+        }
+        ya_descontado = {}
+        for m in movimientos:
+            if m.id_movimiento in en_nube:
+                ya_descontado[m.id_producto] = ya_descontado.get(m.id_producto, Decimal("0")) - delta(m)
+        return requerido, ya_descontado
 
     # -----------------------------------------------------------------
     @staticmethod
@@ -236,10 +289,14 @@ class ConflictService:
         # Devuelve al inventario local lo que la venta habia descontado.
         InventarioService.revertir_venta(venta, motivo="Anulada por conflicto de sincronizacion")
 
-        # Marca la operacion en cola como resuelta para que no reintente.
+        # La venta se sube igual, ya anulada (una venta anulada no vuelve a
+        # chocar): asi la nube la registra y sus lineas de detalle, que
+        # tambien estan en cola, encuentran a su venta alla. Antes se
+        # marcaba como resuelta y nunca subia, y esas lineas fallaban para
+        # siempre por llave foranea.
         SyncQueue.query.filter_by(
             tabla_afectada="ventas", registro_id=venta.id_venta
-        ).update({"estado_sync": "resuelto"})
+        ).update({"estado_sync": "pendiente", "intentos": 0})
 
         ConflictService._notificar(
             venta.id_usuario,
@@ -258,23 +315,93 @@ class ConflictService:
     # -----------------------------------------------------------------
     @staticmethod
     def _anular_venta_remota(c):
-        """Anula en la nube la venta perdedora y notifica a su usuario."""
+        """Anula en la nube la venta perdedora y notifica a su usuario.
+
+        Ademas le devuelve al stock de la nube lo que esa venta desconto
+        (sus propios movimientos dicen cuanto) y deja todo en el registro de
+        cambios de la nube, para que el restaurante tambien la vea anulada y
+        reciba la devolucion. Antes solo se cambiaba el estado: el stock de
+        la nube quedaba descontado y la venta local volvia a chocar.
+        """
+        from app.services.sync_service import _delta_movimiento
+
         datos = c.datos_remoto or {}
         id_remoto = datos.get("id_venta")
         if not id_remoto:
             return
         try:
             engine = db.engines.get("cloud")
+            ahora = nicaragua_now()
+            referencia = "VENTA-" + str(id_remoto)
             with engine.begin() as conn:
+                estado = conn.execute(
+                    text("SELECT estado FROM ventas WHERE id_venta = :id"), {"id": id_remoto}
+                ).scalar()
+                if estado is None or estado == "anulada":
+                    return
                 conn.execute(
                     text(
-                        "UPDATE ventas SET estado = 'anulada', motivo_anulacion = :m "
-                        "WHERE id_venta = :id"
+                        "UPDATE ventas SET estado = 'anulada', motivo_anulacion = :m, "
+                        "timestamp_local_actualizacion = :ahora WHERE id_venta = :id"
                     ),
-                    {"m": MENSAJE_AGOTADO, "id": id_remoto},
+                    {"m": MENSAJE_AGOTADO, "id": id_remoto, "ahora": ahora},
                 )
-                if c.usuario_remoto:
+                ConflictService._registrar_cambio_nube(conn, "UPDATE", "ventas", id_remoto, ahora)
+
+                neto, dueno = {}, {}
+                for m in conn.execute(
+                    text(
+                        "SELECT id_producto, id_empresa, id_sucursal, id_usuario, "
+                        "stock_anterior, stock_nuevo FROM movimientos_inventario "
+                        "WHERE referencia = :r"
+                    ),
+                    {"r": referencia},
+                ).mappings().all():
+                    neto[m["id_producto"]] = neto.get(m["id_producto"], Decimal("0")) + _delta_movimiento(m)
+                    dueno[m["id_producto"]] = m
+                for id_producto, total in neto.items():
+                    if total >= 0:
+                        continue
+                    inv = conn.execute(
+                        text(
+                            "SELECT id_inventario, stock_actual FROM inventario "
+                            "WHERE id_producto = :p ORDER BY id_inventario LIMIT 1 FOR UPDATE"
+                        ),
+                        {"p": id_producto},
+                    ).mappings().first()
+                    if inv is None:
+                        continue
+                    anterior = Decimal(str(inv["stock_actual"]))
+                    nuevo = anterior - total
                     conn.execute(
+                        text(
+                            "UPDATE inventario SET stock_actual = :n, fecha_actualizacion = :ahora "
+                            "WHERE id_inventario = :i"
+                        ),
+                        {"n": nuevo, "ahora": ahora, "i": inv["id_inventario"]},
+                    )
+                    m = dueno[id_producto]
+                    mov = conn.execute(
+                        text(
+                            "INSERT INTO movimientos_inventario (id_empresa, id_sucursal, "
+                            "id_producto, id_usuario, tipo_movimiento, cantidad, stock_anterior, "
+                            "stock_nuevo, referencia, observacion, fecha_movimiento, "
+                            "timestamp_operacion, estado_sync) VALUES (:e, :s, :p, :u, "
+                            "'devolucion', :c, :a, :n, :r, :o, :ahora, :ahora, 'sinc_remoto')"
+                        ),
+                        {
+                            "e": m["id_empresa"], "s": m["id_sucursal"], "p": id_producto,
+                            "u": m["id_usuario"], "c": -total, "a": anterior, "n": nuevo,
+                            "r": referencia, "o": "Anulada por conflicto de sincronizacion",
+                            "ahora": ahora,
+                        },
+                    )
+                    ConflictService._registrar_cambio_nube(
+                        conn, "INSERT", "movimientos_inventario", mov.lastrowid, ahora
+                    )
+
+                if c.usuario_remoto:
+                    notif = conn.execute(
                         text(
                             "INSERT INTO notificaciones "
                             "(id_empresa, id_usuario, titulo, mensaje, tipo, leida) "
@@ -288,8 +415,31 @@ class ConflictService:
                             + ". Otro punto de venta registro la venta antes que usted.",
                         },
                     )
+                    ConflictService._registrar_cambio_nube(
+                        conn, "INSERT", "notificaciones", notif.lastrowid, ahora
+                    )
         except Exception:  # noqa: BLE001
             log.exception("No se pudo anular la venta remota #%s", id_remoto)
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _registrar_cambio_nube(conn, operacion, tabla, registro_id, ahora):
+        """Anota en el registro de cambios de la nube algo que se escribio
+        alla directamente, para que el restaurante lo baje en su pull."""
+        from flask import current_app
+
+        conn.execute(
+            text(
+                "INSERT INTO sync_queue (operation_type, tabla_afectada, registro_id, "
+                "id_empresa, timestamp_operacion, timestamp_sincronizacion, estado_sync, "
+                "dispositivo_origen, intentos, fecha_creacion) VALUES "
+                "(:op, :t, :r, :e, :ahora, :ahora, 'sinc_remoto', 'nube-conflicto', 0, :ahora)"
+            ),
+            {
+                "op": operacion, "t": tabla, "r": registro_id, "ahora": ahora,
+                "e": current_app.config.get("ID_EMPRESA", 1),
+            },
+        )
 
     # -----------------------------------------------------------------
     @staticmethod

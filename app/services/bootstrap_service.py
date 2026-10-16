@@ -194,6 +194,77 @@ def copiar_desde_nube(tablas=None, limite_por_tabla=None):
 
 
 # ---------------------------------------------------------------------------
+def resincronizar_desde_nube():
+    """Deja esta base igual a la nube y fija el punto de partida del pull.
+
+    Para un equipo que se quedo atras mas tiempo del que la nube guarda su
+    registro de cambios, o despues de cambios hechos directo en la base de
+    la nube (SQL a mano, fuera de la app), que no pasan por ese registro.
+
+    Exige que no haya nada de este equipo pendiente de subir: lo que se
+    borra aqui es lo que ya no existe en la nube, y un cambio local sin
+    subir se perderia.
+    """
+    from app.models.sync import SyncQueue
+    from app.services.sync_service import SyncService, TABLAS_SYNC
+
+    if current_app.config.get("MODO_NODO", "local") == "nube":
+        raise RuntimeError("La nube no se resincroniza: ella es la fuente.")
+    if SyncService.contar_pendientes():
+        raise RuntimeError(
+            "Hay cambios de este equipo que aun no suben a la nube; sincroniza primero."
+        )
+    engine = db.engines.get("cloud")
+    if engine is None:
+        raise RuntimeError("No hay conexion configurada con la nube")
+
+    # Se toma ANTES de copiar: lo que cambie en la nube mientras se copia
+    # se vuelve a bajar en el siguiente pull (aplicarlo dos veces es seguro).
+    with engine.connect() as conn:
+        ultimo = SyncService.ultimo_id_nube(conn)
+
+    resumen = copiar_desde_nube()
+
+    borrados = {}
+    for tabla in reversed(TABLAS_SYNC):
+        if not _tabla_existe_local(tabla):
+            continue
+        pk = PK_POR_TABLA[tabla]
+        with engine.connect() as conn:
+            en_nube = set(conn.execute(text("SELECT " + pk + " FROM " + tabla)).scalars().all())
+        aqui = set(db.session.execute(text("SELECT " + pk + " FROM " + tabla)).scalars().all())
+        sobran = aqui - en_nube
+        if sobran:
+            # Lo que esta en conflicto todavia no subio: no se toca.
+            sobran -= set(
+                r for (r,) in db.session.query(SyncQueue.registro_id).filter(
+                    SyncQueue.tabla_afectada == tabla,
+                    SyncQueue.estado_sync.in_(["pendiente", "error", "en_conflicto"]),
+                )
+            )
+        if not sobran:
+            continue
+        db.session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+        ids = sorted(sobran)
+        for i in range(0, len(ids), 200):
+            parte = ids[i:i + 200]
+            marcas = ", ".join(":id" + str(n) for n in range(len(parte)))
+            db.session.execute(
+                text("DELETE FROM " + tabla + " WHERE " + pk + " IN (" + marcas + ")"),
+                {"id" + str(n): v for n, v in enumerate(parte)},
+            )
+        db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+        db.session.commit()
+        borrados[tabla] = len(ids)
+
+    SyncService.fijar_cursor(ultimo)
+    resumen["borrados"] = borrados
+    resumen["cursor"] = int(ultimo)
+    log.info("Resincronizacion completa: %s copiadas, borradas %s", resumen["copiados"], borrados)
+    return resumen
+
+
+# ---------------------------------------------------------------------------
 def _proximo_auto_increment(tabla):
     """AUTO_INCREMENT actual de la tabla.
 

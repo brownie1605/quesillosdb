@@ -19,6 +19,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import event, insert, update
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session as SASession
 
 from app.extensions import db
@@ -71,6 +72,24 @@ def _instantanea(obj):
     return datos
 
 
+def _columnas_cambiadas(obj):
+    """Columnas que cambiaron en este flush.
+
+    Se guardan con cada UPDATE (en el payload, clave `__cambios__`) para que
+    la subida mande solo eso. Si se subiera la fila completa, un cambio
+    hecho en la web a OTRA columna de la misma fila se perderia: por
+    ejemplo, iniciar sesion en el restaurante toca `ultimo_acceso` del
+    usuario, y subir la fila entera revertiria un PIN cambiado o un usuario
+    desactivado en la web minutos antes.
+    """
+    estado = sa_inspect(obj)
+    cambiadas = set()
+    for prop in estado.mapper.column_attrs:
+        if estado.attrs[prop.key].history.has_changes():
+            cambiadas.update(c.name for c in prop.columns if hasattr(c, "name"))
+    return cambiadas
+
+
 def _usuario_actual():
     try:
         from flask_login import current_user
@@ -104,6 +123,7 @@ def _encolar_cambios(session, flush_context):
     # (p. ej. la venta se crea y despues se le calcula el total). Se guarda a
     # que fila de la cola corresponde para refrescarla en vez de duplicarla.
     encolados = session.info.setdefault("_sync_encolados", {})
+    cambios_previos = session.info.setdefault("_sync_cambios", {})
 
     for obj, operacion in _pendientes(session):
         tabla = getattr(obj, "__tablename__", None)
@@ -116,9 +136,14 @@ def _encolar_cambios(session, flush_context):
         if registro_id is None:
             continue
 
-        payload = {} if operacion == "DELETE" else _instantanea(obj)
-        firma = checksum(payload) if payload else None
         clave = (tabla, registro_id)
+        payload = {} if operacion == "DELETE" else _instantanea(obj)
+        if operacion == "UPDATE":
+            # Acumula las columnas de todos los flush de esta transaccion.
+            cambiadas = _columnas_cambiadas(obj) | cambios_previos.get(clave, set())
+            cambios_previos[clave] = cambiadas
+            payload["__cambios__"] = sorted(cambiadas)
+        firma = checksum(payload) if payload else None
 
         if clave in encolados:
             # Ya esta en la cola: se actualiza con el estado mas reciente.
@@ -155,3 +180,4 @@ def _encolar_cambios(session, flush_context):
 @event.listens_for(SASession, "after_rollback")
 def _limpiar_seguimiento(session):
     session.info.pop("_sync_encolados", None)
+    session.info.pop("_sync_cambios", None)

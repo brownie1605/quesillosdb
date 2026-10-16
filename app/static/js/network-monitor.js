@@ -7,6 +7,7 @@
   const NetworkMonitor = {
     online: null,
     pendientes: 0,
+    modo: null,
 
     elementos() {
       return {
@@ -28,6 +29,22 @@
       const el = this.elementos();
       const online = !!datos.online;
       this.pendientes = datos.pendientes || 0;
+
+      // La version web (Railway) ES la nube: no tiene cola ni "modo local".
+      // Si deja de responder es que este dispositivo perdio internet.
+      if (datos.modo) this.modo = datos.modo;
+      if (this.modo === "nube") {
+        this.pintar(online ? "sync-online" : "sync-offline", online ? "En la nube" : "Sin conexión");
+        if (el.badge) el.badge.style.display = "none";
+        if (el.banner) {
+          el.banner.classList.toggle("visible", !online);
+          el.banner.innerHTML =
+            "📡 Sin conexión a internet — esta es la versión web: lo que hagas no se guardará hasta que vuelva la señal. " +
+            "En el restaurante usa el sistema local.";
+        }
+        this.online = online;
+        return;
+      }
 
       if (online) {
         this.pintar("sync-online", this.pendientes ? "En línea · sincronizando" : "En línea");

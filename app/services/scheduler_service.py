@@ -70,6 +70,17 @@ def _job_sync(app):
         _emitir_estado(app)
 
 
+def _job_podar_registro(app):
+    """Una vez al dia: borra lo viejo de sync_queue (ver SyncService.podar_registro)."""
+    with app.app_context():
+        try:
+            borradas = SyncService.podar_registro()
+            if borradas:
+                log.info("Registro de cambios: %s filas viejas borradas", borradas)
+        except Exception:  # noqa: BLE001
+            log.exception("Fallo la limpieza del registro de cambios")
+
+
 def _emitir_estado(app):
     try:
         from app.extensions import socketio
@@ -94,7 +105,13 @@ def iniciar_scheduler(app):
         return scheduler
 
     sync_habilitado = app.config.get("SYNC_ENABLED", True)
-    if sync_habilitado:
+    # La instalacion en la nube ES la nube: no tiene con quien sincronizarse.
+    # Antes se sincronizaba consigo misma cada 2 minutos (sin efecto util y
+    # dejando conflictos falsos en la cola).
+    es_nube = app.config.get("MODO_NODO", "local") == "nube"
+    if sync_habilitado and es_nube:
+        log.info("MODO_NODO=nube -> monitor de red y sincronizacion no se inician")
+    if sync_habilitado and not es_nube:
         scheduler.add_job(
             func=_job_check_red,
             args=[app],
@@ -113,8 +130,18 @@ def iniciar_scheduler(app):
             replace_existing=True,
             max_instances=1,
         )
-    else:
+    elif not sync_habilitado:
         log.info("SYNC_ENABLED=false -> monitor de red y sincronizacion no se inician")
+
+    scheduler.add_job(
+        func=_job_podar_registro,
+        args=[app],
+        trigger="interval",
+        hours=24,
+        id="podar_registro_cambios",
+        replace_existing=True,
+        max_instances=1,
+    )
 
     scheduler.add_job(
         func=_job_notificaciones,
