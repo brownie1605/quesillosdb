@@ -233,9 +233,44 @@ class InventarioService:
     # -----------------------------------------------------------------
     @staticmethod
     def revertir_venta(venta, motivo="Reversion de venta"):
-        """Devuelve al stock todo lo que la venta habia descontado."""
+        """Devuelve al stock todo lo que la venta habia descontado.
+
+        Se devuelve exactamente lo que la venta registro en sus movimientos
+        (referencia "VENTA-<id>"): la opcion elegida (Fajitas bowl de res
+        devuelve fajitas de res), sin los ingredientes que se quitaron, y
+        con las cantidades de la receta que habia al venderla. Lo que ya se
+        devolvio antes (quitar un plato de la cuenta, otra anulacion) se
+        descuenta del neto, asi que nunca se devuelve dos veces.
+
+        Antes se recalculaba con la receta ACTUAL y sin la personalizacion:
+        una receta de solo opciones no devolvia nada y un Desayuno tipico
+        no devolvia la opcion elegida.
+        """
         from app.services.receta_service import RecetaService
 
+        referencia = "VENTA-" + str(venta.id_venta)
+        movimientos = MovimientoInventario.query.filter_by(referencia=referencia).all()
+        if movimientos:
+            neto = {}
+            for m in movimientos:
+                delta = Decimal(str(m.stock_nuevo)) - Decimal(str(m.stock_anterior))
+                neto[m.id_producto] = neto.get(m.id_producto, Decimal("0")) + delta
+            for id_producto, total in neto.items():
+                if total < 0:
+                    InventarioService.mover(
+                        id_producto,
+                        -total,  # positivo = entrada
+                        "devolucion",
+                        venta.id_usuario,
+                        referencia=referencia,
+                        observacion=motivo,
+                        commit=False,
+                    )
+            db.session.commit()
+            return
+
+        # Venta sin movimientos registrados (anterior a que existieran):
+        # se calcula con la receta, como antes.
         for det in venta.detalles:
             requerimientos = RecetaService.requerimiento_de_venta(det.id_producto, det.cantidad)
             for id_producto, cantidad in requerimientos.items():
