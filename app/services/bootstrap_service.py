@@ -122,14 +122,41 @@ def _sin_binarios(datos):
 
 # ---------------------------------------------------------------------------
 def copiar_desde_nube(tablas=None, limite_por_tabla=None):
-    """Copia la nube -> local. No borra nada: usa upsert por clave primaria."""
+    """Copia la nube -> local. No borra nada: usa upsert por clave primaria.
+
+    Todas las tablas se leen dentro de UNA sola transaccion de la nube
+    (REPEATABLE READ): es una "foto" consistente. Antes cada tabla se leia en
+    su propia conexion, y una venta hecha en la web justo entre leer
+    `inventario` y leer `movimientos_inventario` dejaba el stock ya
+    descontado pero sin su movimiento; el siguiente pull aplicaba el
+    movimiento otra vez y el stock local se descontaba dos veces.
+
+    El ultimo cambio del registro de la nube se lee PRIMERO, dentro de la
+    misma foto (eso es lo que la fija), y se devuelve en `resumen["cursor"]`:
+    es exactamente el punto desde el cual el pull debe seguir. Como el dato y
+    su registro de cambio se confirman juntos, todo lo que esta en la foto
+    tiene su cambio <= cursor, y todo lo posterior lo baja el pull.
+    """
     engine = db.engines.get("cloud")
     if engine is None:
         raise RuntimeError("No hay conexion configurada con la nube")
 
-    tablas = tablas or ORDEN_COPIA
-    resumen = {"copiados": 0, "por_tabla": {}, "errores": []}
+    from app.services.sync_service import SyncService
 
+    tablas = tablas or ORDEN_COPIA
+    resumen = {"copiados": 0, "por_tabla": {}, "errores": [], "cursor": None}
+
+    conn = engine.connect().execution_options(isolation_level="REPEATABLE READ")
+    try:
+        resumen["cursor"] = int(SyncService.ultimo_id_nube(conn))
+        _copiar_tablas(conn, tablas, limite_por_tabla, resumen)
+    finally:
+        conn.rollback()  # solo lectura: la foto se suelta sin confirmar nada
+        conn.close()
+    return resumen
+
+
+def _copiar_tablas(conn, tablas, limite_por_tabla, resumen):
     for tabla in tablas:
         if not _tabla_existe_local(tabla):
             continue
@@ -137,11 +164,11 @@ def copiar_desde_nube(tablas=None, limite_por_tabla=None):
         columnas_ok = _columnas_locales(tabla)
 
         try:
-            with engine.connect() as conn:
-                sql = "SELECT * FROM " + tabla
-                if limite_por_tabla:
-                    sql += " LIMIT " + str(int(limite_por_tabla))
-                filas = conn.execute(text(sql)).mappings().all()
+            # Misma conexion (misma foto de la nube) para todas las tablas.
+            sql = "SELECT * FROM " + tabla
+            if limite_por_tabla:
+                sql += " LIMIT " + str(int(limite_por_tabla))
+            filas = conn.execute(text(sql)).mappings().all()
 
             insertados = 0
             fallidas = 0
@@ -190,7 +217,6 @@ def copiar_desde_nube(tablas=None, limite_por_tabla=None):
 
     db.session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
     db.session.commit()
-    return resumen
 
 
 # ---------------------------------------------------------------------------
@@ -218,12 +244,9 @@ def resincronizar_desde_nube():
     if engine is None:
         raise RuntimeError("No hay conexion configurada con la nube")
 
-    # Se toma ANTES de copiar: lo que cambie en la nube mientras se copia
-    # se vuelve a bajar en el siguiente pull (aplicarlo dos veces es seguro).
-    with engine.connect() as conn:
-        ultimo = SyncService.ultimo_id_nube(conn)
-
+    # El cursor sale de la misma foto consistente de la nube que la copia.
     resumen = copiar_desde_nube()
+    ultimo = resumen["cursor"]
 
     borrados = {}
     for tabla in reversed(TABLAS_SYNC):

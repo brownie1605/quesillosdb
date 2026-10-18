@@ -284,11 +284,36 @@ try:
 
         db.create_all()
         NetworkService.check_connectivity()
-        with db.engines["cloud"].connect() as conn:
-            ultimo = SyncService.ultimo_id_nube(conn)
-        copiar_desde_nube()
-        SyncService.fijar_cursor(ultimo)
+        SyncService.fijar_cursor(copiar_desde_nube()["cursor"])
     comparar_todo("Bootstrap")
+
+    print("\n== Venta en la web MIENTRAS el restaurante copia la nube (foto consistente)")
+    # La instalacion y la resincronizacion se hacen con la web en uso. Si cada
+    # tabla se leyera en su propia conexion, una venta que caiga entre la
+    # lectura de `inventario` y la de `movimientos_inventario` dejaria el
+    # movimiento copiado pero el stock sin descontar (y el pull lo daria por
+    # ya aplicado): stock de mas, para siempre.
+    from app.services import bootstrap_service
+
+    _columnas_original = bootstrap_service._columnas_locales
+    _en_medio = {"hecho": False}
+
+    def _venta_en_medio(tabla):
+        if tabla == "cajas" and not _en_medio["hecho"]:   # justo despues de `inventario`
+            _en_medio["hecho"] = True
+            with en(app_nube):
+                vender("web", P["Superquesillo"], 1)
+        return _columnas_original(tabla)
+
+    bootstrap_service._columnas_locales = _venta_en_medio
+    try:
+        with en(app_rest):
+            SyncService.fijar_cursor(copiar_desde_nube()["cursor"])
+    finally:
+        bootstrap_service._columnas_locales = _columnas_original
+    check(_en_medio["hecho"], "la venta de la web cayo en medio de la copia")
+    sincronizar("Primer ciclo despues de copiar con una venta en medio")
+    comparar_todo("Copia con una venta en medio")
 
     print("\n== Numeracion de IDs por nodo")
     with en(app_nube):

@@ -331,14 +331,11 @@ def bootstrap_nube(offset):
         click.echo("Sin conexion con la nube. Intenta cuando haya internet.")
         return
 
-    # Punto de partida del pull, tomado ANTES de copiar: lo que cambie en la
-    # nube mientras se copia se vuelve a bajar despues (es seguro repetirlo).
-    with db.engines["cloud"].connect() as conn:
-        ultimo_cambio = SyncService.ultimo_id_nube(conn)
-
     click.echo("Copiando datos desde la nube...")
+    # La copia se hace sobre una foto consistente de la nube y devuelve el
+    # punto exacto desde donde el pull debe seguir.
     resumen = copiar_desde_nube()
-    SyncService.fijar_cursor(ultimo_cambio)
+    SyncService.fijar_cursor(resumen["cursor"])
     for tabla, n in resumen["por_tabla"].items():
         if n:
             click.echo("  %-24s %s filas" % (tabla, n))
