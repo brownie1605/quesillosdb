@@ -398,9 +398,9 @@ let cuentaActiva = null;    // id_venta de la cuenta en pantalla (Cuenta 1, Cuen
 let clientesLista = [];
 
 async function init() {
-    await cargarProductos();
-    await cargarCuenta();
-    await cargarClientesParaCobro();
+    // Los tres pedidos salen a la vez (antes uno detras de otro): en datos
+    // moviles cada pedido espera su viaje de ida y vuelta.
+    await Promise.all([cargarProductos(), cargarCuenta(), cargarClientesParaCobro()]);
     document.getElementById('buscar').addEventListener('input', renderProductos);
     document.getElementById('btnEnviar').addEventListener('click', enviarCarrito);
     document.getElementById('btnCobrar').addEventListener('click', abrirCobrar);
