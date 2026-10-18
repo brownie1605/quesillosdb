@@ -3,6 +3,14 @@
 {% block page_title %}Inventario{% endblock %}
 
 {% block content %}
+<!-- Secciones de Inventario -->
+<div id="seccionesInventario" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px;">
+    <button type="button" class="btn-seccion-inv activo" data-seccion="seccionExistencias">📦 Existencias</button>
+    <button type="button" class="btn-seccion-inv" data-seccion="seccionConsumo">📊 Consumo</button>
+    <button type="button" class="btn-seccion-inv" data-seccion="seccionBajas">🗑️ Bajas</button>
+</div>
+
+<div id="seccionExistencias">
 <div class="cards-grid" style="grid-template-columns: 1fr; margin-bottom: 20px;">
     <div class="kpi-card" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px;">
         <div>
@@ -74,10 +82,81 @@
     </table>
     <div id="paginacionInventario" class="pagination"></div>
 </div>
+</div><!-- /seccionExistencias -->
+
+<!-- Consumo: cuanto se uso de cada producto al vender -->
+<div id="seccionConsumo" style="display: none;">
+    <div class="page-header">
+        <div class="filter-group">
+            <select id="consumoAgrupar" class="form-control" style="width: 140px;">
+                <option value="dia">Por día</option>
+                <option value="mes">Por mes</option>
+            </select>
+            <input type="date" id="consumoInicio" class="form-control" style="width: 160px;">
+            <input type="date" id="consumoFin" class="form-control" style="width: 160px;">
+            <select id="consumoTipo" class="form-control" style="width: 170px;">
+                <option value="">Todos los productos</option>
+                <option value="insumo">Solo insumos</option>
+                <option value="final">Solo productos finales</option>
+            </select>
+        </div>
+        <button id="consumoExportar" class="btn btn-success">⬇️ Exportar Excel</button>
+    </div>
+    <div class="panel">
+        <h3 class="inv-subtitulo">Total del rango</h3>
+        <table><thead><tr><th>Producto</th><th>Tipo</th><th style="text-align:right;">Usado</th></tr></thead>
+            <tbody id="consumoResumen"></tbody></table>
+    </div>
+    <div class="panel" style="margin-top: 16px;">
+        <h3 class="inv-subtitulo" id="consumoDetalleTitulo">Día por día</h3>
+        <table><thead><tr><th>Periodo</th><th>Producto</th><th style="text-align:right;">Usado</th></tr></thead>
+            <tbody id="consumoDetalle"></tbody></table>
+    </div>
+</div>
+
+<!-- Bajas: merma, vencido, dañado... -->
+<div id="seccionBajas" style="display: none;">
+    <div class="panel" style="margin-bottom: 16px;">
+        <h3 class="inv-subtitulo">Registrar baja</h3>
+        <div class="filter-group" style="flex-wrap: wrap;">
+            <select id="bajaProducto" class="form-control" style="min-width: 240px; flex: 2;"></select>
+            <input type="number" id="bajaCantidad" class="form-control" placeholder="Cantidad" min="0" step="0.01" style="width: 120px;">
+            <select id="bajaMotivo" class="form-control" style="width: 170px;"></select>
+            <input type="text" id="bajaDetalle" class="form-control" placeholder="Detalle (opcional)" maxlength="200" style="flex: 2; min-width: 180px;">
+            <button id="bajaRegistrar" class="btn btn-primary">Registrar baja</button>
+        </div>
+        <p style="font-size: 12px; color: #6a768d; margin: 8px 0 0;">Resta del stock y queda en el historial de movimientos.</p>
+    </div>
+    <div class="page-header">
+        <div class="filter-group">
+            <input type="date" id="bajasInicio" class="form-control" style="width: 160px;">
+            <input type="date" id="bajasFin" class="form-control" style="width: 160px;">
+        </div>
+        <div class="kpi-card" style="padding: 8px 16px; margin: 0;">
+            <span style="font-size: 12px; color: #6a768d;">Costo de las bajas</span>
+            <strong id="bajasTotal" style="display: block; font-size: 18px; color: #c0392b;">C$ 0.00</strong>
+        </div>
+    </div>
+    <div class="panel">
+        <table><thead><tr><th>Fecha</th><th>Producto</th><th style="text-align:right;">Cantidad</th><th>Motivo</th><th style="text-align:right;">Costo</th><th>Usuario</th></tr></thead>
+            <tbody id="bajasLista"></tbody></table>
+    </div>
+</div>
+
+<style>
+    .btn-seccion-inv {
+        padding: 9px 18px; border-radius: 10px; border: 1.5px solid #e0d5cc; background: #fff;
+        color: #5d4037; font-weight: 700; font-size: 14px; cursor: pointer;
+    }
+    .btn-seccion-inv.activo { background: #5d4037; border-color: #5d4037; color: #fff; }
+    .inv-subtitulo { margin: 0 0 10px; font-size: 15px; color: #5d4037; }
+    .inv-vacio { text-align: center; color: #6a768d; padding: 18px; }
+</style>
 
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="{{ url_for('static', filename='js/inventario.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/inventario_secciones.js') }}?v=1"></script>
 {% endblock %}

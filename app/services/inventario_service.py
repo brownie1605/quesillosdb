@@ -286,6 +286,116 @@ class InventarioService:
         db.session.commit()
 
     # -----------------------------------------------------------------
+    MOTIVOS_BAJA = ("Merma", "Vencido", "Dañado", "Consumo interno", "Otro")
+    REFERENCIA_BAJA = "BAJA"
+
+    @staticmethod
+    def registrar_baja(id_producto, cantidad, motivo, usuario_id, detalle=None):
+        """Baja de inventario (merma, vencido, danado...): resta stock con un
+        movimiento 'ajuste' marcado como BAJA, para poder listarlas aparte."""
+        cantidad = Decimal(str(cantidad or 0))
+        if cantidad <= 0:
+            raise ValueError("La cantidad debe ser mayor a cero")
+        motivo = motivo if motivo in InventarioService.MOTIVOS_BAJA else "Otro"
+        texto = "Baja: " + motivo + (" - " + detalle.strip()[:200] if detalle and detalle.strip() else "")
+        mov = InventarioService.mover(
+            id_producto, -cantidad, "ajuste", usuario_id,
+            referencia=InventarioService.REFERENCIA_BAJA, observacion=texto, commit=False,
+        )
+        db.session.commit()
+        return mov
+
+    @staticmethod
+    def bajas(desde, hasta):
+        """Bajas registradas entre dos fechas (inclusive), la mas reciente primero."""
+        from datetime import datetime, timedelta
+
+        inicio = datetime.combine(desde, datetime.min.time())
+        fin = datetime.combine(hasta, datetime.min.time()) + timedelta(days=1)
+        movs = (
+            MovimientoInventario.query
+            .filter(MovimientoInventario.referencia == InventarioService.REFERENCIA_BAJA)
+            .filter(MovimientoInventario.fecha_movimiento >= inicio)
+            .filter(MovimientoInventario.fecha_movimiento < fin)
+            .order_by(MovimientoInventario.fecha_movimiento.desc())
+            .all()
+        )
+        productos = {
+            p.id_producto: p for p in
+            Producto.query.filter(Producto.id_producto.in_({m.id_producto for m in movs} or {0})).all()
+        }
+        filas = []
+        for m in movs:
+            p = productos.get(m.id_producto)
+            cantidad = Decimal(str(m.stock_anterior)) - Decimal(str(m.stock_nuevo))
+            costo = Decimal(str((p.precio_compra if p else 0) or 0))
+            filas.append({
+                "id_movimiento": m.id_movimiento,
+                "fecha": m.fecha_movimiento.strftime("%Y-%m-%d %H:%M") if m.fecha_movimiento else "",
+                "id_producto": m.id_producto,
+                "producto": p.nombre if p else str(m.id_producto),
+                "cantidad": float(cantidad),
+                "motivo": (m.observacion or "").replace("Baja: ", "", 1),
+                "costo": float((cantidad * costo).quantize(Decimal("0.01"))),
+                "id_usuario": m.id_usuario,
+            })
+        return filas
+
+    @staticmethod
+    def consumo(desde, hasta, agrupar="dia"):
+        """Cuanto se uso de cada producto por dia o por mes al vender.
+
+        Sale de los movimientos de las ventas (referencia VENTA-<id>): lo
+        que se desconto (venta directa o insumos de la receta) menos lo que
+        se devolvio al anular o al quitar un plato de la cuenta. Asi
+        "Toalla quesillo" cuenta lo que de verdad salio en platos.
+        """
+        from datetime import datetime, timedelta
+
+        inicio = datetime.combine(desde, datetime.min.time())
+        fin = datetime.combine(hasta, datetime.min.time()) + timedelta(days=1)
+        movs = (
+            MovimientoInventario.query
+            .filter(MovimientoInventario.referencia.like("VENTA-%"))
+            .filter(MovimientoInventario.fecha_movimiento >= inicio)
+            .filter(MovimientoInventario.fecha_movimiento < fin)
+            .all()
+        )
+        formato = "%Y-%m" if agrupar == "mes" else "%Y-%m-%d"
+        por_periodo, total = {}, {}
+        for m in movs:
+            usado = Decimal(str(m.stock_anterior)) - Decimal(str(m.stock_nuevo))
+            periodo = m.fecha_movimiento.strftime(formato)
+            clave = (periodo, m.id_producto)
+            por_periodo[clave] = por_periodo.get(clave, Decimal("0")) + usado
+            total[m.id_producto] = total.get(m.id_producto, Decimal("0")) + usado
+
+        productos = {
+            p.id_producto: p for p in
+            Producto.query.filter(Producto.id_producto.in_(set(total) or {0})).all()
+        }
+        from app.models import UnidadMedida
+        unidades = {u.id_unidad: u.abreviatura for u in UnidadMedida.query.all()}
+
+        def info(pid):
+            p = productos.get(pid)
+            return {
+                "id_producto": pid,
+                "producto": p.nombre if p else str(pid),
+                "tipo_producto": p.tipo_producto if p else "",
+                "unidad": unidades.get(p.id_unidad, "") if p else "",
+            }
+
+        detalle = [
+            dict(info(pid), periodo=periodo, cantidad=float(cant))
+            for (periodo, pid), cant in por_periodo.items() if cant > 0
+        ]
+        detalle.sort(key=lambda d: (d["periodo"], -d["cantidad"]), reverse=False)
+        resumen = [dict(info(pid), cantidad=float(cant)) for pid, cant in total.items() if cant > 0]
+        resumen.sort(key=lambda d: -d["cantidad"])
+        return {"agrupar": "mes" if agrupar == "mes" else "dia", "resumen": resumen, "detalle": detalle}
+
+    # -----------------------------------------------------------------
     @staticmethod
     def productos_bajo_minimo():
         return (

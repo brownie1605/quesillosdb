@@ -98,6 +98,77 @@ def api_movimientos():
         res.append(d)
     return jsonify(res)
 
+def _rango_fechas(dias_por_defecto):
+    """(desde, hasta) de ?inicio=YYYY-MM-DD&fin=YYYY-MM-DD; por defecto los
+    ultimos `dias_por_defecto` dias hasta hoy."""
+    from datetime import date, timedelta
+    from app.utils.date_utils import nicaragua_now
+
+    hoy = nicaragua_now().date()
+    try:
+        desde = date.fromisoformat(request.args.get("inicio")) if request.args.get("inicio") else None
+        hasta = date.fromisoformat(request.args.get("fin")) if request.args.get("fin") else None
+    except ValueError:
+        desde = hasta = None
+    hasta = hasta or hoy
+    desde = desde or (hasta - timedelta(days=dias_por_defecto - 1))
+    if desde > hasta:
+        desde, hasta = hasta, desde
+    return desde, hasta
+
+
+@inventario_bp.route("/api/consumo", methods=["GET"])
+@login_required
+def api_consumo():
+    """Cuanto se uso de cada producto por dia o por mes (?agrupar=dia|mes)."""
+    desde, hasta = _rango_fechas(1)
+    datos = InventarioService.consumo(desde, hasta, request.args.get("agrupar", "dia"))
+    datos.update({"inicio": desde.isoformat(), "fin": hasta.isoformat()})
+    return jsonify(datos)
+
+
+@inventario_bp.route("/api/bajas", methods=["GET"])
+@login_required
+def api_bajas():
+    from app.models import Usuario
+
+    desde, hasta = _rango_fechas(30)
+    filas = InventarioService.bajas(desde, hasta)
+    usuarios = {u.id_usuario: u.nombre_completo for u in Usuario.query.all()}
+    for f in filas:
+        f["usuario"] = usuarios.get(f.pop("id_usuario"), "—")
+    return jsonify({
+        "inicio": desde.isoformat(), "fin": hasta.isoformat(),
+        "motivos": list(InventarioService.MOTIVOS_BAJA),
+        "bajas": filas,
+        "total_costo": round(sum(f["costo"] for f in filas), 2),
+    })
+
+
+@inventario_bp.route("/api/bajas", methods=["POST"])
+@login_required
+def api_registrar_baja():
+    from app.services.auditoria_service import registrar_auditoria
+    from app.services.inventario_service import StockInsuficiente
+
+    data = request.get_json(silent=True) or {}
+    try:
+        mov = InventarioService.registrar_baja(
+            int(data.get("id_producto") or 0), data.get("cantidad"),
+            data.get("motivo"), current_user.id_usuario, data.get("detalle"),
+        )
+    except StockInsuficiente as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 409
+    except (ValueError, TypeError, ArithmeticError) as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e) or "Datos invalidos"}), 400
+    registrar_auditoria("BAJA INVENTARIO", "Inventario", {
+        "id_producto": mov.id_producto, "cantidad": float(mov.cantidad), "motivo": mov.observacion,
+    })
+    return jsonify({"success": True, "message": "Baja registrada"})
+
+
 @inventario_bp.route("/api/notificaciones", methods=["GET"])
 @login_required
 def api_notificaciones():
