@@ -574,6 +574,88 @@ class RecetaService:
 
     # -----------------------------------------------------------------
     @staticmethod
+    def maximo_producible_lote(productos, recetas_por_producto=None):
+        """Lo mismo que `maximo_producible()` para muchos productos a la vez.
+
+        Devuelve {id_producto: cantidad}. Hace el calculo con el inventario,
+        las recetas y los productos cargados de una sola vez (unas pocas
+        consultas en total) en lugar de consultar por cada producto e
+        ingrediente: con el catalogo completo eran ~1,600 consultas cada vez
+        que se abria Mesas o el POS. La logica es la misma que la de
+        `maximo_producible()`; ante un cambio de reglas hay que tocar las dos.
+
+        `recetas_por_producto` ({id_producto: Receta}, de cualquier estado):
+        si el llamador ya las cargo, se reutilizan en vez de volver a pedirlas.
+        """
+        from app.models.inventario import Inventario
+
+        stock = {}
+        for inv in Inventario.query.order_by(Inventario.id_inventario).all():
+            if inv.id_producto not in stock:     # igual que .first(): la fila mas antigua
+                stock[inv.id_producto] = (
+                    Decimal(str(inv.stock_actual)) if inv.stock_actual is not None else Decimal("0")
+                )
+        if recetas_por_producto is None:
+            recetas_por_producto = {r.id_producto: r for r in Receta.query.all()}
+        por_id = {p.id_producto: p for p in productos}
+        resultado = {}
+
+        def stock_de(id_producto):
+            return stock.get(id_producto, Decimal("0"))
+
+        def calcular(id_producto):
+            if id_producto in resultado:
+                return resultado[id_producto]
+            producto = por_id.get(id_producto)
+            if producto is None:
+                producto = Producto.query.get(id_producto)   # insumo de una opcion fuera de la lista
+                if producto:
+                    por_id[id_producto] = producto
+            if not producto:
+                valor = 0
+            elif not producto.es_receta:
+                valor = float(stock_de(id_producto))
+            else:
+                receta = recetas_por_producto.get(id_producto)
+                if receta is not None and receta.estado != "activo":
+                    receta = None
+                if receta and not receta.ingredientes and receta.grupos_opciones:
+                    rendimiento = Decimal(str(receta.rendimiento or 1)) or Decimal("1")
+                    posibles = None
+                    for g in receta.grupos_opciones:
+                        if not g.obligatorio:
+                            continue
+                        mejor = Decimal("0")
+                        for it in g.items:
+                            if not it.id_producto_insumo or not it.cantidad:
+                                continue
+                            disponible = Decimal(str(calcular(it.id_producto_insumo)))
+                            mejor = max(mejor, disponible * rendimiento / Decimal(str(it.cantidad)))
+                        posibles = mejor if posibles is None else min(posibles, mejor)
+                    valor = float(posibles or 0)
+                elif not receta or not receta.ingredientes:
+                    valor = float(stock_de(id_producto))
+                else:
+                    rendimiento = Decimal(str(receta.rendimiento or 1)) or Decimal("1")
+                    posibles = None
+                    for ing in receta.ingredientes:
+                        if ing.opcional:
+                            continue
+                        necesaria = Decimal(str(ing.cantidad_necesaria or 0))
+                        if necesaria <= 0:
+                            continue
+                        cuantos = (stock_de(ing.id_producto) * rendimiento) / necesaria
+                        posibles = cuantos if posibles is None else min(posibles, cuantos)
+                    valor = float(posibles or 0)
+            resultado[id_producto] = valor
+            return valor
+
+        for p in productos:
+            calcular(p.id_producto)
+        return resultado
+
+    # -----------------------------------------------------------------
+    @staticmethod
     def maximo_producible(id_producto):
         """Cuantas unidades del producto se pueden preparar con el stock actual."""
         from app.services.inventario_service import InventarioService

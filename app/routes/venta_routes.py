@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 
 from app.extensions import db, limiter
 from app.models import Producto, Cliente, Venta, DetalleVenta, Inventario, Categoria
+from app.models.receta import Receta
 from app.services.auditoria_service import registrar_auditoria
 from app.services.venta_service import VentaService, VentaError
 from app.services.receta_service import RecetaService
@@ -96,22 +97,26 @@ def api_productos():
     )
     categorias = {c.id_categoria: c.nombre for c in Categoria.query.all()}
 
+    # Recetas e inventario se cargan de una sola vez: antes se consultaban por
+    # cada producto (~1,600 consultas) y la pantalla tardaba segundos en abrir.
+    vendibles = [p for p in productos if p.se_vende is not False]
+    recetas = {r.id_producto: r for r in Receta.query.all()}
+    stocks = RecetaService.maximo_producible_lote(vendibles, recetas)
+
     resultado = []
-    for p in productos:
-        if p.se_vende is False:
-            continue
+    for p in vendibles:
         data = p.to_dict()
         data["categoria_nombre"] = categorias.get(p.id_categoria) or "Sin categoría"
         if p.es_receta:
             # Un producto con receta no tiene stock propio: depende de sus insumos.
-            data["stock"] = RecetaService.maximo_producible(p.id_producto)
+            data["stock"] = stocks[p.id_producto]
             data["stock_tipo"] = "receta"
+            receta = recetas.get(p.id_producto)
             data["tiene_personalizacion"] = bool(
-                p.receta and p.receta.estado == "activo" and p.receta.tiene_personalizacion
+                receta and receta.estado == "activo" and receta.tiene_personalizacion
             )
         else:
-            inv = Inventario.query.filter_by(id_producto=p.id_producto).first()
-            data["stock"] = float(inv.stock_actual) if inv else 0.0
+            data["stock"] = stocks[p.id_producto]
             data["stock_tipo"] = "directo"
             data["tiene_personalizacion"] = False
         resultado.append(data)
