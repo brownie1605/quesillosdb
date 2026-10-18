@@ -144,6 +144,7 @@ def api_crear():
             precio_compra=float(request.form.get("precio_compra", 0.0)),
             precio_venta=float(request.form.get("precio_venta", 0.0)) if vendible else 0.0,
             aplica_impuesto=(request.form.get("aplica_impuesto") == 'true') if vendible else False,
+            es_pedidos_ya=request.form.get("es_pedidos_ya") == 'true',
             tipo_producto=tipo_producto,
             se_vende=vendible,
             imagen_url=imagen_url,
@@ -213,6 +214,8 @@ def api_editar(id):
         prod.id_categoria = (request.form.get("id_categoria") or None) if vendible else None
         prod.precio_venta = float(request.form.get("precio_venta", prod.precio_venta)) if vendible else 0.0
         prod.aplica_impuesto = (request.form.get("aplica_impuesto") == 'true') if vendible else False
+        if request.form.get("es_pedidos_ya") is not None:
+            prod.es_pedidos_ya = request.form.get("es_pedidos_ya") == 'true'
         prod.se_vende = vendible
 
         # Actualizar stock mínimo si existe el registro de inventario

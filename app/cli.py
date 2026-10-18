@@ -36,6 +36,7 @@ def registrar_comandos(app):
     app.cli.add_command(demo_quesillo)
     app.cli.add_command(bootstrap_nube)
     app.cli.add_command(resync_nube)
+    app.cli.add_command(crear_copias_pedidosya)
     app.cli.add_command(aplicar_offset)
     app.cli.add_command(verificar_ids)
 
@@ -376,6 +377,22 @@ def resync_nube():
                % (r["copiados"], r["borrados"] or "ninguna"))
     for e in r["errores"]:
         click.echo("  ! %s: %s" % (e["tabla"], e["error"]))
+
+
+@click.command("crear-copias-pedidosya")
+@with_appcontext
+def crear_copias_pedidosya():
+    """Crea la categoria "Pedidos Ya" y una copia " P.YA" de cada plato.
+
+    Se puede repetir sin duplicar: salta los platos que ya tienen su copia.
+    """
+    from app.models import Usuario
+    from app.services.pedidos_ya_service import crear_copias
+
+    admin = Usuario.query.filter_by(estado="activo").order_by(Usuario.id_usuario).first()
+    r = crear_copias(admin.id_usuario if admin else None)
+    click.echo("Categoria: %s. Copias creadas: %s. Ya existian: %s."
+               % (r["categoria"], len(r["creados"]), r["omitidos"]))
 
 
 @click.command("aplicar-offset")

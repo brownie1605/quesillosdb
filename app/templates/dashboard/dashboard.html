@@ -107,6 +107,11 @@
             <h2 id="fPropinas">C$ 0.00</h2>
             <span id="fPropinasDetalle">No cuenta como ganancia</span>
         </div>
+        <div class="kpi-card">
+            <p>🛵 Pedidos Ya</p>
+            <h2 id="fPedidosYa">C$ 0.00</h2>
+            <span id="fPedidosYaDetalle">Sin pedidos en el rango</span>
+        </div>
     </div>
 </div>
 
@@ -238,7 +243,7 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=3"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=4"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const hoy = new Date();

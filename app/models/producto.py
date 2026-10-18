@@ -50,6 +50,9 @@ class Producto(db.Model):
     # NULL = no imprime en ninguna (ej. un material que no se vende).
     impresora = db.Column(db.Enum("quesillo", "cocina", "bebidas"), nullable=True)
 
+    # Producto de la carta de Pedidos Ya (las copias "... P.YA").
+    es_pedidos_ya = db.Column(db.Boolean, nullable=False, default=False)
+
     estado = db.Column(db.Enum("activo", "inactivo"), default="activo")
     fecha_creacion = db.Column(db.DateTime, default=nicaragua_now)
     fecha_actualizacion = db.Column(db.DateTime, default=nicaragua_now, onupdate=nicaragua_now)
@@ -93,6 +96,7 @@ class Producto(db.Model):
             "es_receta": bool(self.es_receta),
             "es_ingrediente_receta": bool(self.es_ingrediente_receta),
             "se_vende": bool(self.se_vende),
+            "es_pedidos_ya": bool(self.es_pedidos_ya),
             "estado": self.estado,
             "imagen_url": self.imagen_url or None,
         }

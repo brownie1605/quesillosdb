@@ -159,6 +159,13 @@
                 <div id="prod_imagen_preview" style="margin-top: 8px;"></div>
             </div>
 
+            <div style="margin-bottom: 10px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                    <input type="checkbox" id="prod_es_pedidos_ya">
+                    🛵 Es de Pedidos Ya
+                </label>
+            </div>
+
             <div id="campo_iva">
                 <div style="margin-bottom: 10px;">
                     <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
@@ -226,5 +233,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/productos.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/productos.js') }}?v=3"></script>
 {% endblock %}

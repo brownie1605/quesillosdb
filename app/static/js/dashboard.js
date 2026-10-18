@@ -78,6 +78,25 @@ async function cargarResumenFinanciero(inicio = '', fin = '') {
         console.error("Error al cargar propinas:", error);
     }
 
+    // Pedidos Ya del mismo rango (productos marcados como de Pedidos Ya).
+    try {
+        let urlPya = '/reportes/api/pedidos_ya';
+        if (inicio && fin) urlPya += `?inicio=${inicio}&fin=${fin}`;
+        const dataPya = await fetch(urlPya).then(r => r.json());
+        if (dataPya.success) {
+            const fPya = document.getElementById('fPedidosYa');
+            const fPyaDet = document.getElementById('fPedidosYaDetalle');
+            if (fPya) fPya.textContent = _moneyFmt(dataPya.total);
+            if (fPyaDet) {
+                fPyaDet.textContent = dataPya.pedidos
+                    ? `${dataPya.pedidos} pedido(s) · ${dataPya.unidades} producto(s)`
+                    : 'Sin pedidos en el rango';
+            }
+        }
+    } catch (error) {
+        console.error("Error al cargar Pedidos Ya:", error);
+    }
+
     // Top productos (cantidad + ingresos), mismo rango
     try {
         let urlTop = '/reportes/api/productos_top';

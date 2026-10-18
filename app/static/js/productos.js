@@ -138,7 +138,7 @@ function renderizarTabla() {
         tr.innerHTML = `
             <td>${imgHtml}</td>
             <td>${p.codigo || '-'}</td>
-            <td>${p.nombre}</td>
+            <td>${p.nombre}${p.es_pedidos_ya ? ' <span title="Pedidos Ya" style="background:#fa0050;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;">P.YA</span>' : ''}</td>
             <td><span class="q-chip ${tipoChip}" style="padding:2px 8px;font-size:11px;">${p.tipo_label || p.tipo_producto || 'final'}</span></td>
             <td>${p.categoria_nombre}</td>
             <td>C$ ${p.precio_compra.toFixed(2)}</td>
@@ -294,6 +294,7 @@ function abrirModalEditar(id) {
     document.getElementById('prod_precio_venta').value = p.precio_venta.toFixed(2);
     document.getElementById('prod_stock_minimo').value = p.stock_minimo || 0;
     document.getElementById('prod_aplica_impuesto').checked = p.aplica_impuesto || false;
+    document.getElementById('prod_es_pedidos_ya').checked = !!p.es_pedidos_ya;
     
     // Mostrar imagen actual si existe
     const preview = document.getElementById('prod_imagen_preview');
@@ -336,6 +337,7 @@ async function guardarProducto(e) {
     formData.append('precio_venta', document.getElementById('prod_precio_venta').value);
     formData.append('stock_minimo', document.getElementById('prod_stock_minimo').value);
     formData.append('aplica_impuesto', document.getElementById('prod_aplica_impuesto').checked);
+    formData.append('es_pedidos_ya', document.getElementById('prod_es_pedidos_ya').checked);
     
     if (fileInput.files.length > 0) {
         formData.append('imagen', fileInput.files[0]);

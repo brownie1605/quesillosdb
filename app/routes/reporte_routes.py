@@ -195,6 +195,41 @@ def api_resumen_financiero():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
+@reporte_bp.route("/api/pedidos_ya", methods=["GET"])
+@login_required
+def api_pedidos_ya():
+    """Ventas de productos de Pedidos Ya (productos.es_pedidos_ya) en el
+    rango: total vendido, cuantas ventas los incluyen y unidades."""
+    try:
+        inicio = request.args.get('inicio')
+        fin = request.args.get('fin')
+        if inicio and fin:
+            fecha_inicio, fecha_fin = inicio, fin
+        else:
+            hoy = nicaragua_now().date()
+            fecha_inicio = str(hoy - timedelta(days=6))
+            fecha_fin = str(hoy)
+        fila = db.session.execute(text("""
+            SELECT COALESCE(SUM(d.subtotal), 0) AS total,
+                   COUNT(DISTINCT v.id_venta) AS pedidos,
+                   COALESCE(SUM(d.cantidad), 0) AS unidades
+            FROM detalle_ventas d
+            JOIN ventas v ON v.id_venta = d.id_venta
+            JOIN productos p ON p.id_producto = d.id_producto
+            WHERE v.id_empresa = :empresa AND v.estado = 'completada' AND p.es_pedidos_ya = 1
+            AND DATE(v.fecha_venta) >= :inicio AND DATE(v.fecha_venta) <= :fin
+        """), {"empresa": current_user.id_empresa, "inicio": fecha_inicio, "fin": fecha_fin}).fetchone()
+        return jsonify({
+            "success": True,
+            "total": float(fila.total or 0),
+            "pedidos": int(fila.pedidos or 0),
+            "unidades": float(fila.unidades or 0),
+            "inicio": fecha_inicio, "fin": fecha_fin,
+        })
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @reporte_bp.route("/api/propinas", methods=["GET"])
 @login_required
 def api_propinas():
@@ -220,6 +255,7 @@ def api_propinas():
                 CASE
                     WHEN metodo_pago LIKE 'Tarjeta%' THEN 'Tarjeta'
                     WHEN metodo_pago = 'Efectivo' THEN 'Efectivo'
+                    WHEN metodo_pago = 'Mixto' THEN 'Mixto'
                     ELSE 'Otro'
                 END as metodo,
                 COALESCE(SUM(propina), 0) as total,
