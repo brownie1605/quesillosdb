@@ -65,6 +65,35 @@ def _cuenta_elegida(mesa, id_venta=None):
     return None
 
 
+@mesa_bp.route("/<int:id_mesa>/precuenta")
+@login_required
+def precuenta(id_mesa):
+    """Ticket para mostrarle al cliente cuanto lleva, SIN cobrar: solo lee la
+    cuenta (no toca caja, inventario ni el estado de la venta)."""
+    from decimal import Decimal
+    from app.utils.date_utils import nicaragua_now
+
+    mesa = Mesa.query.get_or_404(id_mesa)
+    cuentas = VentaService.cuentas_de_mesa(mesa)
+    venta = _cuenta_elegida(mesa, request.args.get("venta", type=int))
+    if not venta or venta.estado != "pendiente":
+        return "Esta mesa no tiene una cuenta abierta", 404
+
+    ids = [c.id_venta for c in cuentas]
+    base = Decimal(str(venta.subtotal or 0)) - Decimal(str(venta.descuento or 0))
+    propina = (max(base, Decimal("0")) * Decimal("0.10")).quantize(Decimal("0.01"))
+    return render_template(
+        "mesas/precuenta.html",
+        mesa=mesa, venta=venta, detalles=list(venta.detalles),
+        numero_cuenta=ids.index(venta.id_venta) + 1 if venta.id_venta in ids else 1,
+        total_cuentas=len(cuentas),
+        total_sin_propina=max(base, Decimal("0")).quantize(Decimal("0.01")),
+        propina=propina,
+        total_con_propina=(max(base, Decimal("0")) + propina).quantize(Decimal("0.01")),
+        ahora=nicaragua_now(),
+    )
+
+
 @mesa_bp.route("/api/<int:id_mesa>/cuenta", methods=["GET"])
 @login_required
 def api_cuenta(id_mesa):

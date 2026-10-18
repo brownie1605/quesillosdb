@@ -186,6 +186,9 @@
             <div class="fila"><span>Subtotal</span><span id="totSubtotal">C$ 0.00</span></div>
             <div class="fila" id="filaDescuento" style="display:none;"><span id="lblFilaDescuento">Descuento</span><span id="totDescuento" style="color:#1e7e34;"></span></div>
             <div class="fila total"><span>Total</span><span id="totTotal">C$ 0.00</span></div>
+            <button class="btn w-100 mt-2" style="border:1px solid #8B2E2E; color:#8B2E2E; background:#fff; font-weight:600;" id="btnPrecuenta" disabled title="Imprime la cuenta para el cliente, sin cobrar">
+                <i class="bi bi-receipt"></i> Precuenta
+            </button>
             <button class="btn w-100 mt-2" style="background: linear-gradient(45deg,#8B2E2E,#b04545); color:#fff;" id="btnCobrar" disabled>
                 <i class="bi bi-cash-coin"></i> Cobrar
             </button>
@@ -401,6 +404,9 @@ async function init() {
     document.getElementById('buscar').addEventListener('input', renderProductos);
     document.getElementById('btnEnviar').addEventListener('click', enviarCarrito);
     document.getElementById('btnCobrar').addEventListener('click', abrirCobrar);
+    document.getElementById('btnPrecuenta').addEventListener('click', () => {
+        if (cuentaActiva) window.open(`/mesas/${ID_MESA}/precuenta?venta=${cuentaActiva}`, '_blank');
+    });
     document.getElementById('btnConfirmarCobro').addEventListener('click', confirmarCobro);
     document.getElementById('cbRecibido').addEventListener('input', recalcularCobro);
     document.getElementById('cbPropinaSwitch').addEventListener('change', recalcularCobro);
@@ -824,6 +830,7 @@ function renderCuenta() {
     document.getElementById('totSubtotal').textContent = 'C$ ' + subtotal.toFixed(2);
     document.getElementById('totTotal').textContent = 'C$ ' + total.toFixed(2);
     document.getElementById('btnCobrar').disabled = !detalles.length;
+    document.getElementById('btnPrecuenta').disabled = !detalles.length;
     renderCuentasYAcciones();
 }
 
