@@ -4,139 +4,159 @@
 {% block page_title %}Turno de caja{% endblock %}
 
 {% block extra_head %}
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
-    .titulo { color:#5d4037; font-weight:700; }
-    .btn-cafe { background: linear-gradient(45deg,#8d6e63,#bcaaa4); color:#fff; border:none; }
-    .btn-cafe:hover { color:#fff; opacity:.9; }
-    .stat-card { background:#fff; border-radius:12px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,.06); text-align:center; }
-    .stat-card .valor { font-size:22px; font-weight:800; color:#3e2723; }
-    .stat-card .etiqueta { font-size:12px; color:#8d6e63; text-transform:uppercase; letter-spacing:.5px; }
-    .stat-card.destacado { background: linear-gradient(135deg,#8d6e63,#5d4037); }
-    .stat-card.destacado .valor, .stat-card.destacado .etiqueta { color:#fff; }
-    .arqueo-tabla { width:100%; border-collapse:collapse; font-size:13.5px; }
-    .arqueo-tabla th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:#8d6e63; padding:4px 6px; border-bottom:1px solid #eee; }
-    .arqueo-tabla td { padding:4px 6px; vertical-align:middle; }
-    .arqueo-tabla input[type=number] { width:80px; padding:5px 8px; text-align:right; }
-    .arqueo-subtotal { text-align:right; font-weight:700; color:#5d4037; white-space:nowrap; }
-    .arqueo-resumen { background:#fbf6f2; border-radius:10px; padding:12px 14px; font-size:13.5px; }
-    .arqueo-resumen .fila { display:flex; justify-content:space-between; padding:3px 0; }
-    .arqueo-resumen .fila.total { border-top:1px dashed #d7c4b8; margin-top:6px; padding-top:8px; font-weight:800; font-size:16px; color:#3e2723; }
-    .modo-btn { flex:1; padding:12px; border-radius:10px; border:2px solid #e0d5cc; background:#fff; color:#8d6e63; font-weight:700; cursor:pointer; transition:.15s; text-align:center; }
-    .modo-btn.activo { border-color:#5d4037; background:#5d4037; color:#fff; }
-    .conteo-rapido-input { font-size:32px; font-weight:800; text-align:center; padding:20px; border-radius:12px; border:2px solid #d7c4b8; color:#3e2723; width:100%; }
-    .conteo-rapido-input:focus { outline:none; border-color:#8d6e63; box-shadow:0 0 0 4px rgba(141,110,99,.15); }
-    .diferencia-box { border-radius:12px; padding:16px; text-align:center; margin-top:14px; }
-    .diferencia-box.ok { background:#e8f5e9; color:#1e7e34; }
-    .diferencia-box.falta { background:#fdecea; color:#c0392b; }
-    .diferencia-box.sobra { background:#fff8e1; color:#8d6e00; }
+    .caja { max-width: 760px; margin: 0 auto; color: #3e2723; }
+    .caja-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .caja-top h3 { margin: 0; font-size: 20px; font-weight: 700; color: #5d4037; }
+    .caja-pill { padding: 6px 14px; border-radius: 999px; background: #e8f5e9; color: #1e7e34; font-size: 13px; font-weight: 600; }
+    .caja-card { background: var(--card-bg, #fff); border-radius: 16px; padding: 24px; box-shadow: 0 2px 12px rgba(62, 39, 35, .06); }
+    .caja-label { display: block; font-size: 13px; font-weight: 600; color: #8d6e63; margin-bottom: 8px; }
+    .caja-monto { width: 100%; font-size: 30px; font-weight: 800; text-align: center; padding: 16px; border-radius: 12px;
+                  border: 1.5px solid #e0d5cc; color: #3e2723; background: #fff; box-sizing: border-box; }
+    .caja-monto:focus { outline: none; border-color: #8d6e63; box-shadow: 0 0 0 4px rgba(141, 110, 99, .12); }
+    .caja-chips { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+    .caja-chips button { border: 1px solid #e0d5cc; background: #fff; color: #5d4037; border-radius: 999px; padding: 6px 14px; font-weight: 600; cursor: pointer; }
+    .caja-chips button:hover { background: #fbf6f2; }
+    .caja-btn { width: 100%; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 18px; }
+    .caja-btn.abrir { background: #5d4037; color: #fff; }
+    .caja-btn.cerrar { background: #c0392b; color: #fff; }
+    .caja-btn:hover { opacity: .92; }
+    .caja-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .caja-stat { background: var(--card-bg, #fff); border-radius: 14px; padding: 16px; text-align: center; box-shadow: 0 2px 12px rgba(62, 39, 35, .06); }
+    .caja-stat .valor { font-size: 22px; font-weight: 800; }
+    .caja-stat .etiqueta { font-size: 12px; color: #8d6e63; margin-top: 2px; }
+    .caja-stat.destacado { background: #5d4037; }
+    .caja-stat.destacado .valor, .caja-stat.destacado .etiqueta { color: #fff; }
+    .caja-seg { display: flex; background: #f5efea; border-radius: 12px; padding: 4px; margin-bottom: 18px; }
+    .modo-btn { flex: 1; border: none; background: transparent; color: #8d6e63; font-weight: 700; padding: 10px; border-radius: 9px; cursor: pointer; }
+    .modo-btn.activo { background: #fff; color: #3e2723; box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }
+    .conteo-rapido-input { width: 100%; font-size: 30px; font-weight: 800; text-align: center; padding: 16px; border-radius: 12px;
+                           border: 1.5px solid #e0d5cc; color: #3e2723; box-sizing: border-box; }
+    .conteo-rapido-input:focus { outline: none; border-color: #8d6e63; box-shadow: 0 0 0 4px rgba(141, 110, 99, .12); }
+    .caja-ayuda { text-align: center; color: #a1887f; font-size: 13px; margin: 8px 0 0; }
+    .diferencia-box { border-radius: 12px; padding: 14px; text-align: center; margin-top: 14px; }
+    .diferencia-box.ok { background: #e8f5e9; color: #1e7e34; }
+    .diferencia-box.falta { background: #fdecea; color: #c0392b; }
+    .diferencia-box.sobra { background: #fff8e1; color: #8d6e00; }
+    .caja-arqueo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .caja-arqueo h4 { font-size: 14px; margin: 0 0 6px; color: #5d4037; }
+    .arqueo-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    .arqueo-tabla th { text-align: left; font-size: 11px; text-transform: uppercase; color: #a1887f; padding: 4px; font-weight: 600; }
+    .arqueo-tabla td { padding: 3px 4px; }
+    .arqueo-tabla input { width: 70px; padding: 5px 8px; text-align: right; border: 1px solid #e0d5cc; border-radius: 8px; }
+    .arqueo-subtotal { text-align: right; font-weight: 700; color: #5d4037; white-space: nowrap; }
+    .arqueo-resumen { background: #fbf6f2; border-radius: 12px; padding: 12px 14px; font-size: 13.5px; margin-top: 14px; }
+    .arqueo-resumen .fila { display: flex; justify-content: space-between; padding: 3px 0; }
+    .arqueo-resumen .fila.total { border-top: 1px dashed #d7c4b8; margin-top: 6px; padding-top: 8px; font-weight: 800; font-size: 16px; }
+    .caja-tc { width: 140px; padding: 6px 10px; border: 1px solid #e0d5cc; border-radius: 8px; }
+    .caja-obs { width: 100%; margin-top: 16px; padding: 10px 12px; border: 1px solid #e0d5cc; border-radius: 10px;
+                font-family: inherit; resize: vertical; box-sizing: border-box; }
+    .cuadre-titulo { margin: 0 0 10px; font-size: 15px; color: #5d4037; }
+    .cuadre-fila { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14.5px; }
+    .cuadre-fila.suma strong { color: #1e7e34; }
+    .cuadre-fila.resta strong { color: #c0392b; }
+    .cuadre-fila.total { border-top: 1px dashed #d7c4b8; margin-top: 6px; padding-top: 10px; font-size: 17px; font-weight: 800; }
+    .cuadre-gastos { font-size: 13px; color: #8d6e63; padding: 0 0 4px 14px; }
+    .cuadre-gastos div { display: flex; justify-content: space-between; padding: 2px 0; }
+    .cuadre-nota { margin: 10px 0 0; font-size: 12.5px; color: #a1887f; }
+    @media (max-width: 640px) {
+        .caja-stats { grid-template-columns: 1fr 1fr; }
+        .caja-stat.destacado { grid-column: span 2; }
+        .caja-arqueo { grid-template-columns: 1fr; }
+        .caja-card { padding: 18px; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-    <h3 class="titulo mb-0">🧾 Turno de caja</h3>
-    <div id="estadoCaja" style="display:none; padding: 8px 16px; background: #d4edda; border-radius: 6px; color: #155724; font-size: 14px; font-weight: 500;">
-        ✅ Turno abierto
+<div class="caja">
+    <div class="caja-top">
+        <h3>Caja</h3>
+        <div id="estadoCaja" class="caja-pill" style="display:none;">● Turno abierto</div>
     </div>
-</div>
 
-<div id="sinTurno" style="display:none;">
-    <div class="panel" style="max-width: 480px; padding: 30px; text-align: center;">
-        <div style="font-size: 48px; margin-bottom: 15px;">🏪</div>
-        <h4 style="color: #5d4037; margin-bottom: 10px;">Abriendo turno de caja</h4>
-        <p style="color: #999; margin-bottom: 25px;">Registra el monto inicial en efectivo para comenzar el turno de ventas</p>
-
-        <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <label style="display: block; font-size: 12px; color: #666; font-weight: 500; margin-bottom: 8px;">Monto inicial (C$)</label>
-            <input type="number" class="form-control" id="montoInicial" value="0.00" min="0" step="0.01" style="font-size: 18px; padding: 12px; text-align: right;">
-            <div style="display:flex; gap:8px; margin-top:10px; justify-content:center;">
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setMontoInicial(0)">C$0</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setMontoInicial(500)">C$500</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setMontoInicial(1000)">C$1,000</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setMontoInicial(2000)">C$2,000</button>
+    <!-- Sin turno: abrir -->
+    <div id="sinTurno" style="display:none;">
+        <div class="caja-card" style="max-width: 440px; margin: 0 auto; text-align: center;">
+            <div style="font-size: 40px;">🏪</div>
+            <h4 style="margin: 6px 0 4px; color: #5d4037;">Abrir turno</h4>
+            <p style="color: #a1887f; margin: 0 0 18px; font-size: 14px;">¿Con cuánto efectivo empieza la caja?</p>
+            <input type="number" class="caja-monto" id="montoInicial" value="0.00" min="0" step="0.01" inputmode="decimal">
+            <div class="caja-chips">
+                <button type="button" onclick="setMontoInicial(0)">C$ 0</button>
+                <button type="button" onclick="setMontoInicial(500)">C$ 500</button>
+                <button type="button" onclick="setMontoInicial(1000)">C$ 1,000</button>
+                <button type="button" onclick="setMontoInicial(2000)">C$ 2,000</button>
             </div>
-            <small style="display: block; margin-top: 10px; color: #999;">Ingresa el dinero que llevás en caja al iniciar</small>
+            <button class="caja-btn abrir" onclick="abrirTurno()">Abrir turno</button>
+        </div>
+    </div>
+
+    <!-- Con turno: resumen y cierre -->
+    <div id="conTurno" style="display:none;">
+        <div class="caja-stats">
+            <div class="caja-stat"><div class="valor" id="statVentas">0</div><div class="etiqueta">Ventas</div></div>
+            <div class="caja-stat"><div class="valor" id="statTotal">C$0</div><div class="etiqueta">Total vendido</div></div>
+            <div class="caja-stat destacado"><div class="valor" id="statEsperado">C$0</div><div class="etiqueta">Efectivo esperado</div></div>
         </div>
 
-        <button class="btn btn-cafe" onclick="abrirTurno()" style="width: 100%; padding: 12px; font-size: 16px;">
-            🔓 Abrir turno
-        </button>
-    </div>
-</div>
+        <!-- Cuadre: de donde sale el efectivo que debe haber -->
+        <div class="caja-card" style="margin-bottom: 16px;">
+            <h4 class="cuadre-titulo">Cuadre del turno</h4>
+            <div class="cuadre-fila"><span>Monto inicial</span><strong id="cuadreInicial">C$ 0.00</strong></div>
+            <div class="cuadre-fila suma"><span>+ Ventas en efectivo</span><strong id="cuadreEfectivo">C$ 0.00</strong></div>
+            <div class="cuadre-fila suma" id="cuadreOtrosIngresosFila" style="display:none;"><span>+ Otros ingresos</span><strong id="cuadreOtrosIngresos">C$ 0.00</strong></div>
+            <div class="cuadre-fila resta"><span>− Gastos del turno</span><strong id="cuadreGastos">C$ 0.00</strong></div>
+            <div id="cuadreGastosLista" class="cuadre-gastos"></div>
+            <div class="cuadre-fila resta" id="cuadreOtrosEgresosFila" style="display:none;"><span>− Otras salidas</span><strong id="cuadreOtrosEgresos">C$ 0.00</strong></div>
+            <div class="cuadre-fila total"><span>= Efectivo que debe haber</span><strong id="cuadreEsperado">C$ 0.00</strong></div>
+            <p class="cuadre-nota">Ventas con tarjeta o transferencia: <strong id="cuadreOtros">C$ 0.00</strong> (no están en la caja)</p>
+        </div>
 
-<div id="conTurno" style="display:none;">
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-4"><div class="stat-card"><div class="valor" id="statVentas">0</div><div class="etiqueta">Ventas</div></div></div>
-        <div class="col-6 col-md-4"><div class="stat-card"><div class="valor" id="statTotal">C$0</div><div class="etiqueta">Total vendido</div></div></div>
-        <div class="col-6 col-md-4"><div class="stat-card destacado"><div class="valor" id="statEsperado">C$0</div><div class="etiqueta">💰 Esperado en caja</div></div></div>
-    </div>
-
-    <div class="row g-3">
-        <div class="col-lg-9">
-            <div class="panel p-3">
-                <h6 class="fw-bold mb-3" style="color:#5d4037; font-size: 17px;">🔐 Cerrar turno de caja</h6>
-
-                <!-- Selector de modo -->
-                <div style="display:flex; gap:10px; margin-bottom:18px;">
-                    <button type="button" id="btnModoRapido" class="modo-btn activo" onclick="cambiarModoConteo('rapido')">
-                        ⚡ Conteo rápido
-                    </button>
-                    <button type="button" id="btnModoDetallado" class="modo-btn" onclick="cambiarModoConteo('detallado')">
-                        🔢 Desglose por billete
-                    </button>
-                </div>
-
-                <!-- MODO RAPIDO: un solo campo -->
-                <div id="modoRapido">
-                    <label class="form-label" style="font-weight:600; color:#5d4037;">¿Cuánto contaste en caja? (C$)</label>
-                    <input type="number" id="montoContadoRapido" class="conteo-rapido-input" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
-                    <p style="text-align:center; color:#999; font-size:13px; margin-top:8px;">Sumá todo el efectivo (córdobas + dólares convertidos) y escribí el total aquí</p>
-
-                    <div id="diferenciaRapida" class="diferencia-box" style="display:none;"></div>
-                </div>
-
-                <!-- MODO DETALLADO: desglose por denominacion (oculto por defecto) -->
-                <div id="modoDetallado" style="display:none;">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <strong style="color:#5d4037;">🇳🇮 Córdobas</strong>
-                            </div>
-                            <table class="arqueo-tabla">
-                                <thead><tr><th>Denominación</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
-                                <tbody id="arqueoCordobasBody"></tbody>
-                            </table>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <strong style="color:#5d4037;">🇺🇸 Dólares</strong>
-                            </div>
-                            <table class="arqueo-tabla">
-                                <thead><tr><th>Billete</th><th>Cantidad</th><th style="text-align:right;">Subtotal</th></tr></thead>
-                                <tbody id="arqueoDolaresBody"></tbody>
-                            </table>
-                            <label class="form-label mt-2 mb-1" style="font-size:12.5px;">Tipo de cambio (C$ por US$1)</label>
-                            <input type="number" class="form-control form-control-sm" id="tipoCambio" min="0" step="0.01" placeholder="Ej. 36.60" style="max-width:140px;">
-                        </div>
-                    </div>
-
-                    <div class="arqueo-resumen mt-3">
-                        <div class="fila"><span>Total en córdobas contado</span><strong id="resSubtotalCordobas">C$ 0.00</strong></div>
-                        <div class="fila"><span>Total en dólares contado</span><strong id="resSubtotalDolares">US$ 0.00</strong></div>
-                        <div class="fila"><span>Dólares convertidos a córdobas</span><strong id="resDolaresConvertidos">C$ 0.00</strong></div>
-                        <div class="fila"><span>Esperado en caja (sistema)</span><strong id="resEsperado">C$ 0.00</strong></div>
-                        <div class="fila total"><span>Total contado</span><strong id="resTotalContado">C$ 0.00</strong></div>
-                        <div class="fila"><span>Diferencia</span><strong id="resDiferencia">C$ 0.00</strong></div>
-                    </div>
-                </div>
-
-                <textarea class="form-control mt-3 mb-3" id="observacion" placeholder="Observación (opcional) — ej. faltante, billete falso, etc." rows="2"></textarea>
-
-                <button class="btn btn-danger" onclick="cerrarTurno()" style="width:100%; padding:14px; font-size:16px; font-weight:700;">
-                    🔒 Cerrar caja
-                </button>
+        <div class="caja-card">
+            <div class="caja-seg">
+                <button type="button" id="btnModoRapido" class="modo-btn activo" onclick="cambiarModoConteo('rapido')">Total contado</button>
+                <button type="button" id="btnModoDetallado" class="modo-btn" onclick="cambiarModoConteo('detallado')">Por billete</button>
             </div>
+
+            <div id="modoRapido">
+                <label class="caja-label" for="montoContadoRapido" style="text-align:center;">¿Cuánto efectivo hay en caja?</label>
+                <input type="number" id="montoContadoRapido" class="conteo-rapido-input" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
+                <p class="caja-ayuda">Córdobas más dólares convertidos.</p>
+                <div id="diferenciaRapida" class="diferencia-box" style="display:none;"></div>
+            </div>
+
+            <div id="modoDetallado" style="display:none;">
+                <div class="caja-arqueo">
+                    <div>
+                        <h4>Córdobas</h4>
+                        <table class="arqueo-tabla">
+                            <thead><tr><th>Valor</th><th>Cant.</th><th style="text-align:right;">Subtotal</th></tr></thead>
+                            <tbody id="arqueoCordobasBody"></tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <h4>Dólares</h4>
+                        <table class="arqueo-tabla">
+                            <thead><tr><th>Billete</th><th>Cant.</th><th style="text-align:right;">Subtotal</th></tr></thead>
+                            <tbody id="arqueoDolaresBody"></tbody>
+                        </table>
+                        <label class="caja-label" for="tipoCambio" style="margin-top:10px;">Tipo de cambio (C$ por US$1)</label>
+                        <input type="number" class="caja-tc" id="tipoCambio" min="0" step="0.01" placeholder="36.60">
+                    </div>
+                </div>
+                <div class="arqueo-resumen">
+                    <div class="fila"><span>Córdobas</span><strong id="resSubtotalCordobas">C$ 0.00</strong></div>
+                    <div class="fila"><span>Dólares</span><strong id="resSubtotalDolares">US$ 0.00</strong></div>
+                    <div class="fila"><span>Dólares en córdobas</span><strong id="resDolaresConvertidos">C$ 0.00</strong></div>
+                    <div class="fila"><span>Esperado</span><strong id="resEsperado">C$ 0.00</strong></div>
+                    <div class="fila total"><span>Contado</span><strong id="resTotalContado">C$ 0.00</strong></div>
+                    <div class="fila"><span>Diferencia</span><strong id="resDiferencia">C$ 0.00</strong></div>
+                </div>
+            </div>
+
+            <textarea class="caja-obs" id="observacion" placeholder="Observación (opcional)" rows="2"></textarea>
+            <button class="caja-btn cerrar" onclick="cerrarTurno()">Cerrar caja</button>
         </div>
     </div>
 </div>
@@ -218,8 +238,8 @@ function construirFilasArqueo() {
     const bodyCordobas = document.getElementById('arqueoCordobasBody');
     bodyCordobas.innerHTML = DENOM_CORDOBAS.map(d => `
         <tr>
-            <td>${d.tipo} C$${d.valor}</td>
-            <td><input type="number" class="form-control form-control-sm" id="cord_${d.valor}" min="0" step="1" value="0" oninput="recalcularArqueo()"></td>
+            <td>C$ ${d.valor}</td>
+            <td><input type="number" id="cord_${d.valor}" min="0" step="1" value="0" oninput="recalcularArqueo()"></td>
             <td class="arqueo-subtotal" id="cord_sub_${d.valor}">C$ 0.00</td>
         </tr>
     `).join('');
@@ -227,8 +247,8 @@ function construirFilasArqueo() {
     const bodyDolares = document.getElementById('arqueoDolaresBody');
     bodyDolares.innerHTML = DENOM_DOLARES.map(v => `
         <tr>
-            <td>US$${v}</td>
-            <td><input type="number" class="form-control form-control-sm" id="usd_${v}" min="0" step="1" value="0" oninput="recalcularArqueo()"></td>
+            <td>US$ ${v}</td>
+            <td><input type="number" id="usd_${v}" min="0" step="1" value="0" oninput="recalcularArqueo()"></td>
             <td class="arqueo-subtotal" id="usd_sub_${v}">US$ 0.00</td>
         </tr>
     `).join('');
@@ -286,6 +306,21 @@ async function cargar() {
     document.getElementById('statTotal').textContent = 'C$ ' + estado.total_ventas.toFixed(2);
     document.getElementById('statEsperado').textContent = 'C$ ' + estado.monto_esperado.toFixed(2);
     montoEsperadoActual = estado.monto_esperado;
+
+    // Cuadre: inicial + ventas en efectivo - gastos = lo que debe haber.
+    const din = (n) => 'C$ ' + Number(n || 0).toFixed(2);
+    document.getElementById('cuadreInicial').textContent = din(estado.monto_inicial);
+    document.getElementById('cuadreEfectivo').textContent = din(estado.efectivo_en_ventas);
+    document.getElementById('cuadreGastos').textContent = din(estado.total_gastos);
+    document.getElementById('cuadreEsperado').textContent = din(estado.monto_esperado);
+    document.getElementById('cuadreOtros').textContent = din(estado.ventas_otros_metodos);
+    document.getElementById('cuadreOtrosIngresosFila').style.display = estado.otros_ingresos ? 'flex' : 'none';
+    document.getElementById('cuadreOtrosIngresos').textContent = din(estado.otros_ingresos);
+    document.getElementById('cuadreOtrosEgresosFila').style.display = estado.otros_egresos ? 'flex' : 'none';
+    document.getElementById('cuadreOtrosEgresos').textContent = din(estado.otros_egresos);
+    document.getElementById('cuadreGastosLista').innerHTML = (estado.gastos || []).map(g =>
+        `<div><span>${escapeHtml(g.hora)} · ${escapeHtml(g.tipo)}: ${escapeHtml(g.descripcion)}</span><span>${din(g.monto)}</span></div>`
+    ).join('');
 
     // Si es un turno distinto al que ya se estaba mostrando (recien
     // abierto), limpiar todo el conteo -- si no, los billetes/monto

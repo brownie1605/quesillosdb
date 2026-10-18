@@ -36,6 +36,21 @@ def api_estado():
         "total_ventas": float(resumen["total_ventas"]),
         "cantidad_ventas": resumen["cantidad_ventas"],
         "monto_esperado": float(resumen["monto_esperado"]),
+        # Desglose del cuadre: inicial + ventas en efectivo - gastos = esperado.
+        "efectivo_en_ventas": float(resumen["efectivo_en_ventas"]),
+        "ventas_otros_metodos": float(resumen["ventas_otros_metodos"]),
+        "otros_ingresos": float(resumen["total_ingresos"]),
+        "otros_egresos": float(resumen["total_egresos"]),
+        "total_gastos": float(resumen["total_gastos"]),
+        "gastos": [
+            {
+                "hora": c.fecha_compra.strftime("%H:%M") if c.fecha_compra else "",
+                "descripcion": c.descripcion_gasto or ("Compra " + (c.numero_compra or "")),
+                "tipo": "Gasto" if c.tipo_compra == "varios" else "Compra",
+                "monto": float(c.total or 0),
+            }
+            for c in resumen["gastos"]
+        ],
     })
 
 

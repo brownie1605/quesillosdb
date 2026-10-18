@@ -111,11 +111,32 @@ class CajaService:
             Decimal("0"),
         )
 
-        efectivo = sum(
-            (Decimal(str(v.total or 0)) for v in ventas if (v.metodo_pago or "").lower() == "efectivo"),
-            Decimal("0"),
+        # Con pago dividido solo cuenta la parte en efectivo (ver
+        # VentaService.efectivo_de).
+        from app.services.venta_service import VentaService
+
+        efectivo = sum((VentaService.efectivo_de(v) for v in ventas), Decimal("0"))
+
+        # Gastos del turno: todo lo registrado en Compras (gastos varios y
+        # compras a proveedores) desde que se abrio la caja se paga con el
+        # efectivo de la caja, asi que se resta de lo que debe haber.
+        from app.models.compra import Compra
+
+        compras = (
+            Compra.query.filter(
+                Compra.estado == "completada",
+                Compra.fecha_compra >= apertura.fecha_apertura,
+                Compra.id_empresa == apertura.caja.id_empresa,
+                Compra.id_sucursal == apertura.caja.id_sucursal,
+            )
+            .order_by(Compra.fecha_compra)
+            .all()
         )
-        monto_esperado = Decimal(str(apertura.monto_inicial or 0)) + efectivo + ingresos - egresos
+        gastos = sum((Decimal(str(c.total or 0)) for c in compras), Decimal("0"))
+
+        monto_esperado = (
+            Decimal(str(apertura.monto_inicial or 0)) + efectivo + ingresos - egresos - gastos
+        )
 
         return {
             "total_ventas": total_ventas,
@@ -123,6 +144,9 @@ class CajaService:
             "total_ingresos": ingresos,
             "total_egresos": egresos,
             "efectivo_en_ventas": efectivo,
+            "ventas_otros_metodos": total_ventas - efectivo,
+            "total_gastos": gastos,
+            "gastos": compras,
             "monto_esperado": monto_esperado,
             "movimientos": movimientos,
         }
@@ -147,7 +171,8 @@ class CajaService:
             id_usuario=usuario.id_usuario,
             monto_inicial=apertura.monto_inicial,
             total_ingresos=resumen["total_ingresos"],
-            total_egresos=resumen["total_egresos"],
+            # Egresos del turno = salidas manuales historicas + gastos de Compras.
+            total_egresos=resumen["total_egresos"] + resumen["total_gastos"],
             total_ventas=resumen["total_ventas"],
             monto_esperado=resumen["monto_esperado"],
             monto_real=monto_real,
