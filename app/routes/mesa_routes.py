@@ -133,6 +133,7 @@ def api_cobrar(id_mesa):
             monto_recibido=float(data.get("monto_recibido", 0.0) or 0),
             id_cliente=data.get("id_cliente"),
             notas=data.get("notas"),
+            pagos=data.get("pagos"),
         )
         registrar_auditoria(
             "COBRAR MESA", "Mesas",

@@ -187,7 +187,15 @@
                         <option value="Efectivo">Efectivo</option>
                         <option value="Tarjeta">Tarjeta</option>
                         <option value="Transferencia">Transferencia</option>
+                        <option value="Dividido">Dividido (varios métodos)</option>
                     </select>
+                </div>
+
+                <!-- Pago dividido: parte en un método y parte en otro -->
+                <div class="mb-2" id="cbDivididoSection" style="display:none;">
+                    <div id="cbPagosFilas"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="cbAgregarPago">+ Agregar pago</button>
+                    <div class="small mt-1" id="cbPagosResumen"></div>
                 </div>
 
                 <!-- Banco emisor (solo Tarjeta) -->
@@ -316,7 +324,27 @@ function agregarAlCarritoNuevo(p, excluidos, opciones, comentario) {
     const key = p.id_producto + '|' + (comentario || '');
     const existente = carritoNuevo.find(i => i.key === key);
     if (existente) existente.cantidad += 1;
-    else carritoNuevo.push({key, id_producto:p.id_producto, nombre:p.nombre, precio:p.precio_venta, cantidad:1, excluidos, opciones, comentario});
+    else carritoNuevo.push({key, id_producto:p.id_producto, nombre:p.nombre, precio:p.precio_venta, cantidad:1, excluidos, opciones, comentario, base: comentario || '', nota: ''});
+    renderCarritoNuevo();
+}
+
+// Nota libre del mesero para ese plato ("bien cocido", "sin hielo"). Se
+// suma a lo que ya dice la personalizacion y viaja en la comanda.
+async function notaCarritoNuevo(key) {
+    const item = carritoNuevo.find(i => i.key === key);
+    if (!item) return;
+    const r = await Swal.fire({
+        title: 'Nota para ' + item.nombre, input: 'text', inputValue: item.nota || '',
+        inputPlaceholder: 'Ej. bien cocido, sin hielo', inputAttributes: {maxlength: 200},
+        showCancelButton: true, confirmButtonText: 'Guardar', cancelButtonText: 'Cancelar',
+    });
+    if (!r.isConfirmed) return;
+    item.nota = (r.value || '').trim();
+    item.comentario = [item.base, item.nota].filter(Boolean).join(' · ') || null;
+    const nuevaKey = item.id_producto + '|' + (item.comentario || '');
+    const igual = carritoNuevo.find(i => i !== item && i.key === nuevaKey);
+    if (igual) { igual.cantidad += item.cantidad; carritoNuevo = carritoNuevo.filter(i => i !== item); }
+    else item.key = nuevaKey;
     renderCarritoNuevo();
 }
 
@@ -334,6 +362,7 @@ function renderCarritoNuevo() {
                         <button type="button" onclick="cambiarCantidad(this.closest('.carrito-item').dataset.key, 1)">+</button>
                     </div>
                     <span>C$ ${(i.cantidad*i.precio).toFixed(2)}</span>
+                    <button class="btn btn-sm btn-link p-0" title="Nota" style="color:#e67e22;text-decoration:none;" onclick="notaCarritoNuevo(this.closest('.carrito-item').dataset.key)">✎</button>
                     <button class="btn btn-sm btn-link text-danger p-0" onclick="quitarDelCarritoNuevo(this.closest('.carrito-item').dataset.key)"><i class="bi bi-x-circle"></i></button>
                 </div>
             </div>`).join('');
@@ -603,6 +632,7 @@ async function cargarClientesParaCobro() {
 
 function abrirCobrar() {
     document.getElementById('cbMetodo').value = 'Efectivo';
+    document.getElementById('cbPagosFilas').innerHTML = '';
     document.getElementById('cbRecibido').value = '0';
     document.getElementById('cbNotas').value = '';
     document.getElementById('cbCliente').value = '';
@@ -624,8 +654,39 @@ function editarPropinaCobro() {
     recalcularCobro();
 }
 
-document.getElementById('cbMetodo').addEventListener('change', recalcularCobro);
+document.getElementById('cbMetodo').addEventListener('change', () => {
+    if (document.getElementById('cbMetodo').value === 'Dividido' && !document.querySelector('#cbPagosFilas .cb-pago')) {
+        cbAgregarPago('Transferencia', 0);
+        cbAgregarPago('Efectivo', 0);
+    }
+    recalcularCobro();
+});
 document.getElementById('cbRecibido').addEventListener('input', recalcularCobro);
+document.getElementById('cbAgregarPago').addEventListener('click', () => { cbAgregarPago('Efectivo', 0); recalcularCobro(); });
+
+// ---- Pago dividido ----
+const CB_METODOS = ['Efectivo', 'Transferencia', 'Tarjeta BAC', 'Tarjeta BANPRO', 'Tarjeta LAFISE'];
+
+function cbAgregarPago(metodo, monto) {
+    const fila = document.createElement('div');
+    fila.className = 'cb-pago d-flex gap-2 mb-2';
+    fila.innerHTML = `
+        <select class="form-select form-select-sm cb-pago-metodo">
+            ${CB_METODOS.map(m => `<option ${m === metodo ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+        <input type="number" class="form-control form-control-sm cb-pago-monto" min="0" step="0.01" value="${monto || ''}" placeholder="Monto" style="max-width:120px;">
+        <button type="button" class="btn btn-sm btn-outline-danger" title="Quitar">✕</button>`;
+    fila.querySelector('button').addEventListener('click', () => { fila.remove(); recalcularCobro(); });
+    fila.querySelectorAll('select, input').forEach(el => el.addEventListener('input', recalcularCobro));
+    document.getElementById('cbPagosFilas').appendChild(fila);
+}
+
+function cbPagos() {
+    return [...document.querySelectorAll('#cbPagosFilas .cb-pago')].map(f => ({
+        metodo: f.querySelector('.cb-pago-metodo').value,
+        monto: parseFloat(f.querySelector('.cb-pago-monto').value) || 0,
+    })).filter(p => p.monto > 0);
+}
 
 function recalcularCobro() {
     const subtotal = (cuenta.venta && cuenta.venta.subtotal) || 0;
@@ -648,10 +709,30 @@ function recalcularCobro() {
     const metodo = document.getElementById('cbMetodo').value;
     document.getElementById('cbBancoSection').style.display = metodo === 'Tarjeta' ? 'block' : 'none';
     document.getElementById('cbEfectivoSection').style.display = metodo === 'Efectivo' ? 'block' : 'none';
+    document.getElementById('cbDivididoSection').style.display = metodo === 'Dividido' ? 'block' : 'none';
 
     const filaCambio = document.getElementById('cbCambioRow');
     const btnConfirmar = document.getElementById('btnConfirmarCobro');
-    if (metodo === 'Efectivo') {
+    if (metodo === 'Dividido') {
+        const pagos = cbPagos();
+        const pagado = pagos.reduce((s, p) => s + p.monto, 0);
+        const noEfectivo = pagos.filter(p => p.metodo !== 'Efectivo').reduce((s, p) => s + p.monto, 0);
+        const falta = total - pagado;
+        const resumen = document.getElementById('cbPagosResumen');
+        let ok = pagos.length >= 2 && falta <= 0.004 && noEfectivo <= total + 0.004;
+        if (noEfectivo > total + 0.004) {
+            resumen.innerHTML = '<span style="color:#c0392b">Tarjeta/transferencia no puede pasar del total</span>';
+        } else if (pagos.length < 2) {
+            resumen.innerHTML = '<span style="color:#c0392b">Pon al menos dos pagos con monto</span>';
+        } else {
+            resumen.innerHTML = `Pagado: <strong>C$ ${pagado.toFixed(2)}</strong>`;
+        }
+        document.getElementById('cbCambioLabel').textContent = falta > 0.004 ? 'Falta' : 'Cambio a entregar';
+        document.getElementById('cbCambio').textContent = 'C$ ' + Math.abs(falta).toFixed(2);
+        document.getElementById('cbCambio').style.color = falta > 0.004 ? '#c0392b' : '#1e7e34';
+        filaCambio.style.display = 'flex';
+        if (btnConfirmar) btnConfirmar.disabled = !ok;
+    } else if (metodo === 'Efectivo') {
         const recibido = parseFloat(document.getElementById('cbRecibido').value) || 0;
         const diferencia = recibido - total;
         document.getElementById('cbCambioLabel').textContent = diferencia < 0 ? 'Falta' : 'Cambio a entregar';
@@ -684,6 +765,11 @@ async function confirmarCobro() {
         id_cliente: document.getElementById('cbCliente').value || null,
         notas: document.getElementById('cbNotas').value,
     };
+    if (metodoPago === 'Dividido') {
+        payload.metodo_pago = 'Mixto';
+        payload.pagos = cbPagos();
+        payload.monto_recibido = payload.pagos.reduce((s, p) => s + p.monto, 0);
+    }
     const btn = document.getElementById('btnConfirmarCobro');
     btn.disabled = true;
     try {

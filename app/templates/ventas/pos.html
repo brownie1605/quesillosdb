@@ -64,6 +64,7 @@
                             <option value="Efectivo">Efectivo</option>
                             <option value="Tarjeta">Tarjeta</option>
                             <option value="Transferencia">Transferencia</option>
+                            <option value="Dividido">Dividido</option>
                         </select>
                         <button id="chargeBtn" class="btn btn-success" style="flex:1; justify-content:center;">Cobrar C$ 0.00</button>
                     </div>
@@ -203,6 +204,18 @@
             </div>
         </div>
 
+        <!-- Pago dividido: parte en un metodo y parte en otro -->
+        <div id="divididoSection" style="display: none; margin-top: 14px; padding: 10px; border: 1px solid #e1e7f0; border-radius: 8px;">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px;">Pagos</div>
+            <div id="pagosFilas"></div>
+            <button type="button" id="agregarPagoBtn" class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px;">+ Agregar pago</button>
+            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-top: 8px;">
+                <span id="divididoLabel">Falta:</span>
+                <span id="divididoMonto">C$ 0.00</span>
+            </div>
+            <div id="divididoAviso" style="font-size: 12px; color: #c0392b;"></div>
+        </div>
+
         <div style="margin-top: 14px;">
             <label style="font-size: 13px; font-weight: 600; color: #6a768d;">Nota (opcional, ej. motivo del descuento)</label>
             <textarea id="modalNotas" class="form-control" rows="2" style="width: 100%; margin-top: 4px;"></textarea>
@@ -306,5 +319,5 @@
 
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/ventas.js') }}?v=4"></script>
+<script src="{{ url_for('static', filename='js/ventas.js') }}?v=5"></script>
 {% endblock %}

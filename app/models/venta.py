@@ -21,6 +21,9 @@ class Venta(db.Model):
     cambio = db.Column(db.Numeric(12, 2), default=0.0)
     estado = db.Column(db.Enum("completada", "anulada", "pendiente"), default="completada")
     metodo_pago = db.Column(db.String(50), default="Efectivo")
+    # Pago dividido: [{"metodo": "Efectivo", "monto": 300.0}, ...]. NULL =
+    # un solo metodo (metodo_pago). Con varios, metodo_pago = "Mixto".
+    pagos_detalle = db.Column(db.JSON, nullable=True)
     notas = db.Column(db.Text, nullable=True)
     fecha_venta = db.Column(db.DateTime, default=nicaragua_now)
 
@@ -48,6 +51,7 @@ class Venta(db.Model):
             "total": float(self.total) if self.total else 0.0,
             "estado": self.estado,
             "metodo_pago": self.metodo_pago,
+            "pagos_detalle": self.pagos_detalle,
             "notas": self.notas,
             "fecha_venta": self.fecha_venta.strftime("%Y-%m-%d %H:%M:%S") if self.fecha_venta else "",
             "uuid_venta": self.uuid_venta,

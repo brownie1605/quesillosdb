@@ -68,6 +68,8 @@ class VentaService:
         comentario = item.get("comentario") or RecetaService.comentario_de_personalizacion(
             id_producto, excluidos, opciones
         )
+        # Incluye la nota libre del mesero; la columna es de 500.
+        comentario = str(comentario).strip()[:500] if comentario else None
 
         det = DetalleVenta(
             id_venta=venta.id_venta,
@@ -105,6 +107,66 @@ class VentaService:
 
     # -----------------------------------------------------------------
     @staticmethod
+    def _es_efectivo(metodo):
+        return (metodo or "").strip().lower() == "efectivo"
+
+    @staticmethod
+    def _aplicar_pagos(venta, pagos):
+        """Pago dividido: parte en un metodo y parte en otro (ej. transferencia
+        + efectivo). `pagos` = [{"metodo": "Transferencia", "monto": 200}, ...].
+
+        Con un solo pago (o ninguno) no cambia nada: manda `metodo_pago` como
+        siempre. Con dos o mas, la venta queda con metodo_pago = "Mixto" y el
+        desglose en `pagos_detalle`. Lo que no es efectivo no puede pasar del
+        total (no se da vuelto de una tarjeta o transferencia); el efectivo si
+        puede sobrar, y eso es el cambio.
+        """
+        validos = []
+        for p in pagos or []:
+            metodo = (p.get("metodo") or "").strip()
+            try:
+                monto = Decimal(str(p.get("monto") or 0)).quantize(Decimal("0.01"))
+            except ArithmeticError:
+                raise VentaError("Monto de pago invalido")
+            if monto < 0:
+                raise VentaError("Un pago no puede ser negativo")
+            if metodo and monto > 0:
+                validos.append({"metodo": metodo[:50], "monto": monto})
+        if len(validos) < 2:
+            venta.pagos_detalle = None
+            return
+
+        total = Decimal(str(venta.total or 0))
+        pagado = sum((p["monto"] for p in validos), Decimal("0"))
+        no_efectivo = sum(
+            (p["monto"] for p in validos if not VentaService._es_efectivo(p["metodo"])), Decimal("0")
+        )
+        if pagado < total:
+            raise VentaError("Los pagos (C$ %s) no cubren el total (C$ %s)" % (pagado, total))
+        if no_efectivo > total:
+            raise VentaError("Lo pagado con tarjeta o transferencia no puede pasar del total")
+
+        venta.metodo_pago = "Mixto"
+        venta.pagos_detalle = [{"metodo": p["metodo"], "monto": float(p["monto"])} for p in validos]
+        venta.monto_recibido = pagado
+        venta.cambio = pagado - total
+
+    @staticmethod
+    def efectivo_de(venta):
+        """Cuanto efectivo deja esta venta en la caja (ya sin el cambio)."""
+        if venta.pagos_detalle:
+            no_efectivo = sum(
+                (Decimal(str(p.get("monto") or 0)) for p in venta.pagos_detalle
+                 if not VentaService._es_efectivo(p.get("metodo"))),
+                Decimal("0"),
+            )
+            return Decimal(str(venta.total or 0)) - no_efectivo
+        if VentaService._es_efectivo(venta.metodo_pago):
+            return Decimal(str(venta.total or 0))
+        return Decimal("0")
+
+    # -----------------------------------------------------------------
+    @staticmethod
     def _exigir_caja_abierta():
         """Sin turno de caja abierto no se puede completar ninguna venta."""
         from app.services.caja_service import CajaService, CajaError
@@ -132,7 +194,7 @@ class VentaService:
     @staticmethod
     def registrar_venta(usuario, cart, metodo_pago="Efectivo", descuento=0.0,
                         propina=0.0, id_cliente=None, monto_recibido=0.0, id_mesa=None,
-                        notas=None):
+                        notas=None, pagos=None):
         """Registra la venta en la BD LOCAL y la encola para la nube.
 
         cart: [{id_producto, cantidad, precio, excluidos?, opciones?}]
@@ -180,6 +242,7 @@ class VentaService:
             VentaService._crear_detalle(venta, item, usuario, ahora)
 
         VentaService._recalcular_totales(venta)
+        VentaService._aplicar_pagos(venta, pagos)
 
         # 3. Se encola solo (ver app/services/sync_events.py).
         db.session.commit()
@@ -396,7 +459,8 @@ class VentaService:
     # -----------------------------------------------------------------
     @staticmethod
     def cobrar_mesa(venta, usuario, metodo_pago="Efectivo", descuento=0.0,
-                    propina=0.0, monto_recibido=0.0, id_cliente=None, notas=None):
+                    propina=0.0, monto_recibido=0.0, id_cliente=None, notas=None,
+                    pagos=None):
         """Cierra la cuenta de una mesa: cobra y libera la mesa."""
         if venta.estado != "pendiente":
             raise VentaError("Esta cuenta ya fue cobrada o anulada")
@@ -417,6 +481,7 @@ class VentaService:
         venta.estado_sync = "pendiente"
 
         VentaService._recalcular_totales(venta)
+        VentaService._aplicar_pagos(venta, pagos)
 
         if venta.id_mesa:
             from app.services.mesa_service import MesaService

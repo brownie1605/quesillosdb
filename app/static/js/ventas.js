@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('propinaSwitch').addEventListener('change', recalcularTotalesModal);
     document.getElementById('confirmCheckoutBtn').addEventListener('click', confirmarCobro);
     document.getElementById('modalEfectivoRecibido').addEventListener('input', actualizarCambio);
+    document.getElementById('agregarPagoBtn').addEventListener('click', () => { agregarPagoDividido('Efectivo', 0); actualizarCambio(); });
 
     // Eventos del Modal de Descuento
     document.getElementById('openDiscountModalBtn').addEventListener('click', abrirModalDescuento);
@@ -202,8 +203,26 @@ function agregarAlCarrito(producto, excluidos, opciones, comentario) {
             excluidos: excluidos || [],
             opciones: opciones || [],
             comentario: comentario || null,
+            base: comentario || '',
+            nota: '',
         });
     }
+    renderizarCarrito();
+}
+
+// Nota libre para ese producto ("bien cocido", "sin hielo"); se suma a lo
+// que ya dice la personalizacion.
+function notaDelCarrito(key) {
+    const item = cart.find(i => i.key === key);
+    if (!item) return;
+    const valor = window.prompt('Nota para ' + item.nombre + ' (ej. bien cocido, sin hielo):', item.nota || '');
+    if (valor === null) return;
+    item.nota = valor.trim().slice(0, 200);
+    item.comentario = [item.base, item.nota].filter(Boolean).join(' · ') || null;
+    const nuevaKey = claveCarrito(item.id_producto, item.comentario);
+    const igual = cart.find(i => i !== item && i.key === nuevaKey);
+    if (igual) { igual.cantidad += item.cantidad; cart = cart.filter(i => i !== item); }
+    else item.key = nuevaKey;
     renderizarCarrito();
 }
 
@@ -259,7 +278,8 @@ function renderizarCarrito() {
                 <button class="qty-btn" data-key="${escapeHtml(item.key)}" onclick="modificarCantidad(this.dataset.key, 1)">+</button>
             </div>
             <div style="text-align: right; font-weight: bold;">C$ ${itemTotal.toFixed(2)}</div>
-            <div style="text-align: right;">
+            <div style="text-align: right; white-space: nowrap;">
+                <button class="btn-icon" title="Nota" data-key="${escapeHtml(item.key)}" onclick="notaDelCarrito(this.dataset.key)">✎</button>
                 <button class="btn-icon delete" data-key="${escapeHtml(item.key)}" onclick="eliminarDelCarrito(this.dataset.key)">🗑️</button>
             </div>
             ${notaHtml}
@@ -420,6 +440,7 @@ function abrirModalCheckout() {
     // Reset Propina manual si el carrito cambió (opcional), aquí lo mantenemos
     document.getElementById('propinaSwitch').checked = true; // Por defecto activo como pidió el usuario
     document.getElementById('modalEfectivoRecibido').value = '0';
+    document.getElementById('pagosFilas').innerHTML = '';
     document.getElementById('modalNotas').value = '';
 
     recalcularTotalesModal();
@@ -429,10 +450,58 @@ function abrirModalCheckout() {
 
 // Muestra el bloque de efectivo/cambio solo si el metodo de pago actual es
 // Efectivo, y recalcula la diferencia contra el total del modal.
+// ---- Pago dividido (parte en un metodo y parte en otro) ----
+const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta BAC', 'Tarjeta BANPRO', 'Tarjeta LAFISE'];
+
+function agregarPagoDividido(metodo, monto) {
+    const fila = document.createElement('div');
+    fila.className = 'pago-fila';
+    fila.style.cssText = 'display:flex; gap:6px; margin-bottom:6px;';
+    fila.innerHTML = `
+        <select class="form-control pago-metodo" style="flex:1;">
+            ${METODOS_PAGO.map(m => `<option ${m === metodo ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+        <input type="number" class="form-control pago-monto" min="0" step="0.01" placeholder="Monto" value="${monto || ''}" style="width:110px; text-align:right;">
+        <button type="button" class="btn btn-secondary" title="Quitar" style="padding:4px 10px;">✕</button>`;
+    fila.querySelector('button').addEventListener('click', () => { fila.remove(); actualizarCambio(); });
+    fila.querySelectorAll('select, input').forEach(el => el.addEventListener('input', actualizarCambio));
+    document.getElementById('pagosFilas').appendChild(fila);
+}
+
+function pagosDivididos() {
+    return [...document.querySelectorAll('#pagosFilas .pago-fila')].map(f => ({
+        metodo: f.querySelector('.pago-metodo').value,
+        monto: parseFloat(f.querySelector('.pago-monto').value) || 0,
+    })).filter(p => p.monto > 0);
+}
+
 function actualizarCambio() {
     const metodo = document.getElementById('paymentMethod').value;
     const seccion = document.getElementById('efectivoSection');
     const btnConfirmar = document.getElementById('confirmCheckoutBtn');
+    const dividido = document.getElementById('divididoSection');
+    dividido.style.display = metodo === 'Dividido' ? 'block' : 'none';
+    if (metodo === 'Dividido') {
+        seccion.style.display = 'none';
+        if (!document.querySelector('#pagosFilas .pago-fila')) {
+            agregarPagoDividido('Transferencia', 0);
+            agregarPagoDividido('Efectivo', 0);
+        }
+        const total = parseFloat(document.getElementById('modalTotal').textContent.replace('C$', '').trim()) || 0;
+        const pagos = pagosDivididos();
+        const pagado = pagos.reduce((s, p) => s + p.monto, 0);
+        const noEfectivo = pagos.filter(p => p.metodo !== 'Efectivo').reduce((s, p) => s + p.monto, 0);
+        const falta = total - pagado;
+        let aviso = '';
+        if (pagos.length < 2) aviso = 'Pon al menos dos pagos con monto.';
+        else if (noEfectivo > total + 0.004) aviso = 'Tarjeta/transferencia no puede pasar del total.';
+        document.getElementById('divididoAviso').textContent = aviso;
+        document.getElementById('divididoLabel').textContent = falta > 0.004 ? 'Falta:' : 'Cambio a entregar:';
+        document.getElementById('divididoMonto').textContent = 'C$ ' + Math.abs(falta).toFixed(2);
+        document.getElementById('divididoMonto').style.color = falta > 0.004 ? '#c0392b' : '#1abc9c';
+        if (btnConfirmar) btnConfirmar.disabled = !!aviso || falta > 0.004;
+        return;
+    }
     if (metodo !== 'Efectivo') {
         seccion.style.display = 'none';
         if (btnConfirmar) btnConfirmar.disabled = false;
@@ -563,6 +632,11 @@ async function confirmarCobro() {
         id_cliente: document.getElementById('clientSelect').value || null,
         notas: document.getElementById('modalNotas').value,
     };
+    if (methodValue === 'Dividido') {
+        payload.metodo_pago = 'Mixto';
+        payload.pagos = pagosDivididos();
+        payload.monto_recibido = payload.pagos.reduce((s, p) => s + p.monto, 0);
+    }
 
     const btn = document.getElementById('confirmCheckoutBtn');
     btn.disabled = true;

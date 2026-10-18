@@ -176,6 +176,7 @@ def api_cobrar():
             id_cliente=data.get("id_cliente"),
             monto_recibido=float(data.get("monto_recibido", 0.0) or 0),
             notas=data.get("notas"),
+            pagos=data.get("pagos"),
         )
         registrar_auditoria(
             "NUEVA VENTA", "Ventas",
@@ -199,6 +200,9 @@ def api_cobrar():
     except StockInsuficiente as e:
         db.session.rollback()
         return jsonify({"success": False, "message": str(e), "faltantes": e.faltantes}), 409
+    except VentaError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
