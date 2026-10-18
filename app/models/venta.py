@@ -14,6 +14,10 @@ class Venta(db.Model):
     numero_venta = db.Column(db.String(50), nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), default=0.0)
     descuento = db.Column(db.Numeric(12, 2), default=0.0)
+    # Porcentaje elegido con el boton "Descuento" de la mesa. Con valor, el
+    # monto de `descuento` se recalcula solo sobre el subtotal. NULL = el
+    # descuento es un monto fijo (venta directa, como siempre).
+    descuento_pct = db.Column(db.Numeric(5, 2), nullable=True)
     impuesto = db.Column(db.Numeric(12, 2), default=0.0)
     propina = db.Column(db.Numeric(12, 2), default=0.0)
     total = db.Column(db.Numeric(12, 2), nullable=False)
@@ -47,6 +51,7 @@ class Venta(db.Model):
             "numero_venta": self.numero_venta,
             "subtotal": float(self.subtotal) if self.subtotal else 0.0,
             "descuento": float(self.descuento) if self.descuento else 0.0,
+            "descuento_pct": float(self.descuento_pct) if self.descuento_pct is not None else None,
             "impuesto": float(self.impuesto) if self.impuesto else 0.0,
             "total": float(self.total) if self.total else 0.0,
             "estado": self.estado,

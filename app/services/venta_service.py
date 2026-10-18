@@ -100,6 +100,9 @@ class VentaService:
     def _recalcular_totales(venta):
         subtotal = sum((d.subtotal for d in venta.detalles), Decimal("0"))
         venta.subtotal = subtotal
+        if venta.descuento_pct is not None:
+            # Descuento en % de la mesa: sigue al subtotal al agregar/quitar.
+            venta.descuento = (subtotal * Decimal(str(venta.descuento_pct)) / 100).quantize(Decimal("0.01"))
         venta.total = (
             subtotal - Decimal(str(venta.descuento or 0)) + Decimal(str(venta.propina or 0))
         ).quantize(Decimal("0.01"))
@@ -268,8 +271,7 @@ class VentaService:
         InventarioService.revertir_venta(venta, motivo=motivo)
 
         if venta.id_mesa:
-            from app.services.mesa_service import MesaService
-            MesaService.liberar(venta.id_mesa)
+            VentaService._soltar_mesa(venta)
 
         db.session.commit()
 
@@ -484,9 +486,194 @@ class VentaService:
         VentaService._aplicar_pagos(venta, pagos)
 
         if venta.id_mesa:
-            from app.services.mesa_service import MesaService
-            MesaService.liberar(venta.id_mesa)
+            VentaService._soltar_mesa(venta)
 
+        db.session.commit()
+        VentaService._push_si_hay_internet()
+        return venta
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def cuentas_de_mesa(mesa):
+        """Cuentas abiertas de la mesa (Cuenta 1, Cuenta 2, ...) en orden."""
+        cuentas = (Venta.query.filter_by(id_mesa=mesa.id_mesa, estado="pendiente")
+                   .order_by(Venta.id_venta).all())
+        if mesa.id_venta_actual and all(c.id_venta != mesa.id_venta_actual for c in cuentas):
+            actual = Venta.query.get(mesa.id_venta_actual)
+            if actual and actual.estado == "pendiente":
+                cuentas.insert(0, actual)
+        return cuentas
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _soltar_mesa(venta):
+        """La cuenta `venta` ya se cobro o anulo. Si a la mesa le quedan otras
+        cuentas abiertas (se separo), sigue ocupada con una de ellas; si no,
+        queda libre como siempre."""
+        from app.models.mesa import Mesa
+        from app.services.mesa_service import MesaService
+
+        otra = (Venta.query.filter(Venta.id_mesa == venta.id_mesa, Venta.estado == "pendiente",
+                                   Venta.id_venta != venta.id_venta)
+                .order_by(Venta.id_venta).first())
+        if not otra:
+            MesaService.liberar(venta.id_mesa)
+            return
+        mesa = Mesa.query.get(venta.id_mesa)
+        if mesa and mesa.id_venta_actual in (None, venta.id_venta):
+            mesa.estado = "ocupada"
+            mesa.id_venta_actual = otra.id_venta
+            mesa.estado_sync = "pendiente"
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def separar_cuenta(venta, movimientos, usuario):
+        """Pasa productos de la cuenta `venta` a una cuenta nueva de la misma
+        mesa. `movimientos` = [{"id_detalle": 12, "cantidad": 2}, ...]; si la
+        cantidad es menor a la de la linea, la linea se parte en dos.
+
+        Lo que el producto desconto del inventario se pasa tambien a la
+        cuenta nueva (sale de "VENTA-<vieja>" y entra a "VENTA-<nueva>"), asi
+        anular o quitar despues devuelve justo lo de cada cuenta. El stock
+        total no cambia."""
+        if venta.estado != "pendiente":
+            raise VentaError("Esta cuenta ya fue cobrada o anulada")
+
+        pedidos = {}
+        for m in movimientos or []:
+            try:
+                id_det = int(m.get("id_detalle"))
+                cant = Decimal(str(m.get("cantidad")))
+            except (TypeError, ValueError, ArithmeticError):
+                raise VentaError("Datos de separacion invalidos")
+            if cant <= 0:
+                raise VentaError("La cantidad a pasar debe ser mayor a cero")
+            pedidos[id_det] = pedidos.get(id_det, Decimal("0")) + cant
+        if not pedidos:
+            raise VentaError("Elige al menos un producto para la otra cuenta")
+
+        lineas = {d.id_detalle_venta: d for d in venta.detalles}
+        for id_det, cant in pedidos.items():
+            det = lineas.get(id_det)
+            if not det:
+                raise VentaError("Ese producto no esta en la cuenta")
+            if cant > Decimal(str(det.cantidad)):
+                raise VentaError(f"Solo hay {det.cantidad:g} de {det.producto.nombre if det.producto else 'ese producto'}")
+        if sum(pedidos.values()) >= sum(Decimal(str(d.cantidad)) for d in venta.detalles):
+            raise VentaError("Deja al menos un producto en la cuenta original")
+
+        ahora = nicaragua_now()
+        nueva = Venta(
+            id_empresa=venta.id_empresa,
+            id_sucursal=venta.id_sucursal,
+            id_usuario=usuario.id_usuario,
+            id_mesa=venta.id_mesa,
+            numero_venta=VentaService.numero_venta(),
+            uuid_venta=str(uuid.uuid4()),
+            descuento=Decimal("0"),
+            impuesto=Decimal("0"),
+            propina=Decimal("0"),
+            metodo_pago="Efectivo",
+            estado="pendiente",
+            total=Decimal("0"),
+            subtotal=Decimal("0"),
+            fecha_venta=ahora,
+            timestamp_local_creacion=ahora,
+            timestamp_local_actualizacion=ahora,
+            origen="local",
+            estado_sync="pendiente",
+        )
+        db.session.add(nueva)
+        db.session.flush()
+
+        for id_det, cant in pedidos.items():
+            det = lineas[id_det]
+            if cant == Decimal(str(det.cantidad)):
+                det.venta = nueva          # la linea entera cambia de cuenta
+                det.estado_sync = "pendiente"
+            else:
+                det.cantidad = Decimal(str(det.cantidad)) - cant
+                det.subtotal = (det.cantidad * Decimal(str(det.precio_unitario))).quantize(Decimal("0.01"))
+                det.estado_sync = "pendiente"
+                nueva.detalles.append(DetalleVenta(
+                    id_producto=det.id_producto,
+                    cantidad=cant,
+                    precio_unitario=det.precio_unitario,
+                    descuento=Decimal("0"),
+                    subtotal=(cant * Decimal(str(det.precio_unitario))).quantize(Decimal("0.01")),
+                    consumio_receta=det.consumio_receta,
+                    personalizacion=det.personalizacion,
+                    comentario=det.comentario,
+                    timestamp_local_creacion=ahora,
+                    estado_sync="pendiente",
+                ))
+
+            personalizacion = det.personalizacion or {}
+            requerimientos = RecetaService.requerimiento_de_venta(
+                det.id_producto, cant,
+                excluidos=personalizacion.get("excluidos"),
+                opciones=personalizacion.get("opciones"),
+            )
+            for pid, req in requerimientos.items():
+                InventarioService.mover(
+                    pid, req, "ajuste", usuario.id_usuario,
+                    referencia="VENTA-" + str(venta.id_venta),
+                    observacion="Se paso a otra cuenta de la mesa", commit=False,
+                )
+                InventarioService.mover(
+                    pid, -req, "venta", usuario.id_usuario,
+                    referencia="VENTA-" + str(nueva.id_venta),
+                    observacion="Viene de otra cuenta de la mesa", commit=False,
+                )
+        db.session.flush()
+
+        VentaService._recalcular_totales(venta)
+        VentaService._recalcular_totales(nueva)
+        venta.timestamp_local_actualizacion = ahora
+        venta.estado_sync = "pendiente"
+        db.session.commit()
+        VentaService._push_si_hay_internet()
+        return nueva
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def fijar_descuento(venta, porcentaje):
+        """Descuento en % de una cuenta abierta (0 = sin descuento)."""
+        if venta.estado != "pendiente":
+            raise VentaError("Esta cuenta ya fue cobrada o anulada")
+        try:
+            pct = Decimal(str(porcentaje or 0))
+        except ArithmeticError:
+            raise VentaError("Porcentaje invalido")
+        if pct < 0 or pct > 100:
+            raise VentaError("El descuento debe estar entre 0 y 100 %")
+        venta.descuento_pct = pct if pct > 0 else None
+        if venta.descuento_pct is None:
+            venta.descuento = Decimal("0")
+        VentaService._recalcular_totales(venta)
+        venta.timestamp_local_actualizacion = nicaragua_now()
+        venta.estado_sync = "pendiente"
+        db.session.commit()
+        VentaService._push_si_hay_internet()
+        return venta
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def fijar_cliente(venta, id_cliente):
+        """Cliente de una cuenta abierta (None = Publico general)."""
+        from app.models.cliente import Cliente
+
+        if venta.estado != "pendiente":
+            raise VentaError("Esta cuenta ya fue cobrada o anulada")
+        if id_cliente:
+            cliente = Cliente.query.get(int(id_cliente))
+            if not cliente or cliente.estado != "activo":
+                raise VentaError("Ese cliente no existe o no esta activo")
+            venta.id_cliente = cliente.id_cliente
+        else:
+            venta.id_cliente = None
+        venta.timestamp_local_actualizacion = nicaragua_now()
+        venta.estado_sync = "pendiente"
         db.session.commit()
         VentaService._push_si_hay_internet()
         return venta

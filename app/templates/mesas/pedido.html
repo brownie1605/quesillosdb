@@ -57,12 +57,76 @@
     .cant-stepper { display:flex; align-items:center; gap:6px; background:#faf5f2; border:1px solid #e0d5d0; border-radius:20px; padding:2px 6px; }
     .cant-stepper button { width:22px; height:22px; border:none; border-radius:50%; background:#8d6e63; color:#fff; font-weight:700; line-height:1; }
     .cant-stepper .cant-num { min-width:22px; text-align:center; font-weight:700; color:#3e2723; cursor:pointer; }
-    .tk-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:2px; background:#d7ccc8; border:2px solid #d7ccc8; border-radius:12px; overflow:hidden; }
-    .tk-grid button { padding:22px 0; font-size:24px; font-weight:700; border:none; background:#fff; color:#3e2723; }
-    .tk-grid button:active { background:#f3e9e4; }
-    .tk-grid button.tk-borrar { background:#faf5f2; color:#8B2E2E; font-size:19px; }
-    .tk-grid button.tk-borrar:active { background:#f0e2dd; }
-    .tk-display { font-size:34px; font-weight:800; text-align:center; color:#3e2723; background:#faf5f2; border:1px solid #e0d5d0; border-radius:10px; padding:12px; margin-bottom:14px; }
+    /* Botones Separar / Descuento / Cliente de la cuenta */
+    .cuenta-acciones { display:grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap:8px; padding:12px 16px; border-bottom:1px solid #eee; }
+    .cuenta-accion { display:flex; flex-direction:column; align-items:center; gap:3px; padding:9px 4px; border-radius:12px;
+        border:1px solid #e0d5d0; background:#faf5f2; color:#5d4037; font-size:12.5px; font-weight:700; line-height:1.15; min-width:0; }
+    .cuenta-accion i, .cuenta-accion svg { font-size:20px; color:#8B2E2E; }
+    .cuenta-accion small { font-weight:600; color:#8d6e63; font-size:11px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .cuenta-accion:hover:not(:disabled) { border-color:#bcaaa4; background:#f3e9e4; }
+    .cuenta-accion.activo { border-color:#8B2E2E; background:#fbeceb; }
+    .cuenta-accion:disabled { opacity:.45; }
+    /* Paginacion Cuenta 1 / Cuenta 2 ... */
+    .cuenta-tabs { display:flex; gap:6px; flex-wrap:wrap; padding:10px 16px 0; }
+    .cuenta-tab { display:flex; flex-direction:column; align-items:center; padding:5px 14px; border-radius:10px; border:1px solid #d7ccc8;
+        background:#fff; color:#5d4037; font-size:13px; font-weight:700; line-height:1.2; }
+    .cuenta-tab small { font-weight:600; font-size:11px; color:#8d6e63; }
+    .cuenta-tab.active { background: linear-gradient(45deg,#8B2E2E,#b04545); color:#fff; border-color:transparent; }
+    .cuenta-tab.active small { color:#f6dcdc; }
+
+    /* Cuadricula de numeros (cantidad, descuento, separar) */
+    .cq-capa { position:fixed; inset:0; z-index:2000; background:rgba(62,39,35,.45); display:flex; align-items:center; justify-content:center; padding:16px; }
+    .cq-caja { background:#fff; border-radius:18px; width:100%; max-width:330px; max-height:100%; overflow-y:auto; padding:18px 18px 20px; box-shadow:0 18px 40px rgba(0,0,0,.25); }
+    .cq-cabeza { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px; }
+    .cq-titulo { font-weight:800; color:#3e2723; font-size:16px; }
+    .cq-sub { color:#8d6e63; font-size:12.5px; }
+    .cq-display { font-size:34px; font-weight:800; text-align:center; color:#3e2723; background:#faf5f2; border:1px solid #e0d5d0; border-radius:12px; padding:8px; margin-bottom:14px; }
+    .cq-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; }
+    .cq-grid button { aspect-ratio: 1 / .78; border:none; border-radius:16px; font-size:28px; font-weight:300; color:#fff;
+        background: linear-gradient(160deg,#a1887f,#8d6e63); box-shadow:0 6px 12px rgba(93,64,55,.28); transition: transform .08s; }
+    .cq-grid button:active { transform: scale(.94); background: linear-gradient(160deg,#8d6e63,#6d4c41); }
+    .cq-grid button.cq-extra { background:#f3e9e4; color:#8B2E2E; font-size:20px; font-weight:700; box-shadow:none; }
+    .cq-aceptar { width:100%; margin-top:16px; padding:12px; border:none; border-radius:12px; font-weight:700; font-size:16px; color:#fff;
+        background: linear-gradient(45deg,#8B2E2E,#b04545); }
+
+    /* Separar cuenta: dos hojas de libreta y la barra del medio */
+    .sp-wrap { display:grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap:14px; align-items:stretch; }
+    .sp-hoja { position:relative; min-height:340px; border-radius:6px 14px 14px 6px; padding:14px 12px 12px 34px; display:flex; flex-direction:column;
+        background-color:#fffdf8; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 31px, #eaded6 31px, #eaded6 32px);
+        box-shadow:0 6px 18px rgba(93,64,55,.14); border:1px solid #eee3dc; }
+    .sp-hoja::before { content:''; position:absolute; top:0; bottom:0; left:24px; width:2px; background:#e8a9a9; }
+    .sp-hoja-titulo { font-weight:800; color:#8B2E2E; font-size:15px; margin-bottom:8px; }
+    .sp-lineas { flex:1; overflow-y:auto; max-height:52vh; }
+    .sp-linea { display:flex; justify-content:space-between; gap:8px; padding:6px 8px; margin-bottom:4px; border-radius:8px; cursor:pointer;
+        font-size:13.5px; color:#3e2723; border:2px solid transparent; }
+    .sp-linea:hover { background:rgba(188,170,164,.18); }
+    .sp-linea small { color:#e67e22; display:block; font-size:11.5px; }
+    .sp-linea.sel { border-color:#8B2E2E; background:#fbeceb; }
+    .sp-linea .sp-pasan { display:inline-block; margin-left:4px; padding:0 6px; border-radius:8px; background:#8B2E2E; color:#fff; font-size:11px; font-weight:700; }
+    .sp-total { border-top:2px solid #d7ccc8; padding-top:8px; margin-top:8px; display:flex; justify-content:space-between; font-weight:800; color:#3e2723; }
+    .sp-vacia { color:#a1887f; font-size:13px; text-align:center; padding:30px 0; }
+    .sp-barra { display:flex; flex-direction:column; justify-content:center; gap:14px; }
+    .sp-btn { width:54px; height:54px; border-radius:14px; border:none; font-size:24px; color:#fff;
+        background: linear-gradient(160deg,#a1887f,#8d6e63); box-shadow:0 6px 12px rgba(93,64,55,.28); }
+    .sp-btn:active { transform: scale(.94); }
+    .sp-btn.sp-guardar { background: linear-gradient(45deg,#8B2E2E,#b04545); margin-top:10px; }
+    .sp-aviso { min-height:20px; text-align:center; color:#c0392b; font-size:13px; margin-top:10px; }
+    @media (max-width: 575px) {
+        .sp-wrap { gap:6px; }
+        .sp-hoja { padding:10px 6px 8px 22px; min-height:260px; }
+        .sp-hoja::before { left:14px; }
+        .sp-linea { font-size:12px; padding:5px 4px; flex-direction:column; gap:0; }
+        .sp-linea > span:last-child { color:#8d6e63; font-size:11.5px; }
+        .sp-total { flex-direction:column; font-size:13px; }
+        .sp-btn { width:44px; height:44px; font-size:20px; }
+    }
+    /* Cliente */
+    .cli-lista { max-height:50vh; overflow-y:auto; }
+    .cli-opcion { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:10px 12px; border:1px solid #eee; border-radius:10px;
+        background:#fff; margin-bottom:6px; color:#3e2723; font-weight:600; }
+    .cli-opcion:hover { border-color:#bcaaa4; background:#faf5f2; }
+    .cli-opcion.activo { border-color:#8B2E2E; background:#fbeceb; }
+    .cli-opcion i { color:#8B2E2E; font-size:18px; }
     .cb-banco-option { cursor:pointer; transition: all .15s; }
     .cb-banco-option input[type="radio"] { display:none; }
     .cb-banco-option:has(input:checked) { border-color:#8B2E2E !important; background:#fbeceb; box-shadow:0 0 0 1px #8B2E2E; }
@@ -83,6 +147,29 @@
             <a href="/mesas/" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Mesas</a>
         </div>
 
+        <!-- Cuenta 1 / Cuenta 2 ... (solo si la cuenta se separo) -->
+        <div class="cuenta-tabs" id="cuentaTabs" style="display:none;"></div>
+
+        <div class="cuenta-acciones">
+            <button type="button" class="cuenta-accion" id="btnSeparar" disabled title="Separar la cuenta">
+                <svg viewBox="0 0 34 20" width="34" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+                    <path d="M2 7h12M4.5 7v10M11.5 7v10M6 3.5h4"/><path d="M20 7h12M22.5 7v10M29.5 7v10M24 3.5h4"/>
+                </svg>
+                Separar
+                <small id="lblSeparar">&nbsp;</small>
+            </button>
+            <button type="button" class="cuenta-accion" id="btnDescuento" disabled title="Descuento">
+                <i class="bi bi-percent"></i>
+                Descuento
+                <small id="lblDescuento">Sin descuento</small>
+            </button>
+            <button type="button" class="cuenta-accion" id="btnCliente" disabled title="Cliente">
+                <i class="bi bi-person"></i>
+                Cliente
+                <small id="lblCliente">Público general</small>
+            </button>
+        </div>
+
         <div class="cuenta-items" id="cuentaItems">
             <p class="text-muted small text-center py-3">Aún no hay productos en la cuenta.</p>
         </div>
@@ -97,6 +184,7 @@
 
         <div class="totales">
             <div class="fila"><span>Subtotal</span><span id="totSubtotal">C$ 0.00</span></div>
+            <div class="fila" id="filaDescuento" style="display:none;"><span id="lblFilaDescuento">Descuento</span><span id="totDescuento" style="color:#1e7e34;"></span></div>
             <div class="fila total"><span>Total</span><span id="totTotal">C$ 0.00</span></div>
             <button class="btn w-100 mt-2" style="background: linear-gradient(45deg,#8B2E2E,#b04545); color:#fff;" id="btnCobrar" disabled>
                 <i class="bi bi-cash-coin"></i> Cobrar
@@ -130,31 +218,75 @@
     </div>
 </div>
 
-<!-- Modal teclado numérico (cantidad) -->
-<div class="modal fade" id="modalTeclado" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-header"><h6 class="modal-title" id="tkTitulo">Cantidad</h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="tk-display" id="tkDisplay">0</div>
-                <div class="tk-grid">
-                    <button type="button" onclick="tkDigito('7')">7</button>
-                    <button type="button" onclick="tkDigito('8')">8</button>
-                    <button type="button" onclick="tkDigito('9')">9</button>
-                    <button type="button" onclick="tkDigito('4')">4</button>
-                    <button type="button" onclick="tkDigito('5')">5</button>
-                    <button type="button" onclick="tkDigito('6')">6</button>
-                    <button type="button" onclick="tkDigito('1')">1</button>
-                    <button type="button" onclick="tkDigito('2')">2</button>
-                    <button type="button" onclick="tkDigito('3')">3</button>
-                    <button type="button" class="tk-borrar" onclick="tkLimpiar()">C</button>
-                    <button type="button" onclick="tkDigito('0')">0</button>
-                    <button type="button" class="tk-borrar" onclick="tkBorrar()">⌫</button>
-                </div>
+<!-- Cuadrícula de números: cantidad de un producto, % de descuento y cuántos
+     pasan a la otra cuenta al separar. Es una capa propia (no un modal de
+     Bootstrap) para poder abrirse encima del modal de Separar. -->
+<div class="cq-capa" id="cqCapa" style="display:none;">
+    <div class="cq-caja" role="dialog" aria-modal="true" aria-labelledby="cqTitulo">
+        <div class="cq-cabeza">
+            <div>
+                <div class="cq-titulo" id="cqTitulo">Cantidad</div>
+                <div class="cq-sub" id="cqSub"></div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn text-white" style="background:#8B2E2E;" onclick="tkConfirmar()">Aceptar</button>
+            <button type="button" class="btn-close" aria-label="Cerrar" onclick="cqCerrar(null)"></button>
+        </div>
+        <div class="cq-display"><span id="cqValor">1</span><span id="cqSufijo"></span></div>
+        <div class="cq-grid">
+            <button type="button" onclick="cqDigito('1')">1</button>
+            <button type="button" onclick="cqDigito('2')">2</button>
+            <button type="button" onclick="cqDigito('3')">3</button>
+            <button type="button" onclick="cqDigito('4')">4</button>
+            <button type="button" onclick="cqDigito('5')">5</button>
+            <button type="button" onclick="cqDigito('6')">6</button>
+            <button type="button" onclick="cqDigito('7')">7</button>
+            <button type="button" onclick="cqDigito('8')">8</button>
+            <button type="button" onclick="cqDigito('9')">9</button>
+            <button type="button" class="cq-extra" onclick="cqLimpiar()" title="Limpiar">C</button>
+            <button type="button" onclick="cqDigito('0')">0</button>
+            <button type="button" class="cq-extra" onclick="cqBorrar()" title="Borrar">⌫</button>
+        </div>
+        <button type="button" class="cq-aceptar" onclick="cqAceptar()">Aceptar</button>
+    </div>
+</div>
+
+<!-- Modal separar cuenta -->
+<div class="modal fade" id="modalSeparar" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-fullscreen-md-down">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Separar cuenta — {{ mesa.nombre }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Toca un producto, elige cuántos y pásalo con la flecha. Al terminar toca <strong>Guardar</strong>.</p>
+                <div class="sp-wrap">
+                    <div class="sp-hoja">
+                        <div class="sp-hoja-titulo" id="spTituloIzq">Cuenta 1</div>
+                        <div class="sp-lineas" id="spIzq"></div>
+                        <div class="sp-total"><span>Total</span><span id="spTotalIzq">C$ 0.00</span></div>
+                    </div>
+                    <div class="sp-barra">
+                        <button type="button" class="sp-btn" title="Pasar a la cuenta nueva" onclick="spMover('izq')"><i class="bi bi-arrow-right"></i></button>
+                        <button type="button" class="sp-btn" title="Regresar a la cuenta original" onclick="spMover('der')"><i class="bi bi-arrow-left"></i></button>
+                        <button type="button" class="sp-btn sp-guardar" title="Guardar" id="spGuardarBtn" onclick="spGuardar()"><i class="bi bi-save"></i></button>
+                    </div>
+                    <div class="sp-hoja">
+                        <div class="sp-hoja-titulo" id="spTituloDer">Cuenta 2</div>
+                        <div class="sp-lineas" id="spDer"></div>
+                        <div class="sp-total"><span>Total</span><span id="spTotalDer">C$ 0.00</span></div>
+                    </div>
+                </div>
+                <div class="sp-aviso" id="spAviso"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal cliente -->
+<div class="modal fade" id="modalCliente" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Cliente de la cuenta</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="text" class="form-control mb-3" id="cliBuscar" placeholder="Buscar cliente...">
+                <div class="cli-lista" id="cliLista"></div>
             </div>
         </div>
     </div>
@@ -164,13 +296,12 @@
 <div class="modal fade" id="modalCobrar" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Cobrar {{ mesa.nombre }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title" id="cbTitulo">Cobrar {{ mesa.nombre }}</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
                 <div class="mb-2 d-flex justify-content-between"><span>Subtotal</span><strong id="cbSubtotal">C$ 0.00</strong></div>
-                <div class="mb-2">
-                    <label class="form-label">Descuento (%)</label>
-                    <input type="number" class="form-control" id="cbDescuento" value="0" min="0" max="100" step="0.1">
-                    <div class="form-text" id="cbDescuentoMontoTexto" style="font-size:11.5px;"></div>
+                <!-- El descuento se elige con el botón "Descuento" de la mesa -->
+                <div class="mb-2" id="cbDescuentoFila" style="display:none; justify-content:space-between;">
+                    <span id="cbDescuentoLabel">Descuento</span><strong id="cbDescuentoMonto" style="color:#1e7e34;"></strong>
                 </div>
                 <div class="mb-2 d-flex justify-content-between align-items-center p-2 border rounded">
                     <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer;">
@@ -223,11 +354,9 @@
                     <input type="number" class="form-control" id="cbRecibido" value="0" min="0" step="0.01">
                 </div>
 
-                <div class="mb-2">
-                    <label class="form-label">Cliente (opcional)</label>
-                    <select class="form-select" id="cbCliente">
-                        <option value="">Público general</option>
-                    </select>
+                <!-- El cliente se elige con el botón "Cliente" de la mesa -->
+                <div class="mb-2 d-flex justify-content-between">
+                    <span>Cliente</span><strong id="cbClienteNombre">Público general</strong>
                 </div>
 
                 <div class="mb-2">
@@ -262,6 +391,8 @@ let carritoNuevo = [];   // lo que se va a "enviar" a la cuenta
 let cuenta = { venta: null, detalles: [] };
 let pzProducto = null, pzDatos = null;
 let cbPropinaManual = null; // si el usuario edita la propina a mano (null = automática al 10%)
+let cuentaActiva = null;    // id_venta de la cuenta en pantalla (Cuenta 1, Cuenta 2... si se separó)
+let clientesLista = [];
 
 async function init() {
     await cargarProductos();
@@ -271,10 +402,18 @@ async function init() {
     document.getElementById('btnEnviar').addEventListener('click', enviarCarrito);
     document.getElementById('btnCobrar').addEventListener('click', abrirCobrar);
     document.getElementById('btnConfirmarCobro').addEventListener('click', confirmarCobro);
-    ['cbDescuento', 'cbRecibido'].forEach(id =>
-        document.getElementById(id).addEventListener('input', recalcularCobro));
+    document.getElementById('cbRecibido').addEventListener('input', recalcularCobro);
     document.getElementById('cbPropinaSwitch').addEventListener('change', recalcularCobro);
     document.getElementById('cbEditarPropinaBtn').addEventListener('click', editarPropinaCobro);
+    document.getElementById('btnSeparar').addEventListener('click', abrirSeparar);
+    document.getElementById('btnDescuento').addEventListener('click', abrirDescuento);
+    document.getElementById('btnCliente').addEventListener('click', abrirCliente);
+    document.getElementById('cliBuscar').addEventListener('input', renderClientes);
+}
+
+async function postJson(url, datos) {
+    const resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(datos)});
+    return resp.json();
 }
 
 async function cargarProductos() {
@@ -313,18 +452,22 @@ function renderProductos() {
     `).join('');
 }
 
-function onProdClick(id) {
+// Al tocar un producto primero sale la cuadrícula para la cantidad y
+// después, si tiene, las elecciones de siempre.
+async function onProdClick(id) {
     const p = productos.find(x => x.id_producto === id);
     if (!p) return;
-    if (p.tiene_personalizacion) { abrirPersonalizar(p); return; }
-    agregarAlCarritoNuevo(p, [], [], null);
+    const cantidad = await abrirCuadricula({titulo: p.nombre, sub: '¿Cuántos va a pedir?', valor: 1});
+    if (!cantidad) return;
+    if (p.tiene_personalizacion) { abrirPersonalizar(p, cantidad); return; }
+    agregarAlCarritoNuevo(p, [], [], null, cantidad);
 }
 
-function agregarAlCarritoNuevo(p, excluidos, opciones, comentario) {
+function agregarAlCarritoNuevo(p, excluidos, opciones, comentario, cantidad = 1) {
     const key = p.id_producto + '|' + (comentario || '');
     const existente = carritoNuevo.find(i => i.key === key);
-    if (existente) existente.cantidad += 1;
-    else carritoNuevo.push({key, id_producto:p.id_producto, nombre:p.nombre, precio:p.precio_venta, cantidad:1, excluidos, opciones, comentario, base: comentario || '', nota: ''});
+    if (existente) existente.cantidad += cantidad;
+    else carritoNuevo.push({key, id_producto:p.id_producto, nombre:p.nombre, precio:p.precio_venta, cantidad, excluidos, opciones, comentario, base: comentario || '', nota: ''});
     renderCarritoNuevo();
 }
 
@@ -383,42 +526,76 @@ function cambiarCantidad(key, delta) {
     renderCarritoNuevo();
 }
 
-// ---- teclado numérico: para meter de una vez "12x tortilla" en vez de tocar + doce veces ----
-let tkKey = null;
+// ---- cuadrícula de números: cantidad, % de descuento y cuántos pasan al separar ----
+// abrirCuadricula(...) devuelve una promesa con el número (o null si se cerró).
+let cqResolver = null, cqMax = 999, cqNuevo = true;
 
-function abrirTeclado(key) {
-    tkKey = key;
-    const item = carritoNuevo.find(i => i.key === key);
-    if (!item) return;
-    document.getElementById('tkTitulo').textContent = item.nombre;
-    document.getElementById('tkDisplay').textContent = String(item.cantidad);
-    new bootstrap.Modal(document.getElementById('modalTeclado')).show();
+function abrirCuadricula({titulo, sub = '', valor = 1, max = 999, sufijo = ''}) {
+    if (cqResolver) cqCerrar(null);
+    cqMax = max;
+    cqNuevo = true;    // el primer número que se toque reemplaza al que se muestra
+    document.getElementById('cqTitulo').textContent = titulo;
+    document.getElementById('cqSub').textContent = sub;
+    document.getElementById('cqValor').textContent = String(valor);
+    document.getElementById('cqSufijo').textContent = sufijo;
+    document.getElementById('cqCapa').style.display = 'flex';
+    return new Promise(resolve => { cqResolver = resolve; });
 }
 
-function tkDigito(d) {
-    const el = document.getElementById('tkDisplay');
-    let actual = el.textContent === '0' ? '' : el.textContent;
-    if (actual.length >= 3) return; // hasta 999
-    el.textContent = actual + d;
+function cqDigito(d) {
+    const el = document.getElementById('cqValor');
+    let v = cqNuevo || el.textContent === '0' ? '' : el.textContent;
+    cqNuevo = false;
+    v += d;
+    if (parseInt(v) > cqMax) v = String(cqMax);
+    el.textContent = v;
 }
 
-function tkBorrar() {
-    const el = document.getElementById('tkDisplay');
+function cqBorrar() {
+    const el = document.getElementById('cqValor');
+    cqNuevo = false;
     el.textContent = el.textContent.slice(0, -1) || '0';
 }
 
-function tkLimpiar() {
-    document.getElementById('tkDisplay').textContent = '0';
+function cqLimpiar() {
+    cqNuevo = false;
+    document.getElementById('cqValor').textContent = '0';
 }
 
-function tkConfirmar() {
-    const cantidad = parseInt(document.getElementById('tkDisplay').textContent) || 0;
-    const item = carritoNuevo.find(i => i.key === tkKey);
-    if (item) {
-        if (cantidad <= 0) quitarDelCarritoNuevo(tkKey);
-        else { item.cantidad = cantidad; renderCarritoNuevo(); }
-    }
-    bootstrap.Modal.getInstance(document.getElementById('modalTeclado')).hide();
+function cqAceptar() {
+    cqCerrar(parseInt(document.getElementById('cqValor').textContent) || 0);
+}
+
+function cqCerrar(valor) {
+    document.getElementById('cqCapa').style.display = 'none';
+    const resolver = cqResolver;
+    cqResolver = null;
+    if (resolver) resolver(valor);
+}
+
+document.getElementById('cqCapa').addEventListener('click', (e) => { if (e.target.id === 'cqCapa') cqCerrar(null); });
+document.addEventListener('keydown', (e) => {
+    if (!cqResolver) return;
+    if (/^[0-9]$/.test(e.key)) cqDigito(e.key);
+    else if (e.key === 'Backspace') cqBorrar();
+    else if (e.key === 'Enter') cqAceptar();
+    else if (e.key === 'Escape') cqCerrar(null);
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+}, true);
+
+// Tocar el número de un producto en "Agregar a la cuenta": para meter de
+// una vez "12x tortilla" en vez de tocar + doce veces.
+async function abrirTeclado(key) {
+    const item = carritoNuevo.find(i => i.key === key);
+    if (!item) return;
+    const cantidad = await abrirCuadricula({titulo: item.nombre, sub: 'Cantidad', valor: item.cantidad});
+    if (cantidad === null) return;
+    const actual = carritoNuevo.find(i => i.key === key);
+    if (!actual) return;
+    if (cantidad <= 0) quitarDelCarritoNuevo(key);
+    else { actual.cantidad = cantidad; renderCarritoNuevo(); }
 }
 
 async function enviarCarrito() {
@@ -426,7 +603,7 @@ async function enviarCarrito() {
     const btn = document.getElementById('btnEnviar');
     btn.disabled = true;
     try {
-        const resp = await fetch(`/mesas/api/${ID_MESA}/agregar`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({items})});
+        const resp = await fetch(`/mesas/api/${ID_MESA}/agregar`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({items, id_venta: cuentaActiva})});
         const r = await resp.json();
         if (r.success) {
             carritoNuevo = [];
@@ -449,8 +626,181 @@ async function enviarCarrito() {
 }
 
 async function cargarCuenta() {
-    cuenta = await fetch(`/mesas/api/${ID_MESA}/cuenta`).then(r => r.json());
+    const q = cuentaActiva ? `?venta=${cuentaActiva}` : '';
+    cuenta = await fetch(`/mesas/api/${ID_MESA}/cuenta${q}`).then(r => r.json());
+    cuentaActiva = cuenta.venta ? cuenta.venta.id_venta : null;
     renderCuenta();
+}
+
+function numeroCuentaActiva() {
+    const c = (cuenta.cuentas || []).find(x => x.id_venta === cuentaActiva);
+    return c ? c.numero : 1;
+}
+
+async function elegirCuenta(idVenta) {
+    if (idVenta === cuentaActiva) return;
+    cuentaActiva = idVenta;
+    await cargarCuenta();
+}
+
+function renderCuentasYAcciones() {
+    const venta = cuenta.venta;
+    const cuentas = cuenta.cuentas || [];
+    const tabs = document.getElementById('cuentaTabs');
+    tabs.style.display = cuentas.length > 1 ? 'flex' : 'none';
+    tabs.innerHTML = cuentas.map(c => `
+        <button type="button" class="cuenta-tab ${c.id_venta === cuentaActiva ? 'active' : ''}" onclick="elegirCuenta(${c.id_venta})">
+            Cuenta ${c.numero}<small>C$ ${c.total.toFixed(2)}</small>
+        </button>`).join('');
+
+    const unidades = (cuenta.detalles || []).reduce((s, d) => s + d.cantidad, 0);
+    document.getElementById('btnSeparar').disabled = unidades < 2;
+    document.getElementById('lblSeparar').innerHTML = cuentas.length > 1 ? `${cuentas.length} cuentas` : '&nbsp;';
+    document.getElementById('btnSeparar').classList.toggle('activo', cuentas.length > 1);
+
+    const pct = venta ? venta.descuento_pct : null;
+    document.getElementById('btnDescuento').disabled = !venta;
+    document.getElementById('lblDescuento').textContent = pct ? `${pct} %` : 'Sin descuento';
+    document.getElementById('btnDescuento').classList.toggle('activo', !!pct);
+
+    document.getElementById('btnCliente').disabled = !venta;
+    document.getElementById('lblCliente').textContent = (venta && venta.cliente_nombre) || 'Público general';
+    document.getElementById('btnCliente').classList.toggle('activo', !!(venta && venta.id_cliente));
+
+    const desc = venta ? (venta.descuento || 0) : 0;
+    document.getElementById('filaDescuento').style.display = desc > 0 ? '' : 'none';
+    document.getElementById('lblFilaDescuento').textContent = pct ? `Descuento (${pct} %)` : 'Descuento';
+    document.getElementById('totDescuento').textContent = '− C$ ' + desc.toFixed(2);
+}
+
+// ---- Descuento: cuadrícula "Escoja la cantidad de descuento" (en %) ----
+async function abrirDescuento() {
+    if (!cuenta.venta) return;
+    const porcentaje = await abrirCuadricula({
+        titulo: 'Escoja la cantidad de descuento',
+        sub: 'Porcentaje sobre el subtotal (0 = sin descuento)',
+        valor: cuenta.venta.descuento_pct || 0, max: 100, sufijo: ' %',
+    });
+    if (porcentaje === null) return;
+    const r = await postJson(`/mesas/api/${ID_MESA}/descuento`, {id_venta: cuentaActiva, porcentaje});
+    if (!r.success) { Swal.fire({icon:'error', title:'No se pudo aplicar', text:r.message}); return; }
+    await cargarCuenta();
+}
+
+// ---- Cliente: si no se elige ninguno queda "Público general" ----
+function abrirCliente() {
+    if (!cuenta.venta) return;
+    document.getElementById('cliBuscar').value = '';
+    renderClientes();
+    new bootstrap.Modal(document.getElementById('modalCliente')).show();
+}
+
+function renderClientes() {
+    const texto = document.getElementById('cliBuscar').value.toLowerCase();
+    const actual = cuenta.venta ? cuenta.venta.id_cliente : null;
+    const lista = clientesLista.filter(c => !texto || (c.nombre || '').toLowerCase().includes(texto));
+    document.getElementById('cliLista').innerHTML =
+        (texto ? '' : `<button type="button" class="cli-opcion ${!actual ? 'activo' : ''}" onclick="elegirCliente(null)"><i class="bi bi-people"></i> Público general</button>`) +
+        lista.map(c => `<button type="button" class="cli-opcion ${actual === c.id_cliente ? 'activo' : ''}" onclick="elegirCliente(${c.id_cliente})"><i class="bi bi-person"></i> ${escapeHtml(c.nombre)}</button>`).join('') +
+        (texto && !lista.length ? '<p class="text-muted small text-center py-3">No hay clientes con ese nombre.</p>' : '');
+}
+
+async function elegirCliente(idCliente) {
+    const r = await postJson(`/mesas/api/${ID_MESA}/cliente`, {id_venta: cuentaActiva, id_cliente: idCliente});
+    if (!r.success) { Swal.fire({icon:'error', title:'No se pudo guardar', text:r.message}); return; }
+    bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
+    await cargarCuenta();
+}
+
+// ---- Separar cuenta: hoja izquierda (cuenta actual) y derecha (cuenta nueva) ----
+let spIzq = [], spDer = [], spSel = null;   // spSel = {lado, id, cantidad}
+
+function abrirSeparar() {
+    spIzq = (cuenta.detalles || []).map(d => ({
+        id: d.id_detalle_venta, nombre: d.producto, comentario: d.comentario,
+        precio: d.precio_unitario, cantidad: d.cantidad,
+    }));
+    spDer = [];
+    spSel = null;
+    document.getElementById('spTituloIzq').textContent = 'Cuenta ' + numeroCuentaActiva();
+    document.getElementById('spTituloDer').textContent = 'Cuenta ' + Math.max(2, (cuenta.cuentas || []).length + 1);
+    spAviso('');
+    spRender();
+    new bootstrap.Modal(document.getElementById('modalSeparar')).show();
+}
+
+function spAviso(texto) { document.getElementById('spAviso').textContent = texto; }
+
+function spRenderLado(lado) {
+    const lista = lado === 'izq' ? spIzq : spDer;
+    const cont = document.getElementById(lado === 'izq' ? 'spIzq' : 'spDer');
+    cont.innerHTML = lista.length ? lista.map(l => {
+        const sel = spSel && spSel.lado === lado && spSel.id === l.id;
+        return `
+        <div class="sp-linea ${sel ? 'sel' : ''}" onclick="spTocar('${lado}', ${l.id})">
+            <span>${l.cantidad}x ${escapeHtml(l.nombre)}${sel && l.cantidad > 1 ? `<span class="sp-pasan">${spSel.cantidad} ${lado === 'izq' ? '→' : '←'}</span>` : ''}
+                ${l.comentario ? `<small>✎ ${escapeHtml(l.comentario)}</small>` : ''}</span>
+            <span>C$ ${(l.cantidad * l.precio).toFixed(2)}</span>
+        </div>`;
+    }).join('') : `<div class="sp-vacia">${lado === 'izq' ? 'Sin productos' : 'Pasa aquí los productos de la otra cuenta'}</div>`;
+    const total = lista.reduce((s, l) => s + l.cantidad * l.precio, 0);
+    document.getElementById(lado === 'izq' ? 'spTotalIzq' : 'spTotalDer').textContent = 'C$ ' + total.toFixed(2);
+}
+
+function spRender() { spRenderLado('izq'); spRenderLado('der'); }
+
+async function spTocar(lado, id) {
+    spAviso('');
+    if (spSel && spSel.lado === lado && spSel.id === id) { spSel = null; spRender(); return; }
+    const linea = (lado === 'izq' ? spIzq : spDer).find(l => l.id === id);
+    if (!linea) return;
+    let cantidad = 1;
+    if (linea.cantidad > 1) {
+        cantidad = await abrirCuadricula({
+            titulo: linea.nombre,
+            sub: `¿Cuántos pasan a la otra cuenta? (máx. ${linea.cantidad})`,
+            valor: linea.cantidad, max: linea.cantidad,
+        });
+        if (!cantidad) return;
+    }
+    spSel = {lado, id, cantidad};
+    spRender();
+}
+
+function spMover(desde) {
+    if (!spSel || spSel.lado !== desde) {
+        spAviso(desde === 'izq' ? 'Toca primero un producto de la cuenta de la izquierda.' : 'Toca primero un producto de la cuenta de la derecha.');
+        return;
+    }
+    const origen = desde === 'izq' ? spIzq : spDer;
+    const destino = desde === 'izq' ? spDer : spIzq;
+    const linea = origen.find(l => l.id === spSel.id);
+    const cantidad = Math.min(spSel.cantidad, linea.cantidad);
+    linea.cantidad -= cantidad;
+    if (linea.cantidad <= 0) origen.splice(origen.indexOf(linea), 1);
+    const igual = destino.find(l => l.id === linea.id);
+    if (igual) igual.cantidad += cantidad;
+    else destino.push({...linea, cantidad});
+    spSel = null;
+    spAviso('');
+    spRender();
+}
+
+async function spGuardar() {
+    if (!spDer.length) { spAviso('Pasa al menos un producto a la cuenta nueva.'); return; }
+    if (!spIzq.length) { spAviso('Deja al menos un producto en la cuenta original.'); return; }
+    const btn = document.getElementById('spGuardarBtn');
+    btn.disabled = true;
+    try {
+        const r = await postJson(`/mesas/api/${ID_MESA}/separar`, {
+            id_venta: cuentaActiva,
+            movimientos: spDer.map(l => ({id_detalle: l.id, cantidad: l.cantidad})),
+        });
+        if (!r.success) { spAviso(r.message || 'No se pudo separar la cuenta.'); return; }
+        bootstrap.Modal.getInstance(document.getElementById('modalSeparar')).hide();
+        await cargarCuenta();
+        Swal.fire({icon:'success', title:'Cuenta separada', text:`La mesa ahora tiene ${r.cuentas} cuentas.`, timer:1600, showConfirmButton:false});
+    } finally { btn.disabled = false; }
 }
 
 function renderCuenta() {
@@ -470,9 +820,11 @@ function renderCuenta() {
     }
     const venta = cuenta.venta;
     const subtotal = venta ? venta.subtotal : 0;
+    const total = venta ? Math.max(0, subtotal - (venta.descuento || 0)) : 0;
     document.getElementById('totSubtotal').textContent = 'C$ ' + subtotal.toFixed(2);
-    document.getElementById('totTotal').textContent = 'C$ ' + subtotal.toFixed(2);
+    document.getElementById('totTotal').textContent = 'C$ ' + total.toFixed(2);
     document.getElementById('btnCobrar').disabled = !detalles.length;
+    renderCuentasYAcciones();
 }
 
 async function quitarDeLaCuenta(idDetalle) {
@@ -493,10 +845,12 @@ let pzPasos = [];
 let pzIndice = 0;
 let pzSeleccion = {};       // id_grupo -> id_item elegido (o undefined si se omitió)
 let pzExcluidosSet = new Set(); // ids de ingredientes desmarcados (se quitan)
+let pzCantidad = 1;             // la que se eligió en la cuadrícula; las elecciones valen para todos
 
-async function abrirPersonalizar(p) {
+async function abrirPersonalizar(p, cantidad = 1) {
     pzProducto = p;
-    document.getElementById('pzTitulo').textContent = 'Personalizar: ' + p.nombre;
+    pzCantidad = cantidad;
+    document.getElementById('pzTitulo').textContent = 'Personalizar: ' + p.nombre + (cantidad > 1 ? ` (x${cantidad})` : '');
     const datos = await fetch(`/ventas/api/personalizacion/${p.id_producto}`).then(r => r.json());
     pzDatos = datos;
 
@@ -506,7 +860,7 @@ async function abrirPersonalizar(p) {
     // no un checklist con todos juntos.
     exc.forEach(item => pzPasos.push({ tipo: 'exc-item', item }));
 
-    if (!pzPasos.length) { agregarAlCarritoNuevo(p, [], [], null); return; }
+    if (!pzPasos.length) { agregarAlCarritoNuevo(p, [], [], null, cantidad); return; }
 
     pzIndice = 0;
     pzSeleccion = {};
@@ -615,16 +969,13 @@ function pzFinalizarPersonalizacion() {
     if (nombresExc.length) comentario += (comentario ? ' · ' : '') + 'Sin ' + nombresExc.join(', ');
 
     bootstrap.Modal.getInstance(document.getElementById('modalPersonalizar')).hide();
-    agregarAlCarritoNuevo(pzProducto, excluidos, opciones, comentario || null);
+    agregarAlCarritoNuevo(pzProducto, excluidos, opciones, comentario || null, pzCantidad);
 }
 
 // ---- cobrar ----
 async function cargarClientesParaCobro() {
     try {
-        const clientes = await fetch('/ventas/api/clientes').then(r => r.json());
-        const sel = document.getElementById('cbCliente');
-        sel.innerHTML = '<option value="">Público general</option>' +
-            clientes.map(c => `<option value="${c.id_cliente}">${escapeHtml(c.nombre)}</option>`).join('');
+        clientesLista = await fetch('/ventas/api/clientes').then(r => r.json());
     } catch (e) {
         console.error('Error cargando clientes', e);
     }
@@ -635,8 +986,9 @@ function abrirCobrar() {
     document.getElementById('cbPagosFilas').innerHTML = '';
     document.getElementById('cbRecibido').value = '0';
     document.getElementById('cbNotas').value = '';
-    document.getElementById('cbCliente').value = '';
-    document.getElementById('cbDescuento').value = '0';
+    document.getElementById('cbClienteNombre').textContent = (cuenta.venta && cuenta.venta.cliente_nombre) || 'Público general';
+    document.getElementById('cbTitulo').textContent = 'Cobrar {{ mesa.nombre }}' +
+        ((cuenta.cuentas || []).length > 1 ? ` — Cuenta ${numeroCuentaActiva()}` : '');
     document.getElementById('cbPropinaSwitch').checked = true; // 10% activo por defecto
     cbPropinaManual = null;
     recalcularCobro();
@@ -690,11 +1042,12 @@ function cbPagos() {
 
 function recalcularCobro() {
     const subtotal = (cuenta.venta && cuenta.venta.subtotal) || 0;
-    let descPct = parseFloat(document.getElementById('cbDescuento').value) || 0;
-    if (descPct < 0) descPct = 0;
-    if (descPct > 100) descPct = 100;
-    const desc = subtotal * (descPct / 100);
-    document.getElementById('cbDescuentoMontoTexto').textContent = desc > 0 ? `− C$ ${desc.toFixed(2)}` : '';
+    // El descuento ya viene calculado en la cuenta (botón "Descuento" de la mesa).
+    const desc = (cuenta.venta && cuenta.venta.descuento) || 0;
+    const descPct = cuenta.venta && cuenta.venta.descuento_pct;
+    document.getElementById('cbDescuentoFila').style.display = desc > 0 ? 'flex' : 'none';
+    document.getElementById('cbDescuentoLabel').textContent = descPct ? `Descuento (${descPct} %)` : 'Descuento';
+    document.getElementById('cbDescuentoMonto').textContent = `− C$ ${desc.toFixed(2)}`;
     const baseTotal = Math.max(0, subtotal - desc);
 
     const propinaOn = document.getElementById('cbPropinaSwitch').checked;
@@ -752,17 +1105,13 @@ async function confirmarCobro() {
         const banco = document.querySelector('input[name="cbBanco"]:checked').value;
         metodoPago = `Tarjeta ${banco}`;
     }
-    const subtotal = (cuenta.venta && cuenta.venta.subtotal) || 0;
-    let descPct = parseFloat(document.getElementById('cbDescuento').value) || 0;
-    if (descPct < 0) descPct = 0;
-    if (descPct > 100) descPct = 100;
-
     const payload = {
+        id_venta: cuentaActiva,
         metodo_pago: metodoPago,
-        descuento: subtotal * (descPct / 100),
+        descuento: (cuenta.venta && cuenta.venta.descuento) || 0,
         propina: parseFloat(document.getElementById('cbPropina').value) || 0,
         monto_recibido: parseFloat(document.getElementById('cbRecibido').value) || 0,
-        id_cliente: document.getElementById('cbCliente').value || null,
+        id_cliente: (cuenta.venta && cuenta.venta.id_cliente) || null,
         notas: document.getElementById('cbNotas').value,
     };
     if (metodoPago === 'Dividido') {
@@ -777,7 +1126,14 @@ async function confirmarCobro() {
         if (r.success) {
             const cambioTxt = r.cambio > 0 ? `\nCambio: C$ ${r.cambio.toFixed(2)}` : '';
             await Swal.fire({icon:'success', title:'Cobrado', text:`Venta #${r.numero_venta}${cambioTxt}`});
-            window.location.href = '/mesas/';
+            if (r.cuentas_restantes > 0) {
+                // Se separó: quedan otras cuentas de la mesa por cobrar.
+                bootstrap.Modal.getInstance(document.getElementById('modalCobrar')).hide();
+                cuentaActiva = null;
+                await cargarCuenta();
+            } else {
+                window.location.href = '/mesas/';
+            }
         } else {
             Swal.fire({icon:'error', title:'No se pudo cobrar', text:r.message});
         }

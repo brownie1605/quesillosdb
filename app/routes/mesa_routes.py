@@ -53,19 +53,40 @@ def api_atender(id_mesa):
         return jsonify({"success": False, "message": str(e)}), 400
 
 
+def _cuenta_elegida(mesa, id_venta=None):
+    """La cuenta abierta sobre la que se trabaja: la que pide la pantalla
+    (Cuenta 1, Cuenta 2, ... cuando se separo) o la de la mesa."""
+    if id_venta:
+        venta = Venta.query.get(int(id_venta))
+        if venta and venta.id_mesa == mesa.id_mesa and venta.estado == "pendiente":
+            return venta
+    if mesa.id_venta_actual:
+        return Venta.query.get(mesa.id_venta_actual)
+    return None
+
+
 @mesa_bp.route("/api/<int:id_mesa>/cuenta", methods=["GET"])
 @login_required
 def api_cuenta(id_mesa):
     mesa = Mesa.query.get_or_404(id_mesa)
-    if not mesa.id_venta_actual:
-        return jsonify({"mesa": mesa.to_dict(), "venta": None, "detalles": []})
+    cuentas = VentaService.cuentas_de_mesa(mesa)
+    if not cuentas:
+        return jsonify({"mesa": mesa.to_dict(), "venta": None, "detalles": [], "cuentas": []})
 
-    venta = Venta.query.get(mesa.id_venta_actual)
-    detalles = [d.to_dict() for d in venta.detalles] if venta else []
+    venta = _cuenta_elegida(mesa, request.args.get("venta", type=int)) or cuentas[0]
+    if venta.id_venta not in [c.id_venta for c in cuentas]:
+        venta = cuentas[0]
+    datos = venta.to_dict()
+    datos["id_cliente"] = venta.id_cliente
+    datos["cliente_nombre"] = venta.cliente.nombre if venta.cliente else None
     return jsonify({
         "mesa": mesa.to_dict(),
-        "venta": venta.to_dict() if venta else None,
-        "detalles": detalles,
+        "venta": datos,
+        "detalles": [d.to_dict() for d in venta.detalles],
+        "cuentas": [
+            {"id_venta": c.id_venta, "numero": i + 1, "total": float(c.total or 0)}
+            for i, c in enumerate(cuentas)
+        ],
     })
 
 
@@ -82,7 +103,7 @@ def api_agregar(id_mesa):
         if not mesa.id_venta_actual:
             venta = VentaService.abrir_mesa(mesa, current_user, cart=items)
         else:
-            venta = Venta.query.get(mesa.id_venta_actual)
+            venta = _cuenta_elegida(mesa, data.get("id_venta"))
             venta = VentaService.agregar_items(venta, items, current_user)
 
         from app.services.notificacion_service import NotificacionService
@@ -106,7 +127,8 @@ def api_quitar_item(id_mesa, id_detalle):
     mesa = Mesa.query.get_or_404(id_mesa)
     if not mesa.id_venta_actual:
         return jsonify({"success": False, "message": "Esta mesa no tiene una cuenta abierta"}), 400
-    venta = Venta.query.get(mesa.id_venta_actual)
+    det = DetalleVenta.query.get(id_detalle)
+    venta = _cuenta_elegida(mesa, det.id_venta if det else None)
     try:
         venta = VentaService.quitar_item(venta, id_detalle, current_user)
         return jsonify({"success": True, "venta": venta.to_dict()})
@@ -123,7 +145,7 @@ def api_cobrar(id_mesa):
         return jsonify({"success": False, "message": "Esta mesa no tiene una cuenta abierta"}), 400
 
     data = request.get_json(silent=True) or {}
-    venta = Venta.query.get(mesa.id_venta_actual)
+    venta = _cuenta_elegida(mesa, data.get("id_venta"))
     try:
         venta = VentaService.cobrar_mesa(
             venta, current_user,
@@ -143,6 +165,7 @@ def api_cobrar(id_mesa):
             "success": True, "venta_id": venta.id_venta,
             "numero_venta": venta.numero_venta, "total": float(venta.total),
             "cambio": float(venta.cambio or 0),
+            "cuentas_restantes": len(VentaService.cuentas_de_mesa(mesa)),
         })
     except VentaError as e:
         db.session.rollback()
@@ -150,6 +173,65 @@ def api_cobrar(id_mesa):
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+@mesa_bp.route("/api/<int:id_mesa>/separar", methods=["POST"])
+@login_required
+def api_separar(id_mesa):
+    """Pasa productos de una cuenta a una cuenta nueva de la misma mesa."""
+    mesa = Mesa.query.get_or_404(id_mesa)
+    data = request.get_json(silent=True) or {}
+    venta = _cuenta_elegida(mesa, data.get("id_venta"))
+    if not venta:
+        return jsonify({"success": False, "message": "Esta mesa no tiene una cuenta abierta"}), 400
+    try:
+        nueva = VentaService.separar_cuenta(venta, data.get("movimientos") or [], current_user)
+        registrar_auditoria(
+            "SEPARAR CUENTA", "Mesas",
+            {"mesa": mesa.nombre, "de_venta": venta.id_venta, "a_venta": nueva.id_venta},
+        )
+        return jsonify({"success": True, "id_venta": nueva.id_venta,
+                        "cuentas": len(VentaService.cuentas_de_mesa(mesa))})
+    except VentaError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+
+
+@mesa_bp.route("/api/<int:id_mesa>/descuento", methods=["POST"])
+@login_required
+def api_descuento(id_mesa):
+    mesa = Mesa.query.get_or_404(id_mesa)
+    data = request.get_json(silent=True) or {}
+    venta = _cuenta_elegida(mesa, data.get("id_venta"))
+    if not venta:
+        return jsonify({"success": False, "message": "Esta mesa no tiene una cuenta abierta"}), 400
+    try:
+        venta = VentaService.fijar_descuento(venta, data.get("porcentaje", 0))
+        registrar_auditoria(
+            "DESCUENTO CUENTA", "Mesas",
+            {"mesa": mesa.nombre, "venta": venta.id_venta,
+             "porcentaje": float(venta.descuento_pct or 0), "monto": float(venta.descuento or 0)},
+        )
+        return jsonify({"success": True, "venta": venta.to_dict()})
+    except VentaError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+
+
+@mesa_bp.route("/api/<int:id_mesa>/cliente", methods=["POST"])
+@login_required
+def api_cliente(id_mesa):
+    mesa = Mesa.query.get_or_404(id_mesa)
+    data = request.get_json(silent=True) or {}
+    venta = _cuenta_elegida(mesa, data.get("id_venta"))
+    if not venta:
+        return jsonify({"success": False, "message": "Esta mesa no tiene una cuenta abierta"}), 400
+    try:
+        VentaService.fijar_cliente(venta, data.get("id_cliente"))
+        return jsonify({"success": True})
+    except VentaError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
 
 
 @mesa_bp.route("/api/gestion", methods=["GET"])
