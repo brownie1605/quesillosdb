@@ -172,6 +172,9 @@
 
                 </button>
 
+                <!-- Instalar como app (PWA); se muestra solo si el navegador lo permite -->
+                <button type="button" class="btn-instalar-app" style="display:none; width:100%; margin-top:10px; padding:11px; border:1.5px solid #8B2E2E; background:#fff; color:#8B2E2E; border-radius:10px; font-weight:700; font-size:15px; cursor:pointer;">📲 Instalar app en este dispositivo</button>
+
                 <!-- DIVIDER -->
                 <div class="divider">
 
@@ -453,6 +456,7 @@ if ('serviceWorker' in navigator && window.isSecureContext) {
     });
 }
 </script>
+<script src="{{ url_for('static', filename='js/instalar-app.js') }}"></script>
 
 </body>
 </html>

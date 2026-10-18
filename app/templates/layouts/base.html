@@ -94,6 +94,9 @@
                 <h1>{% block page_title %}Dashboard{% endblock %}</h1>
             </div>
             <div class="topbar-actions">
+                <!-- Instalar como app (PWA); se muestra solo si el navegador lo permite -->
+                <button type="button" class="btn-instalar-app" title="Instalar como app" style="display:none; border:1px solid #e0d5cc; background:#fff; color:#8B2E2E; border-radius:999px; padding:5px 12px; font-weight:700; font-size:13px; cursor:pointer;">📲 Instalar app</button>
+
                 <!-- Estado de conexion / sincronizacion -->
                 <div id="sync-widget" class="sync-widget" title="Estado de la conexion con la nube">
                     <span id="sync-indicator" class="sync-dot sync-unknown"></span>
@@ -270,6 +273,7 @@ window.closeCustomConfirm = function() {
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+<script src="{{ url_for('static', filename='js/instalar-app.js') }}"></script>
 <script src="{{ url_for('static', filename='js/network-monitor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/sync.js') }}"></script>
 
