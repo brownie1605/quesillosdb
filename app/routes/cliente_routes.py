@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 from sqlalchemy import text
 from datetime import datetime
 
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from app.models import Cliente
 from app.services.auditoria_service import registrar_auditoria
@@ -57,7 +58,7 @@ def api_crear():
         return jsonify({"success": True, "cliente": cliente.to_dict()})
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @cliente_bp.route("/api/editar/<int:id_cliente>", methods=["POST"])
@@ -79,7 +80,7 @@ def api_editar(id_cliente):
         return jsonify({"success": True, "cliente": cliente.to_dict()})
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @cliente_bp.route("/api/eliminar/<int:id_cliente>", methods=["DELETE", "POST"])
@@ -95,7 +96,7 @@ def api_eliminar(id_cliente):
         return jsonify({"success": True})
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @cliente_bp.route("/api/platillos_por_cliente", methods=["GET"])
@@ -207,4 +208,4 @@ def api_platillos_por_cliente():
             "fin": fin
         })
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)

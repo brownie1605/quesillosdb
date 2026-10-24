@@ -249,7 +249,10 @@ def create_app(config_class=Config, iniciar_jobs=True):
             db.session.execute(db.text("SELECT 1"))
             return jsonify({"status": "ok", "hora": datetime.now().isoformat()})
         except Exception as e:  # noqa: BLE001
-            return jsonify({"status": "error", "detalle": str(e)}), 503
+            # El detalle va al log, no a la respuesta: es un endpoint sin
+            # login y str(e) de SQLAlchemy puede incluir host/usuario de la BD.
+            app.logger.error("healthz: la base de datos no responde: %s", e)
+            return jsonify({"status": "error"}), 503
 
     # ---------------------------------------------------------- PWA
     # sw.js debe servirse desde la raiz (no desde /static/) para que su

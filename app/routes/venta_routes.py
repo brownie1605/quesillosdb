@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
 
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db, limiter
 from app.models import Producto, Cliente, Venta, DetalleVenta, Inventario, Categoria
 from app.models.receta import Receta
@@ -210,7 +211,7 @@ def api_cobrar():
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @venta_bp.route("/api/<int:id_venta>/anular", methods=["POST"])
@@ -238,7 +239,7 @@ def api_anular(id_venta):
         return jsonify({"success": True, "message": "Venta anulada", "venta": venta.to_dict()})
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @venta_bp.route("/api/<int:id_venta>/editar", methods=["POST", "PUT"])
@@ -272,7 +273,7 @@ def api_editar_venta(id_venta):
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @venta_bp.route("/factura/<int:id_venta>", methods=["GET"])

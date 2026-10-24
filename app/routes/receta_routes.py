@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from app.models import Producto, Receta, UnidadMedida, Categoria
 from app.services.receta_service import RecetaService, RecetaError
@@ -161,7 +162,7 @@ def api_guardar_por_producto(id_producto):
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @receta_bp.route("/api/crear", methods=["POST"])
@@ -188,7 +189,7 @@ def api_crear():
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @receta_bp.route("/api/<int:id_receta>/actualizar", methods=["POST", "PUT"])
@@ -207,7 +208,7 @@ def api_actualizar(id_receta):
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @receta_bp.route("/api/<int:id_receta>/eliminar", methods=["POST", "DELETE"])
@@ -222,7 +223,7 @@ def api_eliminar(id_receta):
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @receta_bp.route("/api/<int:id_receta>/costo", methods=["GET"])

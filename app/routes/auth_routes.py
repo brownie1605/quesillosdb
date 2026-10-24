@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, session
 from flask_login import login_user, logout_user, login_required
 from datetime import datetime, timedelta
-import random
+import secrets
 import string
 import os
 
@@ -31,7 +31,9 @@ SESSION_KEY_2FA_PENDIENTE_LOGIN = "login_2fa_pendiente"
 
 
 def _generar_codigo():
-    return "".join(random.choices(string.digits, k=6))
+    # secrets (CSPRNG), no random: el codigo de recuperacion es una
+    # credencial y random (Mersenne Twister) es predecible.
+    return "".join(secrets.choice(string.digits) for _ in range(6))
 
 
 def _registrar_intento_codigo_fallido(user):
@@ -45,6 +47,12 @@ def _registrar_intento_codigo_fallido(user):
         user.codigo_recuperacion = None
         user.codigo_expiry = None
         user.intentos_codigo = 0
+        # La API JSON valida contra RecuperacionPassword, no contra
+        # user.codigo_recuperacion: sin invalidar tambien esas filas, el
+        # tope de intentos no frenaba la fuerza bruta por esa via.
+        RecuperacionPassword.query.filter_by(
+            usuario_id=user.id_usuario, usado=False
+        ).update({"usado": True})
     db.session.commit()
 
 
@@ -153,6 +161,14 @@ def verify_2fa_view():
         session.pop(SESSION_KEY_2FA_PENDIENTE_LOGIN, None)
         return redirect(url_for("auth.login"))
 
+    # Un codigo TOTP son solo 6 digitos: sin un tope POR CUENTA (el limite
+    # por IP de arriba se esquiva repartiendo los intentos entre IPs), quien
+    # ya sabe la contrasena podria probarlos todos. Mismo bloqueo que el login.
+    if user.bloqueado_hasta and user.bloqueado_hasta > datetime.now():
+        session.pop(SESSION_KEY_2FA_PENDIENTE_LOGIN, None)
+        flash("Cuenta bloqueada temporalmente por varios intentos fallidos.", "danger")
+        return redirect(url_for("auth.login"))
+
     if request.method == "POST":
         codigo = (request.form.get("codigo") or "").strip()
         valido = TwoFAService.verificar_codigo(user.totp_secret, codigo) or \
@@ -167,6 +183,19 @@ def verify_2fa_view():
             destino = DESTINO_POR_ROL.get(user.rol_nombre, "dashboard.dashboard")
             return redirect(url_for(destino))
 
+        user.intentos_fallidos = (user.intentos_fallidos or 0) + 1
+        if user.intentos_fallidos >= MAX_INTENTOS_LOGIN:
+            user.bloqueado_hasta = datetime.now() + timedelta(minutes=BLOQUEO_LOGIN_MINUTOS)
+            user.intentos_fallidos = 0
+            session.pop(SESSION_KEY_2FA_PENDIENTE_LOGIN, None)
+            registrar_auditoria(
+                "BLOQUEO POR INTENTOS", "Auth",
+                f"Cuenta '{user.usuario}' bloqueada {BLOQUEO_LOGIN_MINUTOS} min por codigos 2FA fallidos",
+            )
+            db.session.commit()
+            flash("Demasiados códigos incorrectos. Cuenta bloqueada temporalmente.", "danger")
+            return redirect(url_for("auth.login"))
+        db.session.commit()
         flash("Código incorrecto.", "danger")
 
     return render_template("auth/verify_2fa.html", usuario=user.usuario)
@@ -205,18 +234,15 @@ def forgot_password():
             enviado, detalle = enviar_codigo_recuperacion(
                 email, codigo, user.nombre_completo
             )
-            if enviado:
-                flash("Código enviado a tu correo. Válido por 15 minutos.", "success")
-            else:
+            if not enviado:
+                # El motivo va solo al log (nunca el codigo): mostrarlo
+                # distinto segun exista o no la cuenta deja enumerar correos.
                 current_app.logger.warning("SMTP no disponible: %s", detalle)
-                flash(
-                    "No se pudo enviar el correo (" + detalle + "). "
-                    "Revisa la configuración SMTP.",
-                    "warning",
-                )
-            return redirect(url_for("auth.verify_code", email=email, rol=rol_nombre))
 
-        flash("Correo o rol no encontrado.", "danger")
+        # Misma respuesta y mismo destino exista o no la cuenta, coincida o
+        # no el rol, y se haya podido enviar o no el correo.
+        flash("Si el correo y el rol coinciden con una cuenta, enviamos un código (válido 15 minutos).", "info")
+        return redirect(url_for("auth.verify_code", email=email, rol=rol_nombre))
 
     roles = Rol.query.filter_by(estado="activo").order_by(Rol.nombre).all()
     return render_template("auth/forgot_password.html", roles=roles)
@@ -362,18 +388,12 @@ def forgot_password_api():
 
     enviado, detalle = enviar_codigo_recuperacion(correo, codigo, user.nombre_completo)
     if enviado:
-        return jsonify(
-            {"success": True, "message": "Se ha enviado un código de recuperación a tu correo."}
-        )
+        return respuesta_generica
 
-    current_app.logger.warning("SMTP no disponible (%s). Código para %s: %s", detalle, correo, codigo)
-    return jsonify(
-        {
-            "success": True,
-            "message": "(Modo prueba) No se pudo enviar el correo: " + detalle,
-            "modo_prueba": True,
-        }
-    )
+    # Nunca se registra el codigo (es una credencial) ni se le dice al
+    # cliente que fallo el envio: eso delataria que la cuenta existe.
+    current_app.logger.warning("SMTP no disponible: %s", detalle)
+    return respuesta_generica
 
 
 @auth_bp.route("/api/verify-code", methods=["POST"])

@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from app.extensions import db
+from app.utils.errores import respuesta_error_interno
+from app.extensions import db, limiter
 from app.models import Usuario
 from app.services.auditoria_service import registrar_auditoria
 from app.services.twofa_service import TwoFAService
@@ -26,6 +27,7 @@ def index():
 
 @configuracion_bp.route("/api/cambiar_password", methods=["POST"])
 @login_required
+@limiter.limit("10 per minute")  # pide la contrasena actual: sin tope, es un adivinador
 def api_cambiar_password():
     data = request.json or {}
     actual = data.get("password_actual") or ""
@@ -57,7 +59,7 @@ def api_guardar_preferencias():
         return jsonify({"success": True, "message": "Preferencias visuales guardadas"})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 # ======================================================================
@@ -111,6 +113,7 @@ def api_2fa_confirmar():
 
 
 @configuracion_bp.route("/api/2fa/desactivar", methods=["POST"])
+@limiter.limit("10 per minute")
 def api_2fa_desactivar():
     data = request.json or {}
     password = data.get("password") or ""

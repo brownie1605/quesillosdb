@@ -103,6 +103,8 @@ SMTP_PASS=contrasena_de_aplicacion_de_google
 
 ### 2.4 Crear la base de datos local
 
+> En la laptop de desarrollo puedes saltarte este paso y usar Docker: ver 2.4b.
+
 ```bash
 mysql -u root -p -e "CREATE DATABASE quesillos_local CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 ```
@@ -142,6 +144,35 @@ necesita además su propio `DEVICE_ID`.
 > alcanzaba: al subir una fila con un ID alto, MySQL adelanta el contador de
 > la nube hasta ese ID y los dos lados terminan generando los mismos números.
 > Los comandos siguen existiendo pero ya no son lo que protege.
+
+### 2.4b Desarrollo con Docker (en vez de instalar MySQL)
+
+Solo para la laptop de desarrollo; la PC del restaurante no usa Docker (ver 2.0).
+Docker corre únicamente la base de datos (MySQL 8.4, la misma versión del
+restaurante); la app sigue corriendo en el `venv`.
+
+En el `.env`:
+
+```env
+DB_LOCAL_HOST=127.0.0.1
+DB_LOCAL_PORT=3307
+DB_LOCAL_PASSWORD=quesillos
+SYNC_ENABLED=false
+```
+
+El puerto es 3307 para no chocar con un MySQL instalado en Windows (3306), y
+solo se abre en 127.0.0.1. `SYNC_ENABLED=false` porque en desarrollo no hay nube.
+
+```bash
+docker compose up -d                          # MySQL en 127.0.0.1:3307
+venv\Scripts\python.exe -m flask init-local   # crea las tablas
+venv\Scripts\python.exe -m flask seed         # empresa, sucursal, roles, unidades
+venv\Scripts\python.exe -m flask crear-admin  # pide la contraseña del administrador
+venv\Scripts\python.exe run.py
+```
+
+Los datos quedan en un volumen de Docker: sobreviven a `docker compose stop`
+y a reiniciar la PC. Para empezar de cero: `docker compose down -v`.
 
 ### 2.5 Actualizar la base de datos en la nube
 

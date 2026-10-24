@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 import io
 from flask import send_file
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from sqlalchemy.exc import IntegrityError
 from app.models import Usuario, Rol
@@ -107,7 +108,7 @@ def api_crear():
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @usuario_bp.route("/api/editar/<int:id>", methods=["PUT"])
 @login_required
@@ -162,7 +163,7 @@ def api_editar(id):
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @usuario_bp.route("/api/eliminar/<int:id>", methods=["DELETE"])
 @login_required
@@ -178,7 +179,7 @@ def api_eliminar(id):
         return jsonify({"success": True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @usuario_bp.route("/imagen/<int:id>", methods=["GET"])
 def obtener_imagen(id):

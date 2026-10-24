@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, jsonify, send_file, request
 from flask_login import login_required, current_user
 from sqlalchemy import text
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from datetime import timedelta, datetime
 from app.utils.date_utils import nicaragua_now
@@ -75,7 +76,7 @@ def api_resumen_ventas():
             
         return jsonify({"success": True, "data": datos[::-1]}) # Reverse to show chronologically
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @reporte_bp.route("/api/resumen_financiero", methods=["GET"])
 @login_required
@@ -192,7 +193,7 @@ def api_resumen_financiero():
             "producto_top": producto_top,
         })
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @reporte_bp.route("/api/pedidos_ya", methods=["GET"])
@@ -227,7 +228,7 @@ def api_pedidos_ya():
             "inicio": fecha_inicio, "fin": fecha_fin,
         })
     except Exception as e:  # noqa: BLE001
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @reporte_bp.route("/api/propinas", methods=["GET"])
@@ -319,7 +320,7 @@ def api_propinas():
             "lista": lista,
         })
     except Exception as e:  # noqa: BLE001
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @reporte_bp.route("/api/productos_top", methods=["GET"])
@@ -361,7 +362,7 @@ def api_productos_top():
             
         return jsonify({"success": True, "data": datos})
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @reporte_bp.route("/api/stock_bajo", methods=["GET"])
 @login_required
@@ -387,7 +388,7 @@ def api_stock_bajo():
             
         return jsonify({"success": True, "data": datos})
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @reporte_bp.route("/api/exportar/ventas", methods=["GET"])
 @login_required
@@ -465,7 +466,7 @@ def exportar_ventas():
             download_name=f'Reporte_Ventas_{fecha_inicio}_al_{fecha_fin}.csv'
         )
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @reporte_bp.route("/api/exportar/inventario", methods=["GET"])
 @login_required
@@ -501,7 +502,7 @@ def exportar_inventario():
             download_name=f'Reporte_Inventario_{nicaragua_now().strftime("%Y%m%d")}.csv'
         )
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @reporte_bp.route("/api/descuentos", methods=["GET"])
 @login_required
@@ -612,7 +613,7 @@ def exportar_descuentos():
             download_name=f"Reporte_Descuentos_{fecha_inicio}_al_{fecha_fin}.csv",
         )
     except Exception as e:  # noqa: BLE001
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @reporte_bp.route("/api/kpis_especiales", methods=["GET"])
@@ -697,4 +698,4 @@ def api_kpis_especiales():
             "mesero_top": mesero_top,
         })
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)

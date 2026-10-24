@@ -34,4 +34,22 @@ def leer_imagen_validada(imagen_file):
     if not datos:
         raise ValueError("El archivo de imagen está vacío")
 
+    # La extension la elige quien sube el archivo: se confirma con los
+    # primeros bytes (firma real del formato) para que un .php/.html/.svg
+    # renombrado a .png no pase como imagen.
+    if not _firma_coincide(datos, ext):
+        raise ValueError("El archivo no es una imagen válida")
+
     return datos, EXTENSIONES_IMAGEN[ext]
+
+
+def _firma_coincide(datos, ext):
+    if ext == "png":
+        return datos.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext in ("jpg", "jpeg"):
+        return datos.startswith(b"\xff\xd8\xff")
+    if ext == "gif":
+        return datos.startswith((b"GIF87a", b"GIF89a"))
+    if ext == "webp":
+        return datos[:4] == b"RIFF" and datos[8:12] == b"WEBP"
+    return False

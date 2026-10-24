@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from app.models import Compra, DetalleCompra, Producto, Proveedor, Inventario, Categoria, UnidadMedida
 from datetime import datetime
@@ -76,7 +77,7 @@ def api_crear():
             return jsonify({"success": False, "message": "El monto debe ser un número válido"}), 400
         except Exception as e:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"success": False, "message": str(e)}), 500
+            return respuesta_error_interno(e)
 
     if not items:
         return jsonify({"success": False, "message": "No hay productos en la compra"}), 400
@@ -134,7 +135,7 @@ def api_crear():
         return jsonify({"success": False, "message": "Cantidad o costo inválido en uno de los productos"}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @compra_bp.route("/api/detalle/<int:id>", methods=["GET"])
 @login_required
@@ -162,7 +163,7 @@ def api_detalle(id):
             
         return jsonify({"success": True, "detalles": res_detalles})
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @compra_bp.route("/api/editar/<int:id>", methods=["PUT"])
 @login_required
@@ -196,7 +197,7 @@ def api_editar(id):
             return jsonify({"success": False, "message": "El monto debe ser un número válido"}), 400
         except Exception as e:  # noqa: BLE001
             db.session.rollback()
-            return jsonify({"success": False, "message": str(e)}), 500
+            return respuesta_error_interno(e)
 
     if not items:
         return jsonify({"success": False, "message": "No hay productos en la compra"}), 400
@@ -253,7 +254,7 @@ def api_editar(id):
         return jsonify({"success": False, "message": "Cantidad o costo inválido en uno de los productos"}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 # ============================================================================

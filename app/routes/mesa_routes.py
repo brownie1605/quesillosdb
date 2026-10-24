@@ -2,6 +2,7 @@
 from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from app.models import Mesa, Venta, DetalleVenta
 from app.services.mesa_service import MesaService, MesaError
@@ -201,7 +202,7 @@ def api_cobrar(id_mesa):
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @mesa_bp.route("/api/<int:id_mesa>/separar", methods=["POST"])

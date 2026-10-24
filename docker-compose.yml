@@ -1,0 +1,35 @@
+# =============================================================================
+#  Quesillos Lo Nuestro - MySQL para DESARROLLO (ver README, seccion 2.4b)
+#
+#  Solo la base de datos: la app de Flask corre fuera de Docker, en el venv.
+#  La PC del restaurante NO usa Docker (ver README 2.0).
+#  El puerto se abre solo en 127.0.0.1: no se ve desde la WiFi.
+#
+#    docker compose up -d     -> arranca MySQL (127.0.0.1:3307)
+#    docker compose stop      -> lo detiene (los datos se quedan)
+#    docker compose down -v   -> borra el contenedor Y los datos
+# =============================================================================
+
+services:
+  mysql-local:
+    # Misma version que la PC del restaurante (MySQL 8.4 LTS).
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: quesillos
+      MYSQL_DATABASE: quesillos_local
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql_local:/var/lib/mysql
+    healthcheck:
+      # Por TCP: mientras se inicializa, MySQL solo escucha por socket, asi
+      # que "healthy" significa que ya termino de crear la base.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  mysql_local:

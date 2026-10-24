@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from app.models import Producto, Categoria, Inventario, UnidadMedida, Proveedor
 from datetime import datetime
@@ -103,7 +104,7 @@ def api_categorias_crear():
         return jsonify({"success": True, "categoria": nueva.to_dict()})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @producto_bp.route("/api/unidades", methods=["GET"])
 @login_required
@@ -179,7 +180,7 @@ def api_crear():
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @producto_bp.route("/api/editar/<int:id>", methods=["POST"])
 @login_required
@@ -232,7 +233,7 @@ def api_editar(id):
         return jsonify({"success": False, "message": str(e)}), 400
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @producto_bp.route("/api/estado/<int:id>", methods=["PUT", "POST"])
 @login_required
@@ -261,7 +262,7 @@ def api_cambiar_estado(id):
         return jsonify({"success": True, "estado": nuevo_estado})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 

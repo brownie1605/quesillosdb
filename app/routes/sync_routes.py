@@ -2,6 +2,7 @@
 from flask import Blueprint, jsonify, request, render_template
 from flask_login import login_required, current_user
 
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from app.models.sync import SyncQueue, ConflictLog
 from app.services.network_service import NetworkService
@@ -101,7 +102,7 @@ def resolve_conflict():
         return jsonify({"success": True, "conflicto": res})
     except Exception as e:  # noqa: BLE001
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 
 @sync_bp.route("/api/sync/conflict/auto", methods=["POST"])

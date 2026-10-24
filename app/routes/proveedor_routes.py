@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
+from app.utils.errores import respuesta_error_interno
 from app.extensions import db
 from app.models import Proveedor
 from app.services.auditoria_service import registrar_auditoria
@@ -43,7 +44,7 @@ def api_crear():
         return jsonify({"success": True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @proveedor_bp.route("/api/editar/<int:id>", methods=["PUT"])
 @login_required
@@ -65,7 +66,7 @@ def api_editar(id):
         return jsonify({"success": True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)
 
 @proveedor_bp.route("/api/eliminar/<int:id>", methods=["DELETE"])
 @login_required
@@ -81,4 +82,4 @@ def api_eliminar(id):
         return jsonify({"success": True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({"success": False, "message": str(e)}), 500
+        return respuesta_error_interno(e)

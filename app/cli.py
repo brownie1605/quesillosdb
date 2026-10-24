@@ -46,7 +46,9 @@ def registrar_comandos(app):
 @with_appcontext
 def init_local():
     """Crea todas las tablas en la BD local a partir de los modelos."""
-    db.create_all()
+    # Solo la base propia: ningun modelo usa el bind "cloud" y create_all()
+    # se conectaria igual a la nube, fallando cuando no hay nube configurada.
+    db.create_all(bind_key=None)
     click.echo("Tablas creadas en la base de datos local.")
 
 

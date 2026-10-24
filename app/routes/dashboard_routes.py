@@ -84,7 +84,7 @@ def dashboard():
 @dashboard_bp.route("/api/dashboard_charts")
 @login_required
 def api_dashboard_charts():
-    from flask import request
+    from flask import request, jsonify
     from datetime import datetime
     
     inicio = request.args.get('inicio')
@@ -95,8 +95,13 @@ def api_dashboard_charts():
     params_7d = {"empresa": current_user.id_empresa}
     
     if inicio and fin:
-        start_date = datetime.strptime(inicio, "%Y-%m-%d").date()
-        end_date = datetime.strptime(fin, "%Y-%m-%d").date()
+        # Vienen tal cual de la URL: una fecha mal formada (o un payload de
+        # un escaner) es un error del cliente, no un 500 del servidor.
+        try:
+            start_date = datetime.strptime(inicio, "%Y-%m-%d").date()
+            end_date = datetime.strptime(fin, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"success": False, "message": "Fecha invalida (usa AAAA-MM-DD)"}), 400
         
         # Limitar la diferencia a 31 días máximo para evitar gráficos enormes
         dias_diff = (end_date - start_date).days
