@@ -12,10 +12,19 @@ Una vez se compren las impresoras, lo unico que falta configurar es su
 IP en `print_agent/agente.py` -- todo lo demas (que producto va a cual
 impresora, el armado del ticket, el aviso en tiempo real) ya esta listo.
 """
+from decimal import Decimal
+
 from app.models.producto import Producto
 from app.utils.date_utils import nicaragua_now
 
 ETIQUETAS = {"quesillo": "🧀 QUESILLO", "cocina": "🍳 COCINA", "bebidas": "🥤 BEBIDAS"}
+
+# Los agentes de impresion conectados (por id de sesion de Socket.IO) y la
+# sala a la que se unen: los tickets de caja (precuenta/factura) solo viajan
+# a esa sala, no a cualquier navegador conectado.
+SALA_AGENTES = "impresion"
+AGENTES = set()
+NOMBRE_NEGOCIO = "QUESILLOS LO NUESTRO"
 
 
 class ImpresionService:
@@ -73,3 +82,71 @@ class ImpresionService:
             except Exception:  # noqa: BLE001
                 pass  # sin agente conectado todavia, o sin socketio en tests: no bloquea el pedido
         return grupos
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def agentes_conectados():
+        return len(AGENTES)
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def armar_ticket_caja(tipo, venta, numero_cuenta=1, total_cuentas=1):
+        """Datos del ticket de caja. `tipo`: 'precuenta' (cuenta abierta, no
+        cobra nada) o 'factura' (venta ya cobrada, el ticket completo)."""
+        from app.models.mesa import Mesa
+
+        mesa = Mesa.query.get(venta.id_mesa) if venta.id_mesa else None
+        dos = Decimal("0.01")
+        subtotal = Decimal(str(venta.subtotal or 0))
+        descuento = Decimal(str(venta.descuento or 0))
+        base = max(subtotal - descuento, Decimal("0")).quantize(dos)
+        items = [
+            {
+                "cantidad": "%g" % float(d.cantidad or 0),
+                "nombre": d.producto.nombre if d.producto else "Producto",
+                "precio_unitario": float(d.precio_unitario or 0),
+                "subtotal": float(d.subtotal or 0),
+                "comentario": d.comentario,
+            }
+            for d in venta.detalles
+        ]
+        payload = {
+            "impresora": "caja",
+            "tipo": tipo,
+            "empresa": NOMBRE_NEGOCIO,
+            "titulo": "PRECUENTA" if tipo == "precuenta" else "FACTURA DE VENTA",
+            "numero": venta.numero_venta if tipo == "factura" else None,
+            "mesa": mesa.nombre if mesa else None,
+            "cuenta": f"Cuenta {numero_cuenta} de {total_cuentas}" if total_cuentas > 1 else None,
+            "fecha": (venta.fecha_venta if tipo == "factura" and venta.fecha_venta else nicaragua_now()).strftime("%Y-%m-%d %H:%M"),
+            "atendio": venta.usuario.nombre_completo if venta.usuario else None,
+            "cliente": venta.cliente.nombre if venta.cliente else None,
+            "items": items,
+            "subtotal": float(subtotal),
+            "descuento": float(descuento),
+            "descuento_pct": float(venta.descuento_pct) if venta.descuento_pct is not None else None,
+        }
+        if tipo == "precuenta":
+            propina = (base * Decimal("0.10")).quantize(dos)
+            payload.update(total=float(base), propina_sugerida=float(propina),
+                           total_con_propina=float(base + propina))
+        else:
+            payload.update(propina=float(venta.propina or 0), total=float(venta.total or 0),
+                           metodo_pago=venta.metodo_pago, pagos=venta.pagos_detalle, notas=venta.notas)
+        return payload
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def emitir_ticket_caja(payload):
+        """Manda el ticket al agente de impresion. Devuelve False si no hay
+        ningun agente conectado (el llamador decide que hacer: la pantalla
+        vuelve a imprimir con el navegador)."""
+        from app.extensions import socketio
+
+        if not AGENTES:
+            return False
+        try:
+            socketio.emit("ticket_caja", payload, to=SALA_AGENTES)
+        except Exception:  # noqa: BLE001
+            return False
+        return True

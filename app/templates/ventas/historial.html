@@ -201,6 +201,7 @@
                 <td>
                     <button class="btn-icon" title="Ver Detalles" onclick="verDetalles(${v.id_venta})">👁️</button>
                     <button class="btn-icon" title="Ver Factura" onclick="window.open('/ventas/factura/${v.id_venta}', '_blank')">🧾</button>
+                    ${v.estado === 'completada' ? `<button class="btn-icon" title="Imprimir en la impresora de caja" onclick="imprimirFactura(${v.id_venta})">🖨️</button>` : ''}
                     ${v.estado === 'completada' ? `<button class="btn-icon" title="Editar cliente / método de pago" onclick="abrirModalEditarVenta(${v.id_venta})">✏️</button>` : ''}
                     ${v.estado === 'completada' ? `<button class="btn-icon delete" title="Anular factura" onclick="anularVenta(${v.id_venta}, '${escapeHtml(v.numero_venta)}')">🚫</button>` : ''}
                 </td>
@@ -262,6 +263,16 @@
 
     function cerrarModalDetalles() {
         document.getElementById('modalDetalles').style.display = 'none';
+    }
+
+    // Manda la factura a la impresora de caja; sin impresora conectada abre
+    // la factura para imprimir con el navegador, como siempre.
+    async function imprimirFactura(id) {
+        try {
+            const r = await fetch(`/ventas/api/${id}/imprimir`, {method: 'POST'}).then(x => x.json());
+            if (r.success && r.impreso) { showCustomAlert('Factura enviada a la impresora de caja', false); return; }
+        } catch (e) { /* sin conexion con el agente: cae al navegador */ }
+        window.open(`/ventas/factura/${id}`, '_blank');
     }
 
     // ---- Editar factura (solo cliente y metodo de pago) ----

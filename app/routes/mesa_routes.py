@@ -94,6 +94,28 @@ def precuenta(id_mesa):
     )
 
 
+@mesa_bp.route("/api/<int:id_mesa>/precuenta/imprimir", methods=["POST"])
+@login_required
+def api_imprimir_precuenta(id_mesa):
+    """Manda la precuenta a la impresora de caja (no cobra nada). Sin agente
+    de impresion conectado devuelve impreso=False y la pantalla imprime con
+    el navegador."""
+    from app.services.impresion_service import ImpresionService
+
+    mesa = Mesa.query.get_or_404(id_mesa)
+    data = request.get_json(silent=True) or {}
+    venta = _cuenta_elegida(mesa, data.get("id_venta"))
+    if not venta or venta.estado != "pendiente":
+        return jsonify({"success": False, "message": "Esta mesa no tiene una cuenta abierta"}), 400
+    ids = [c.id_venta for c in VentaService.cuentas_de_mesa(mesa)]
+    payload = ImpresionService.armar_ticket_caja(
+        "precuenta", venta,
+        numero_cuenta=ids.index(venta.id_venta) + 1 if venta.id_venta in ids else 1,
+        total_cuentas=len(ids),
+    )
+    return jsonify({"success": True, "impreso": ImpresionService.emitir_ticket_caja(payload)})
+
+
 @mesa_bp.route("/api/<int:id_mesa>/cuenta", methods=["GET"])
 @login_required
 def api_cuenta(id_mesa):

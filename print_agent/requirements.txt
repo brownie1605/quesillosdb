@@ -1,2 +1,4 @@
 python-socketio[client]==5.16.1
 websocket-client==1.8.0
+pyserial==3.5
+pywin32>=306; sys_platform == "win32"

@@ -284,3 +284,20 @@ def ver_factura(id_venta):
 
     detalles = DetalleVenta.query.filter_by(id_venta=id_venta).all()
     return render_template("ventas/factura.html", venta=venta, detalles=detalles)
+
+
+@venta_bp.route("/api/<int:id_venta>/imprimir", methods=["POST"])
+@login_required
+def api_imprimir_factura(id_venta):
+    """Manda la factura (ticket completo) a la impresora de caja. Si no hay
+    agente de impresion conectado devuelve impreso=False y la pantalla abre
+    la factura para imprimir con el navegador, como siempre."""
+    from app.services.impresion_service import ImpresionService
+
+    venta = Venta.query.get_or_404(id_venta)
+    if venta.id_empresa != current_user.id_empresa:
+        return jsonify({"success": False, "message": "Acceso denegado"}), 403
+    if venta.estado != "completada":
+        return jsonify({"success": False, "message": "Solo se imprimen facturas cobradas"}), 400
+    payload = ImpresionService.armar_ticket_caja("factura", venta)
+    return jsonify({"success": True, "impreso": ImpresionService.emitir_ticket_caja(payload)})

@@ -107,11 +107,33 @@ def create_app(config_class=Config, iniciar_jobs=True):
         # handshake HTTP inicial del WebSocket (mismo origen), asi que
         # `current_user` ya esta disponible aqui sin nada adicional.
         @socketio.on("connect")
-        def _socketio_requiere_sesion():
+        def _socketio_requiere_sesion(auth=None):
+            import hmac
+            import os
+
             from flask_login import current_user
+            from flask_socketio import join_room
+
+            from app.services.impresion_service import AGENTES, SALA_AGENTES
+
+            # El agente de impresion (print_agent/) no es un usuario con
+            # sesion: entra con la clave PRINT_AGENT_TOKEN del .env. Sin esa
+            # variable configurada nadie puede entrar por esta via.
+            esperado = os.getenv("PRINT_AGENT_TOKEN", "")
+            token = auth.get("token") if isinstance(auth, dict) else None
+            if esperado and token and hmac.compare_digest(str(token), esperado):
+                join_room(SALA_AGENTES)
+                AGENTES.add(request.sid)
+                return None
 
             if not current_user.is_authenticated:
                 return False  # Flask-SocketIO: False rechaza la conexion
+
+        @socketio.on("disconnect")
+        def _agente_desconectado(*_):
+            from app.services.impresion_service import AGENTES
+
+            AGENTES.discard(request.sid)
 
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Precuenta {{ mesa.nombre }}</title>
     <style>
         body {
@@ -144,9 +145,28 @@
         </div>
 
         <div class="acciones">
-            <button type="button" style="background:#8B2E2E;color:#fff;" onclick="window.print()">Imprimir</button>
+            <button type="button" id="btnImprimir" style="background:#8B2E2E;color:#fff;" onclick="imprimirPrecuenta()">Imprimir</button>
             <button type="button" style="background:#eee;color:#333;" onclick="window.close()">Cerrar</button>
         </div>
     </div>
+    <script>
+    // Manda la precuenta a la impresora de caja. Si no hay impresora
+    // conectada al sistema, imprime con el navegador como siempre.
+    async function imprimirPrecuenta() {
+        const boton = document.getElementById('btnImprimir');
+        boton.disabled = true;
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]');
+            const r = await fetch('/mesas/api/{{ mesa.id_mesa }}/precuenta/imprimir', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf ? csrf.content : ''},
+                body: JSON.stringify({id_venta: {{ venta.id_venta }}}),
+            }).then(x => x.json());
+            if (r.success && r.impreso) { boton.textContent = 'Enviada a caja'; setTimeout(() => { boton.textContent = 'Imprimir'; }, 2500); }
+            else window.print();
+        } catch (e) { window.print(); }
+        finally { boton.disabled = false; }
+    }
+    </script>
 </body>
 </html>
