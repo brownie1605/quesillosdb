@@ -44,10 +44,15 @@ def api_categorias():
 @login_required
 def api_lista():
     recetas = Receta.query.order_by(Receta.nombre).all()
+    # Stock calculado de una sola vez para todas (antes una ronda de
+    # consultas por receta e ingrediente).
+    maximos = RecetaService.maximo_producible_lote(
+        [r.producto for r in recetas if r.producto], {r.id_producto: r for r in recetas}
+    )
     salida = []
     for r in recetas:
         d = r.to_dict()
-        d["max_producible"] = RecetaService.maximo_producible(r.id_producto)
+        d["max_producible"] = maximos.get(r.id_producto, 0)
         d["precio_venta"] = float(r.producto.precio_venta or 0) if r.producto else 0
         d["margen"] = round(d["precio_venta"] - d["costo_total"], 2)
         salida.append(d)
@@ -102,14 +107,16 @@ def api_insumos():
         .order_by(Producto.nombre)
         .all()
     )
+    # Stock de todos de una sola vez (antes una ronda de consultas por producto).
+    stocks = RecetaService.maximo_producible_lote(productos)
     salida = []
     for p in productos:
         d = p.to_dict()
         if p.es_receta:
-            d["stock"] = RecetaService.maximo_producible(p.id_producto)
+            d["stock"] = stocks[p.id_producto]
             d["es_receta_ingrediente"] = True
         else:
-            d["stock"] = float(InventarioService.stock_de(p.id_producto))
+            d["stock"] = stocks[p.id_producto]
             d["es_receta_ingrediente"] = False
         salida.append(d)
     return jsonify(salida)

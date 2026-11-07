@@ -73,12 +73,20 @@ def api_marcar_listo(id_venta):
 def api_disponibilidad():
     """Cuantas unidades se pueden preparar de cada receta con el stock actual."""
     recetas = Receta.query.filter_by(estado="activo").all()
+    # Inventario y recetas de una sola vez (antes ~1,000 consultas cada 15 s
+    # mientras la pantalla de cocina estaba abierta).
+    stocks = RecetaService.stocks_actuales()
+    maximos = RecetaService.maximo_producible_lote(
+        [r.producto for r in recetas if r.producto],
+        {r.id_producto: r for r in recetas},
+        stocks,
+    )
     salida = []
     for r in recetas:
-        maximo = RecetaService.maximo_producible(r.id_producto)
+        maximo = maximos.get(r.id_producto, 0)
         faltantes = []
         for ing in r.ingredientes:
-            stock = float(InventarioService.stock_de(ing.id_producto))
+            stock = float(stocks.get(ing.id_producto, 0))
             if stock < float(ing.cantidad_necesaria or 0):
                 faltantes.append(
                     {

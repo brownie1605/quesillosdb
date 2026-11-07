@@ -574,7 +574,24 @@ class RecetaService:
 
     # -----------------------------------------------------------------
     @staticmethod
-    def maximo_producible_lote(productos, recetas_por_producto=None):
+    def stocks_actuales():
+        """{id_producto: stock} de todo el inventario en una sola consulta.
+
+        Mismo criterio que `InventarioService.stock_de()`: si un producto
+        tiene varias filas de inventario se toma la mas antigua (.first())."""
+        from app.models.inventario import Inventario
+
+        stock = {}
+        for inv in Inventario.query.order_by(Inventario.id_inventario).all():
+            if inv.id_producto not in stock:
+                stock[inv.id_producto] = (
+                    Decimal(str(inv.stock_actual)) if inv.stock_actual is not None else Decimal("0")
+                )
+        return stock
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def maximo_producible_lote(productos, recetas_por_producto=None, stock=None):
         """Lo mismo que `maximo_producible()` para muchos productos a la vez.
 
         Devuelve {id_producto: cantidad}. Hace el calculo con el inventario,
@@ -586,15 +603,10 @@ class RecetaService:
 
         `recetas_por_producto` ({id_producto: Receta}, de cualquier estado):
         si el llamador ya las cargo, se reutilizan en vez de volver a pedirlas.
+        `stock` ({id_producto: Decimal}, de `stocks_actuales()`): idem.
         """
-        from app.models.inventario import Inventario
-
-        stock = {}
-        for inv in Inventario.query.order_by(Inventario.id_inventario).all():
-            if inv.id_producto not in stock:     # igual que .first(): la fila mas antigua
-                stock[inv.id_producto] = (
-                    Decimal(str(inv.stock_actual)) if inv.stock_actual is not None else Decimal("0")
-                )
+        if stock is None:
+            stock = RecetaService.stocks_actuales()
         if recetas_por_producto is None:
             recetas_por_producto = {r.id_producto: r for r in Receta.query.all()}
         por_id = {p.id_producto: p for p in productos}
