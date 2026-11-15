@@ -282,3 +282,166 @@ def test_editar_un_usuario_sin_correo_aunque_otro_tampoco_tenga(app, db, datos_b
     r = admin.put(f"/usuarios/api/editar/{m2.id_usuario}",
                   data={"nombre_completo": "Nuevo Nombre", "usuario": "m2", "correo": "", "telefono": "", "id_rol": 3, "password": ""})
     assert r.status_code == 200, r.get_json()
+
+
+# ------------------------------------------------------------------ desbloqueo, reactivacion y roles
+def _borrar(cliente, id_usuario):
+    return cliente.delete(f"/usuarios/api/eliminar/{id_usuario}")
+
+
+def test_cambiar_el_pin_desbloquea_la_cuenta(app, db, datos_base):
+    from app.models import Usuario
+    admin = _entrar_como_admin(app)
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="bloq", password="4821")).status_code == 200
+    u = Usuario.query.filter_by(usuario="bloq").first()
+    u.bloqueado_hasta = datetime.now() + timedelta(minutes=15)               # como tras 5 intentos fallidos
+    u.intentos_fallidos = 3
+    db.session.commit()
+    assert _login(app.test_client(), "bloq", "4821").status_code == 200      # bloqueado: ni el PIN bueno entra
+    r = admin.put(f"/usuarios/api/editar/{u.id_usuario}",
+                  data={"nombre_completo": "Persona", "usuario": "bloq", "correo": "", "telefono": "", "id_rol": 3, "password": "7531"})
+    assert r.status_code == 200
+    assert _login(app.test_client(), "bloq", "7531").status_code == 302      # con el PIN nuevo entra enseguida
+
+
+def test_editar_sin_cambiar_el_pin_no_desbloquea(app, db, datos_base):
+    from app.models import Usuario
+    admin = _entrar_como_admin(app)
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="bloq2", password="4821")).status_code == 200
+    u = Usuario.query.filter_by(usuario="bloq2").first()
+    u.bloqueado_hasta = datetime.now() + timedelta(minutes=15)
+    db.session.commit()
+    admin.put(f"/usuarios/api/editar/{u.id_usuario}",
+              data={"nombre_completo": "Otro Nombre", "usuario": "bloq2", "correo": "", "telefono": "", "id_rol": 3, "password": ""})
+    db.session.refresh(u)
+    assert u.bloqueado_hasta is not None
+
+
+def test_crear_con_el_nombre_de_un_eliminado_reactiva_esa_cuenta(app, db, datos_base):
+    from app.models import Usuario
+    admin = _entrar_como_admin(app)
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="vuelve", nombre_completo="Primera Persona", password="1111")).status_code == 200
+    u = Usuario.query.filter_by(usuario="vuelve").first()
+    id_original = u.id_usuario
+    u.totp_habilitado = True; u.totp_secret = "SECRETOVIEJO"; u.imagen_datos = b"x"; u.imagen_url = "/usuarios/imagen/1"
+    db.session.commit()
+    assert _borrar(admin, id_original).status_code == 200
+    assert _login(app.test_client(), "vuelve", "1111").status_code == 200    # eliminado: no entra
+
+    r = admin.post("/usuarios/api/crear", data=_form(usuario="vuelve", nombre_completo="Segunda Persona", password="2222", id_rol=2))
+    assert r.status_code == 200 and r.get_json().get("reactivado") is True
+    assert Usuario.query.filter_by(usuario="vuelve").count() == 1            # misma cuenta, no una fila duplicada
+    db.session.refresh(u)
+    assert u.id_usuario == id_original and u.estado == "activo"
+    assert u.nombre_completo == "Segunda Persona" and u.id_rol == 2
+    assert u.totp_habilitado is False and u.totp_secret is None              # sin el 2FA de la persona anterior
+    assert u.imagen_datos is None and u.imagen_url is None                   # sin la foto de la anterior
+    assert _login(app.test_client(), "vuelve", "1111").status_code == 200    # el PIN viejo ya no sirve
+    assert _login(app.test_client(), "vuelve", "2222").status_code == 302    # el nuevo si
+
+
+def test_un_usuario_activo_o_de_otra_empresa_no_se_reactiva(app, db, datos_base):
+    from app.models import Empresa, Usuario
+    from app.services.auth_service import generar_password
+    from app.utils.date_utils import nicaragua_now
+    admin = _entrar_como_admin(app)
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="activo1")).status_code == 200
+    r = admin.post("/usuarios/api/crear", data=_form(usuario="activo1"))
+    assert r.status_code == 400 and "ya está en uso" in r.get_json()["message"]
+
+    db.session.add(Empresa(id_empresa=2, nombre="Otra", estado="activo"))
+    db.session.add(Usuario(id_empresa=2, id_sucursal=2, id_rol=datos_base["roles"]["Mesero"].id_rol, usuario="ajeno",
+                           nombre_completo="De Otra Empresa", password_hash=generar_password("1234"),
+                           estado="inactivo", fecha_creacion=nicaragua_now()))
+    db.session.commit()
+    r = admin.post("/usuarios/api/crear", data=_form(usuario="ajeno"))
+    assert r.status_code == 400 and "ya está en uso" in r.get_json()["message"]
+
+
+def _roles_visibles(cliente):
+    return cliente.get("/usuarios/api/roles").get_json()
+
+
+def test_la_lista_de_roles_es_de_mi_empresa_y_sin_repetidos_sin_uso(app, db, datos_base):
+    from app.models import Empresa, Rol
+    db.session.add(Empresa(id_empresa=2, nombre="Otra", estado="activo"))
+    db.session.flush()
+    repetido = Rol(id_empresa=1, nombre="Cajero", estado="activo")           # duplicado de Cajero, sin personas
+    ajeno = Rol(id_empresa=2, nombre="Gerente", estado="activo")             # de otra empresa
+    db.session.add_all([repetido, ajeno]); db.session.commit()
+
+    roles = _roles_visibles(_entrar_como_admin(app))
+    nombres = [r["nombre"] for r in roles]
+    assert sorted(nombres) == sorted(["Admin", "Cajero", "Mesero", "Cocinero"])
+    assert "Gerente" not in nombres
+    assert repetido.id_rol not in [r["id_rol"] for r in roles]
+
+
+def test_un_rol_repetido_con_personas_asignadas_se_conserva(app, db, datos_base):
+    from app.models import Rol
+    repetido = Rol(id_empresa=1, nombre="Cajero", estado="activo")
+    db.session.add(repetido); db.session.commit()
+    admin = _entrar_como_admin(app)
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="con_rol_repetido", id_rol=repetido.id_rol)).status_code == 200
+    ids = [r["id_rol"] for r in _roles_visibles(admin) if r["nombre"] == "Cajero"]
+    assert repetido.id_rol in ids and datos_base["roles"]["Cajero"].id_rol in ids   # ninguno queda sin mostrarse
+
+
+def test_no_se_puede_asignar_un_rol_de_otra_empresa(app, db, datos_base):
+    from app.models import Empresa, Rol, Usuario
+    db.session.add(Empresa(id_empresa=2, nombre="Otra", estado="activo")); db.session.flush()
+    ajeno = Rol(id_empresa=2, nombre="Gerente", estado="activo"); db.session.add(ajeno); db.session.commit()
+    admin = _entrar_como_admin(app)
+    r = admin.post("/usuarios/api/crear", data=_form(usuario="rol_ajeno", id_rol=ajeno.id_rol))
+    assert r.status_code == 400 and "rol" in r.get_json()["message"].lower()
+
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="rol_ok")).status_code == 200
+    u = Usuario.query.filter_by(usuario="rol_ok").first()
+    r = admin.put(f"/usuarios/api/editar/{u.id_usuario}",
+                  data={"nombre_completo": "P", "usuario": "rol_ok", "correo": "", "telefono": "", "id_rol": ajeno.id_rol, "password": ""})
+    assert r.status_code == 400
+
+
+def test_un_rol_de_otra_empresa_con_personas_activas_sigue_visible(app, db, datos_base):
+    """Dato viejo: un usuario de mi empresa con un rol (de otra empresa) que aqui no existe. Debe verse."""
+    from app.models import Empresa, Rol, Usuario
+    db.session.add(Empresa(id_empresa=2, nombre="Otra", estado="activo")); db.session.flush()
+    ajeno = Rol(id_empresa=2, nombre="Gerente", estado="activo"); db.session.add(ajeno); db.session.commit()
+    cajero = Usuario.query.filter_by(usuario="cajero").first()
+    cajero.id_rol = ajeno.id_rol
+    db.session.commit()
+    assert ajeno.id_rol in [r["id_rol"] for r in _roles_visibles(_entrar_como_admin(app))]
+
+
+def test_un_rol_de_otra_empresa_con_el_mismo_nombre_que_uno_mio_no_se_muestra(app, db, datos_base):
+    """Si no, el unico 'Cajero' que se ve seria uno que el servidor rechaza al crear usuarios."""
+    from app.models import Empresa, Rol, Usuario
+    db.session.add(Empresa(id_empresa=2, nombre="Otra", estado="activo")); db.session.flush()
+    ajeno = Rol(id_empresa=2, nombre="Cajero", estado="activo"); db.session.add(ajeno); db.session.commit()
+    Usuario.query.filter_by(usuario="cajero").first().id_rol = ajeno.id_rol
+    db.session.commit()
+    admin = _entrar_como_admin(app)
+    roles = _roles_visibles(admin)
+    assert ajeno.id_rol not in [r["id_rol"] for r in roles]
+    propio = [r["id_rol"] for r in roles if r["nombre"] == "Cajero"]
+    assert propio == [datos_base["roles"]["Cajero"].id_rol]
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="nuevo_cajero", id_rol=propio[0])).status_code == 200
+
+
+def test_quien_tiene_un_rol_de_otra_empresa_se_ve_con_el_rol_propio_del_mismo_nombre(app, db, datos_base):
+    """Se ve con su rol de siempre al editarlo; al guardar queda con el de la empresa."""
+    from app.models import Empresa, Rol, Usuario
+    db.session.add(Empresa(id_empresa=2, nombre="Otra", estado="activo")); db.session.flush()
+    ajeno = Rol(id_empresa=2, nombre="Cajero", estado="activo"); db.session.add(ajeno); db.session.commit()
+    cajero = Usuario.query.filter_by(usuario="cajero").first()
+    cajero.id_rol = ajeno.id_rol
+    db.session.commit()
+    admin = _entrar_como_admin(app)
+    fila = next(u for u in admin.get("/usuarios/api/list").get_json() if u["usuario"] == "cajero")
+    assert fila["id_rol"] == datos_base["roles"]["Cajero"].id_rol and fila["rol_nombre"] == "Cajero"
+    r = admin.put(f"/usuarios/api/editar/{cajero.id_usuario}",
+                  data={"nombre_completo": "Cajero Uno", "usuario": "cajero", "correo": "", "telefono": "",
+                        "id_rol": fila["id_rol"], "password": ""})
+    assert r.status_code == 200
+    db.session.refresh(cajero)
+    assert cajero.id_rol == datos_base["roles"]["Cajero"].id_rol

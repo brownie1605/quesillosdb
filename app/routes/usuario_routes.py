@@ -27,19 +27,52 @@ def lista():
 @login_required
 def api_list():
     usuarios = Usuario.query.filter_by(estado="activo", id_empresa=current_user.id_empresa).all()
+    # Rol propio con el mismo nombre (el mas antiguo), para quien tenga un rol
+    # de OTRA empresa por un dato viejo: asi al editarlo el formulario le
+    # preselecciona su rol de siempre y, al guardar, queda con el de esta empresa.
+    propios = {}
+    for r in Rol.query.filter_by(id_empresa=current_user.id_empresa).order_by(Rol.id_rol).all():
+        propios.setdefault((r.nombre or "").strip().lower(), r.id_rol)
     res = []
     for u in usuarios:
         rol = Rol.query.get(u.id_rol) if u.id_rol else None
         d = u.to_dict()
         d["rol_nombre"] = rol.nombre if rol else "Sin Rol"
+        if rol and rol.id_empresa != current_user.id_empresa:
+            d["id_rol"] = propios.get((rol.nombre or "").strip().lower(), d["id_rol"])
         res.append(d)
     return jsonify(res)
 
 @usuario_bp.route("/api/roles", methods=["GET"])
 @login_required
 def api_roles():
-    roles = Rol.query.all()
-    return jsonify([r.to_dict() for r in roles])
+    """Roles de MI empresa. Si un nombre esta repetido (hay Administrador y
+    Cajero duplicados), se muestra uno solo, salvo que haya personas activas
+    asignadas a cada uno: asi nadie queda sin rol al editar ni sale del filtro.
+    Un rol de OTRA empresa solo se muestra si una persona activa lo tiene y
+    no existe uno propio con ese nombre (dato viejo): no se puede asignar a
+    nadie nuevo, el servidor exige un rol de la empresa."""
+    empresa = current_user.id_empresa
+    en_uso = {
+        fila[0] for fila in db.session.query(Usuario.id_rol)
+        .filter(Usuario.id_empresa == empresa, Usuario.estado == "activo", Usuario.id_rol.isnot(None)).distinct()
+    }
+    propios = Rol.query.filter_by(id_empresa=empresa).order_by(Rol.id_rol).all()
+    por_nombre = {}
+    for r in propios:
+        if r.estado == "activo" or r.id_rol in en_uso:
+            por_nombre.setdefault((r.nombre or "").strip().lower(), []).append(r)
+    elegidos = []
+    for grupo in por_nombre.values():
+        usados = [r for r in grupo if r.id_rol in en_uso]
+        elegidos += usados or [grupo[0]]
+    nombres_propios = {(r.nombre or "").strip().lower() for r in propios}
+    if en_uso:
+        for r in Rol.query.filter(Rol.id_rol.in_(en_uso), Rol.id_empresa != empresa).all():
+            if (r.nombre or "").strip().lower() not in nombres_propios:
+                elegidos.append(r)
+    elegidos.sort(key=lambda r: r.id_rol)
+    return jsonify([r.to_dict() for r in elegidos])
 
 @usuario_bp.route("/api/crear", methods=["POST"])
 @login_required
@@ -65,13 +98,21 @@ def api_crear():
             return jsonify({"success": False, "message": "El usuario es obligatorio."}), 400
         if not (data.get("nombre_completo") or "").strip():
             return jsonify({"success": False, "message": "El nombre es obligatorio."}), 400
-        if not data.get("id_rol") or not Rol.query.get(data.get("id_rol")):
+        if not data.get("id_rol") or not Rol.query.filter_by(
+                id_rol=data.get("id_rol"), id_empresa=current_user.id_empresa).first():
             return jsonify({"success": False, "message": "Elige un rol para el usuario."}), 400
 
-        # Validar duplicados
-        if Usuario.query.filter_by(usuario=usuario).first():
-            return jsonify({"success": False, "message": f"El usuario '{usuario}' ya está en uso."}), 400
-        if correo and Usuario.query.filter_by(correo=correo).first():
+        # Validar duplicados. Si el nombre era de alguien ELIMINADO de esta
+        # empresa, esa cuenta se reactiva con los datos nuevos (mas abajo).
+        existente = Usuario.query.filter_by(usuario=usuario).first()
+        reactivar = None
+        if existente:
+            if existente.estado == "inactivo" and existente.id_empresa == current_user.id_empresa:
+                reactivar = existente
+            else:
+                return jsonify({"success": False, "message": f"El usuario '{usuario}' ya está en uso."}), 400
+        if correo and Usuario.query.filter(
+                Usuario.correo == correo, Usuario.id_usuario != (reactivar.id_usuario if reactivar else 0)).first():
             return jsonify({"success": False, "message": f"El correo '{correo}' ya está en uso."}), 400
             
         # Limpiar y validar telefono (solo numeros, sin guiones)
@@ -87,6 +128,30 @@ def api_crear():
         # digitos, 4 a 6): una regla distinta dejaria a la persona sin poder entrar.
         if not (password.isascii() and password.isdigit() and 4 <= len(password) <= 6):
             return jsonify({"success": False, "message": "El PIN debe ser solo números, de 4 a 6 dígitos."}), 400
+
+        if reactivar:
+            # Es una persona nueva (o que vuelve) con el nombre de una cuenta
+            # eliminada: se parte de cero, sin la foto, el 2FA ni el bloqueo de antes.
+            reactivar.id_sucursal = current_user.id_sucursal
+            reactivar.id_rol = data.get("id_rol")
+            reactivar.nombre_completo = data.get("nombre_completo")
+            reactivar.correo = correo
+            reactivar.telefono = telefono
+            reactivar.password_hash = generate_password_hash(password)
+            reactivar.imagen_datos, reactivar.imagen_mimetype = imagen_datos, imagen_mimetype
+            reactivar.imagen_url = f"/usuarios/imagen/{reactivar.id_usuario}" if imagen_datos else None
+            reactivar.intentos_fallidos = 0
+            reactivar.bloqueado_hasta = None
+            reactivar.totp_secret = None
+            reactivar.totp_habilitado = False
+            reactivar.totp_recovery_codes = None
+            reactivar.codigo_recuperacion = None
+            reactivar.codigo_expiry = None
+            reactivar.intentos_codigo = 0
+            reactivar.estado = "activo"
+            db.session.commit()
+            registrar_auditoria("REACTIVAR USUARIO", "Usuarios", f"Usuario {reactivar.usuario} reactivado")
+            return jsonify({"success": True, "reactivado": True})
 
         nuevo = Usuario(
             id_empresa=current_user.id_empresa,
@@ -159,13 +224,20 @@ def api_editar(id):
         u.usuario = usuario
         u.correo = correo
         u.telefono = telefono
-        u.id_rol = data.get("id_rol", u.id_rol)
+        nuevo_rol = data.get("id_rol", u.id_rol)
+        if str(nuevo_rol) != str(u.id_rol) and not Rol.query.filter_by(
+                id_rol=nuevo_rol, id_empresa=current_user.id_empresa).first():
+            return jsonify({"success": False, "message": "Elige un rol válido para el usuario."}), 400
+        u.id_rol = nuevo_rol
         
         if data.get("password"):
             nuevo_pin = str(data.get("password"))
             if not (nuevo_pin.isascii() and nuevo_pin.isdigit() and 4 <= len(nuevo_pin) <= 6):
                 return jsonify({"success": False, "message": "El PIN debe ser solo números, de 4 a 6 dígitos."}), 400
             u.password_hash = generate_password_hash(data.get("password"))
+            # Si estaba bloqueado por intentos fallidos, con el PIN nuevo entra enseguida.
+            u.intentos_fallidos = 0
+            u.bloqueado_hasta = None
 
         db.session.commit()
         registrar_auditoria("EDITAR USUARIO", "Usuarios", f"Usuario {u.usuario} modificado")
