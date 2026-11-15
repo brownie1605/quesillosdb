@@ -295,8 +295,8 @@ def reset_password_view(email, rol):
             flash("Las contraseñas no coinciden.", "danger")
             return render_template("auth/reset_password.html", email=email, rol=rol)
 
-        if len(nueva) < 8:
-            flash("La contraseña debe tener al menos 8 caracteres.", "danger")
+        if not (nueva.isascii() and nueva.isdigit() and 4 <= len(nueva) <= 6):
+            flash("El PIN debe ser solo números, de 4 a 6 dígitos.", "danger")
             return render_template("auth/reset_password.html", email=email, rol=rol)
 
         user.password_hash = generar_password(nueva)
@@ -411,8 +411,8 @@ def reset_password_api():
 
     if not correo or not codigo or not nueva_password:
         return jsonify({"success": False, "message": "Faltan datos requeridos."})
-    if len(nueva_password) < 8:
-        return jsonify({"success": False, "message": "La contraseña debe tener al menos 8 caracteres."})
+    if not (str(nueva_password).isascii() and str(nueva_password).isdigit() and 4 <= len(str(nueva_password)) <= 6):
+        return jsonify({"success": False, "message": "El PIN debe ser solo números, de 4 a 6 dígitos."})
 
     user = Usuario.query.filter_by(correo=correo).first()
     if not user:

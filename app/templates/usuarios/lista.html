@@ -65,8 +65,8 @@
                     <input type="text" id="usr_usuario" class="form-control" style="width: 100%;" required>
                 </div>
                 <div style="flex: 1;">
-                    <label>Contraseña</label>
-                    <input type="password" id="usr_password" class="form-control" style="width: 100%;" placeholder="Mínimo 8 caracteres" minlength="8">
+                    <label>PIN de entrada</label>
+                    <input type="password" id="usr_password" class="form-control" style="width: 100%;" placeholder="4 a 6 números" inputmode="numeric" minlength="4" maxlength="6" pattern="[0-9]{4,6}" title="Solo números, de 4 a 6 dígitos">
                 </div>
             </div>
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">

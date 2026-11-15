@@ -141,14 +141,14 @@ def test_flujo_completo_cambia_la_contrasena(app, db, datos_base):
 
     r = cliente.post(
         "/reset-password/admin@quesillos.test/Admin",
-        data={"password": "nuevaClave1", "password_confirm": "nuevaClave1"},
+        data={"password": "482915", "password_confirm": "482915"},
     )
     assert r.status_code == 302
 
     db.session.refresh(admin)
-    assert verificar_password(admin.password_hash, "nuevaClave1") is True
+    assert verificar_password(admin.password_hash, "482915") is True
     assert admin.codigo_recuperacion is None
-    assert _login(cliente, "admin", "nuevaClave1").status_code == 302
+    assert _login(cliente, "admin", "482915").status_code == 302
 
 
 def test_contrasenas_que_no_coinciden_no_se_guardan(app, db, datos_base):
@@ -188,3 +188,49 @@ def test_reset_password_sin_verificar_codigo_antes_redirige(app, db, datos_base)
     )
     assert r.status_code == 302
     assert "forgot-password" in r.headers["Location"]
+
+
+# ------------------------------------------------------------------ PIN de 4 a 6 numeros
+import pytest  # noqa: E402
+
+
+def _entrar_como_admin(app):
+    cliente = app.test_client()
+    assert _login(cliente, "admin", "admin123").status_code == 302
+    return cliente
+
+
+def _nuevo_usuario(pin, usuario="pinprueba"):
+    return {"usuario": usuario, "nombre_completo": "Prueba Pin", "correo": f"{usuario}@t.test",
+            "telefono": "88888888", "id_rol": 1, "password": pin}
+
+
+@pytest.mark.parametrize("pin", ["1234", "12345", "123456", "0000"])
+def test_crear_usuario_acepta_pin_de_4_a_6_numeros(app, db, datos_base, pin):
+    r = _entrar_como_admin(app).post("/usuarios/api/crear", data=_nuevo_usuario(pin))
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["success"] is True
+
+
+@pytest.mark.parametrize("pin", ["", "123", "1234567", "12345678", "12ab56", "abcdef", "12 456", "١٢٣٤"])
+def test_crear_usuario_rechaza_pin_que_no_sea_de_4_a_6_numeros(app, db, datos_base, pin):
+    r = _entrar_como_admin(app).post("/usuarios/api/crear", data=_nuevo_usuario(pin))
+    assert r.status_code == 400
+    assert "4 a 6" in r.get_json()["message"]
+
+
+def test_el_pin_nuevo_sirve_para_entrar(app, db, datos_base):
+    admin = _entrar_como_admin(app)
+    assert admin.post("/usuarios/api/crear", data=_nuevo_usuario("4821")).status_code == 200
+    assert _login(app.test_client(), "pinprueba", "4821").status_code == 302
+
+
+def test_cambiar_mi_pin_acepta_4_y_rechaza_8(app, db, datos_base):
+    cliente = _entrar_como_admin(app)
+    r = cliente.post("/configuracion/api/cambiar_password",
+                     json={"password_actual": "admin123", "password_nueva": "12345678"})
+    assert r.status_code == 400 and "4 a 6" in r.get_json()["message"]
+    r = cliente.post("/configuracion/api/cambiar_password",
+                     json={"password_actual": "admin123", "password_nueva": "9087"})
+    assert r.status_code == 200
+    assert _login(app.test_client(), "admin", "9087").status_code == 302

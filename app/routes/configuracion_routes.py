@@ -34,8 +34,8 @@ def api_cambiar_password():
     if not check_password_hash(current_user.password_hash, actual):
         return jsonify({"success": False, "message": "La contraseña actual es incorrecta"}), 400
 
-    if len(nueva) < 8:
-        return jsonify({"success": False, "message": "La nueva contraseña debe tener al menos 8 caracteres"}), 400
+    if not (nueva.isascii() and nueva.isdigit() and 4 <= len(nueva) <= 6):
+        return jsonify({"success": False, "message": "El PIN debe ser solo números, de 4 a 6 dígitos."}), 400
 
     current_user.password_hash = generate_password_hash(nueva)
     db.session.commit()

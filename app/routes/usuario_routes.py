@@ -73,8 +73,10 @@ def api_crear():
         password = data.get("password") or ""
         # Antes, si se dejaba en blanco, la cuenta quedaba con la
         # contraseña "123456" -- un valor adivinable por cualquiera.
-        if len(password) < 8:
-            return jsonify({"success": False, "message": "La contraseña debe tener al menos 8 caracteres."}), 400
+        # El PIN se escribe en el teclado numerico del login (solo
+        # digitos, 4 a 6): una regla distinta dejaria a la persona sin poder entrar.
+        if not (password.isascii() and password.isdigit() and 4 <= len(password) <= 6):
+            return jsonify({"success": False, "message": "El PIN debe ser solo números, de 4 a 6 dígitos."}), 400
 
         nuevo = Usuario(
             id_empresa=current_user.id_empresa,
@@ -147,8 +149,9 @@ def api_editar(id):
         u.id_rol = data.get("id_rol", u.id_rol)
         
         if data.get("password"):
-            if len(data.get("password")) < 8:
-                return jsonify({"success": False, "message": "La contraseña debe tener al menos 8 caracteres."}), 400
+            nuevo_pin = str(data.get("password"))
+            if not (nuevo_pin.isascii() and nuevo_pin.isdigit() and 4 <= len(nuevo_pin) <= 6):
+                return jsonify({"success": False, "message": "El PIN debe ser solo números, de 4 a 6 dígitos."}), 400
             u.password_hash = generate_password_hash(data.get("password"))
 
         db.session.commit()
