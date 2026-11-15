@@ -234,3 +234,51 @@ def test_cambiar_mi_pin_acepta_4_y_rechaza_8(app, db, datos_base):
                      json={"password_actual": "admin123", "password_nueva": "9087"})
     assert r.status_code == 200
     assert _login(app.test_client(), "admin", "9087").status_code == 302
+
+
+# ------------------------------------------------------------------ usuarios sin correo y datos obligatorios
+def _form(**kw):
+    datos = {"nombre_completo": "Persona", "usuario": "u1", "correo": "", "telefono": "", "id_rol": 3, "password": "1234"}
+    datos.update(kw)
+    return datos
+
+
+def test_se_pueden_crear_varios_usuarios_sin_correo(app, db, datos_base):
+    """Antes el segundo usuario sin correo fallaba: 'El correo '' ya esta en uso'."""
+    admin = _entrar_como_admin(app)
+    for i in range(1, 4):
+        r = admin.post("/usuarios/api/crear", data=_form(usuario=f"mesero{i}"))
+        assert r.status_code == 200, r.get_json()
+    from app.models import Usuario
+    assert Usuario.query.filter(Usuario.usuario.like("mesero%"), Usuario.correo.is_(None)).count() == 3
+
+
+def test_correo_repetido_si_se_rechaza(app, db, datos_base):
+    admin = _entrar_como_admin(app)
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="a1", correo="x@t.test")).status_code == 200
+    r = admin.post("/usuarios/api/crear", data=_form(usuario="a2", correo="x@t.test"))
+    assert r.status_code == 400 and "correo" in r.get_json()["message"]
+
+
+@pytest.mark.parametrize("campo,valor,texto", [("usuario", "  ", "usuario"), ("nombre_completo", "", "nombre"), ("id_rol", "", "rol"), ("id_rol", 9999, "rol")])
+def test_crear_exige_usuario_nombre_y_rol(app, db, datos_base, campo, valor, texto):
+    r = _entrar_como_admin(app).post("/usuarios/api/crear", data=_form(**{campo: valor}))
+    assert r.status_code == 400
+    assert texto in r.get_json()["message"].lower()
+
+
+def test_el_usuario_se_guarda_sin_espacios_y_puede_entrar(app, db, datos_base):
+    admin = _entrar_como_admin(app)
+    assert admin.post("/usuarios/api/crear", data=_form(usuario="  carla  ", password="2468")).status_code == 200
+    assert _login(app.test_client(), "carla", "2468").status_code == 302
+
+
+def test_editar_un_usuario_sin_correo_aunque_otro_tampoco_tenga(app, db, datos_base):
+    from app.models import Usuario
+    admin = _entrar_como_admin(app)
+    for n in ("m1", "m2"):
+        assert admin.post("/usuarios/api/crear", data=_form(usuario=n)).status_code == 200
+    m2 = Usuario.query.filter_by(usuario="m2").first()
+    r = admin.put(f"/usuarios/api/editar/{m2.id_usuario}",
+                  data={"nombre_completo": "Nuevo Nombre", "usuario": "m2", "correo": "", "telefono": "", "id_rol": 3, "password": ""})
+    assert r.status_code == 200, r.get_json()

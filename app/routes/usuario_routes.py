@@ -54,14 +54,24 @@ def api_crear():
         if imagen and imagen.filename:
             imagen_datos, imagen_mimetype = leer_imagen_validada(imagen)
 
-        usuario = data.get("usuario")
-        correo = data.get("correo")
+        usuario = (data.get("usuario") or "").strip()
+        # Un correo en blanco es "sin correo" (NULL), no un correo igual a ''.
+        # Antes, quien tuviera el correo vacio bloqueaba crear a cualquier otra
+        # persona sin correo ("El correo '' ya esta en uso").
+        correo = (data.get("correo") or "").strip() or None
         telefono = data.get("telefono", "")
+
+        if not usuario:
+            return jsonify({"success": False, "message": "El usuario es obligatorio."}), 400
+        if not (data.get("nombre_completo") or "").strip():
+            return jsonify({"success": False, "message": "El nombre es obligatorio."}), 400
+        if not data.get("id_rol") or not Rol.query.get(data.get("id_rol")):
+            return jsonify({"success": False, "message": "Elige un rol para el usuario."}), 400
 
         # Validar duplicados
         if Usuario.query.filter_by(usuario=usuario).first():
             return jsonify({"success": False, "message": f"El usuario '{usuario}' ya está en uso."}), 400
-        if Usuario.query.filter_by(correo=correo).first():
+        if correo and Usuario.query.filter_by(correo=correo).first():
             return jsonify({"success": False, "message": f"El correo '{correo}' ya está en uso."}), 400
             
         # Limpiar y validar telefono (solo numeros, sin guiones)
@@ -126,14 +136,17 @@ def api_editar(id):
             u.imagen_datos, u.imagen_mimetype = leer_imagen_validada(imagen)
             u.imagen_url = f"/usuarios/imagen/{u.id_usuario}"
 
-        usuario = data.get("usuario", u.usuario)
-        correo = data.get("correo", u.correo)
+        usuario = (data.get("usuario", u.usuario) or "").strip()
+        correo = (data.get("correo", u.correo) or "").strip() or None   # en blanco = sin correo
         telefono = data.get("telefono", u.telefono)
+
+        if not usuario:
+            return jsonify({"success": False, "message": "El usuario es obligatorio."}), 400
 
         # Validar duplicados (excluyendo el actual)
         if Usuario.query.filter(Usuario.usuario == usuario, Usuario.id_usuario != id).first():
             return jsonify({"success": False, "message": f"El usuario '{usuario}' ya está en uso."}), 400
-        if Usuario.query.filter(Usuario.correo == correo, Usuario.id_usuario != id).first():
+        if correo and Usuario.query.filter(Usuario.correo == correo, Usuario.id_usuario != id).first():
             return jsonify({"success": False, "message": f"El correo '{correo}' ya está en uso."}), 400
             
         # Limpiar y validar telefono
