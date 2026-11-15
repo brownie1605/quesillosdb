@@ -1021,3 +1021,135 @@ body.sidebar-open .mobile-magic-nav {
         width: calc(100% - 60px) !important;
     }
 }
+
+/* ==========================================================================
+   AJUSTES PARA TELEFONO (solo <= 768px; escritorio no cambia)
+   ========================================================================== */
+@media (max-width: 768px) {
+    /* --- Capas: la barra inferior y el aviso sin conexion quedan DEBAJO de
+       las ventanas emergentes (antes tapaban Guardar/Cancelar). --- */
+    .mobile-magic-nav { z-index: 900; }
+    body:has(.modal-overlay[style*="display: flex"]) #offline-banner,
+    body:has(.modal-overlay[style*="display: flex"]) .mobile-magic-nav,
+    body:has(.q-modal[style*="display: flex"]) #offline-banner,
+    body:has(.q-modal[style*="display: flex"]) .mobile-magic-nav {
+        display: none !important;
+    }
+
+    /* --- Ventanas emergentes --- */
+    .modal-overlay {
+        align-items: flex-start !important;
+        overflow-y: auto;
+        padding: 8px 0;
+    }
+    .modal-content {
+        max-height: 90vh;
+        max-height: calc(100dvh - 16px);
+        margin: 0 auto !important;
+        padding: 16px !important;
+        border-radius: 14px;
+    }
+    /* Fila de acciones (Cancelar / Guardar) siempre visible al final */
+    .modal-content div:has(> button[type="submit"]) {
+        position: sticky;
+        bottom: -16px;
+        z-index: 5;
+        margin: 16px -16px -16px !important;
+        padding: 12px 16px;
+        background: #fff;
+        border-top: 1px solid #e1e7f0;
+        gap: 10px;
+    }
+    body.dark-theme .modal-content div:has(> button[type="submit"]) {
+        background: #1e293b;
+        border-top-color: #334155;
+    }
+    .modal-content div:has(> button[type="submit"]) > .btn,
+    .modal-content div:has(> button[type="submit"]) > button {
+        min-height: 46px;
+        flex: 1 1 0;
+        white-space: nowrap;
+    }
+
+    /* Filas de 3 o mas campos dentro de ventanas: una debajo de otra */
+    .modal-content div[style*="display: flex"] > :first-child:nth-last-child(n+3),
+    .modal-content div[style*="display:flex"] > :first-child:nth-last-child(n+3) {
+        flex-basis: 100%;
+    }
+    .modal-content div[style*="display: flex"]:has(> :nth-child(3)):not(:has(> button)),
+    .modal-content div[style*="display:flex"]:has(> :nth-child(3)):not(:has(> button)) {
+        flex-wrap: wrap;
+    }
+    .modal-content div[style*="display: flex"]:has(> :nth-child(3)):not(:has(> button)) > *,
+    .modal-content div[style*="display:flex"]:has(> :nth-child(3)):not(:has(> button)) > * {
+        flex: 1 1 100% !important;
+        min-width: 0;
+    }
+    /* Evita que los campos se salgan de la ventana */
+    .modal-content input,
+    .modal-content select,
+    .modal-content textarea {
+        max-width: 100%;
+        box-sizing: border-box;
+        font-size: 16px; /* evita el zoom automatico de iOS al enfocar */
+    }
+    .modal-content table { display: block; overflow-x: auto; max-width: 100%; }
+
+    /* --- Punto de venta --- */
+    .pos-layout { grid-template-columns: minmax(0, 1fr); }
+    .pos-products { min-width: 0; }
+    .pos-products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        padding-right: 0;
+    }
+    .cart-header { gap: 8px; padding: 12px 14px; }
+    .cart-header h3 { font-size: 16px; margin: 0; }
+    .cart-header > div { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+    .cart-header > div .btn { margin-right: 0 !important; padding: 8px 10px !important; min-height: 40px; white-space: nowrap; }
+    .product-card { padding: 12px 8px; }
+    .product-img { font-size: 36px; margin-bottom: 8px; }
+    .product-title { font-size: 13px; }
+    .product-price { font-size: 13px; }
+
+    /* --- Tablas anchas: se desplazan de lado dentro de su caja --- */
+    .q-table-wrap, .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table.q-table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    table.q-table th, table.q-table td { white-space: nowrap; }
+
+    /* --- Reportes: tarjetas en 2 columnas, no 4 o 5 apretadas --- */
+    .cards-grid[style*="repeat("] {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    /* --- Cuadriculas en linea de 2-3 columnas (Reportes, Configuracion, detalle de compra) --- */
+    div[style*="grid-template-columns: 2fr 1fr"],
+    div[style*="grid-template-columns: 1fr 2fr"],
+    div[style*="grid-template-columns: 1fr 1fr"],
+    div[style*="grid-template-columns: repeat(3, 1fr)"] {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    /* Cajas con ancho minimo fijo (exportar reportes) no deben salirse de la tarjeta */
+    .modal-section[style*="min-width"],
+    .panel [style*="min-width: 300px"] { min-width: 0 !important; flex: 1 1 100% !important; }
+    input[type="date"], input[type="time"], input[type="datetime-local"] {
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .panel canvas { max-width: 100% !important; }
+    /* Hijos flex:1 (campos lado a lado) pueden encogerse en vez de empujar el ancho */
+    .panel div[style*="flex: 1"], .panel div[style*="flex:1"] { min-width: 0; }
+    input[type="date"].form-control, input[type="time"].form-control { width: 100%; padding-left: 8px; padding-right: 6px; font-size: 14px; }
+
+    /* --- Zonas tactiles minimas --- */
+    .q-btn.small, .btn-sm, .btn-icon, select.estado-select {
+        min-height: 40px;
+        min-width: 40px;
+    }
+}

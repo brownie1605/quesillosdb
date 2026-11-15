@@ -321,3 +321,53 @@
     color: #fff;
 }
 .menu a small { opacity: .6; font-size: 10.5px; font-weight: 400; }
+
+/* ---- Telefono: zonas tactiles de los botones pequenos (solo <= 768px) ---- */
+@media (max-width: 768px) {
+    #btn-sync-now.sync-btn,
+    .btn-instalar-app {
+        min-width: 40px;
+        min-height: 40px;
+        padding: 8px 10px;
+    }
+    .q-btn.small { padding: 9px 13px; font-size: 13px; min-height: 40px; }
+    /* Ventanas q-modal (Recetas): ingredientes como tarjetas, sin scroll lateral */
+    .q-modal { padding: 10px 8px; }
+    .q-modal-box { padding: 16px; }
+    .q-modal div[style*="justify-content:space-between"] { flex-wrap: wrap; gap: 8px; }
+    .q-modal .q-btn.small { white-space: nowrap; }
+    .q-modal table.q-table, .q-modal table.q-table tbody, .q-modal table.q-table tfoot,
+    .q-modal table.q-table tr, .q-modal table.q-table td, .q-modal table.q-table th { display: block; overflow: visible; }
+    .q-modal table.q-table thead { display: none; }
+    .q-modal table.q-table th, .q-modal table.q-table td { white-space: normal; padding: 0; border: 0; }
+    .q-modal #tbody-ingredientes tr {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+        padding: 10px; margin-bottom: 8px; border: 1px solid var(--q-borde); border-radius: 10px;
+    }
+    .q-modal #tbody-ingredientes td:nth-child(1),
+    .q-modal #tbody-ingredientes td:nth-child(7) { grid-column: 1 / -1; }
+    .q-modal #tbody-ingredientes td:nth-child(7) .q-btn { width: 100%; min-height: 40px; }
+    .q-modal #tbody-ingredientes td { text-align: left !important; }
+    .q-modal #tbody-ingredientes td:nth-child(n+2):nth-child(-n+6)::before {
+        display: block; font-size: 11.5px; font-weight: 600; opacity: .65; margin-bottom: 2px;
+    }
+    .q-modal #tbody-ingredientes td:nth-child(2)::before { content: "Cantidad"; }
+    .q-modal #tbody-ingredientes td:nth-child(3)::before { content: "Unidad"; }
+    .q-modal #tbody-ingredientes td:nth-child(4)::before { content: "Quitable"; }
+    .q-modal #tbody-ingredientes td:nth-child(5)::before { content: "Stock"; }
+    .q-modal #tbody-ingredientes td:nth-child(6)::before { content: "Costo"; }
+    .q-modal table.q-table tfoot tr { display: flex; justify-content: space-between; gap: 10px; padding: 6px 2px; }
+    .q-modal table.q-table tfoot th[colspan] { text-align: left !important; }
+    .q-modal table.q-table tfoot th:empty { display: none; }
+    .q-modal .item-opcion-row { grid-template-columns: 1fr 1fr; }
+    .q-modal .item-opcion-row > :first-child { grid-column: 1 / -1; }
+    /* El aviso sin conexion se muestra sobre la barra inferior, no tapandola */
+    #offline-banner {
+        bottom: 98px;
+        left: 12px;
+        right: 12px;
+        padding: 8px 12px;
+        font-size: 12.5px;
+        border-radius: 10px;
+    }
+}

@@ -55,8 +55,11 @@
     background: #fff;
     border-radius: 10px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    z-index: 1000;
+    z-index: 900; /* debajo de las ventanas emergentes (1000) */
 }
+
+/* Si ninguna opcion esta activa (p. ej. Compras/Usuarios), no mostrar el circulo verde suelto */
+.mobile-magic-nav ul:not(:has(> li.active)) .indicator { display: none; }
 
 /* Detectar dispositivos móviles (Android/iOS) mediante media query */
 @media (max-width: 768px) {
