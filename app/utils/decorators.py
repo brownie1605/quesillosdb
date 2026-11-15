@@ -5,10 +5,32 @@ El Admin siempre pasa cualquier verificacion.
 """
 from functools import wraps
 
-from flask import redirect, url_for, flash, request, jsonify
+from flask import abort, redirect, url_for, flash, request, jsonify
 from flask_login import current_user
 
 ADMIN_ALIASES = ("admin", "administrador")
+
+# Pantalla de inicio de cada rol (nombre del rol en minusculas -> endpoint).
+# Es la que se abre al entrar, al abrir la app ya con sesion y a donde se
+# manda a quien intenta abrir una pantalla que no es suya.
+DESTINO_POR_ROL = {
+    "admin": "dashboard.dashboard",
+    "administrador": "dashboard.dashboard",
+    "cajero": "venta.pos",
+    "mesero": "mesa.lista",
+    "cocinero": "cocina.pendientes",
+    "inventario": "inventario.lista",       # puede abrir Inventario, Compras y Proveedores (no Productos)
+}
+# Un rol sin pantalla propia (ej. Bodeguero) cae en Configuracion: es la unica
+# que cualquier usuario con sesion puede abrir.
+DESTINO_POR_DEFECTO = "configuracion.index"
+
+
+def destino_inicial(user=None):
+    """Endpoint de la pantalla de inicio del usuario segun su rol."""
+    user = user or current_user
+    rol = getattr(user, "rol_nombre", "") or ""
+    return DESTINO_POR_ROL.get(rol, DESTINO_POR_DEFECTO)
 
 
 def _es_api():
@@ -54,8 +76,13 @@ def require_roles(*roles):
     if not usuario_tiene_rol(*roles):
         if _es_api():
             return jsonify({"success": False, "message": "Acceso denegado"}), 403
+        destino = destino_inicial()
+        if request.endpoint == destino:
+            # Ni su propia pantalla de inicio le dan: mostrar "acceso denegado"
+            # en vez de rebotarlo en circulo sin fin.
+            abort(403)
         flash("No tienes permisos para acceder a esta página.", "danger")
-        return redirect(url_for("dashboard.dashboard"))
+        return redirect(url_for(destino))
     return None
 
 

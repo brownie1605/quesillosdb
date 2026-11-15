@@ -445,3 +445,89 @@ def test_quien_tiene_un_rol_de_otra_empresa_se_ve_con_el_rol_propio_del_mismo_no
     assert r.status_code == 200
     db.session.refresh(cajero)
     assert cajero.id_rol == datos_base["roles"]["Cajero"].id_rol
+
+
+# ------------------------------------------------------------------ a donde entra cada rol
+@pytest.mark.parametrize("rol,destino", [("Mesero", "/mesas/"), ("Cajero", "/ventas/pos"), ("Cocinero", "/cocina/pendientes"), ("Admin", "/dashboard")])
+def test_cada_rol_entra_a_su_pantalla(app, db, datos_base, rol, destino):
+    admin = _entrar_como_admin(app)
+    r = admin.post("/usuarios/api/crear", data=_form(usuario=f"rol_{rol.lower()}", id_rol=datos_base["roles"][rol].id_rol, password="4821"))
+    assert r.status_code == 200, r.get_json()
+    r = _login(app.test_client(), f"rol_{rol.lower()}", "4821")
+    assert r.status_code == 302 and r.headers["Location"].endswith(destino)
+
+
+# ------------------------------------------------------------------ pantalla de inicio por rol, sin ciclos
+def _usuario_con_rol(app, db, datos_base, rol, usuario):
+    """Crea (por la API, como en la pantalla) un usuario con ese rol y devuelve un cliente ya logueado."""
+    from app.models import Rol
+    if rol not in datos_base["roles"]:                       # Inventario / Bodeguero no vienen en los datos base
+        r = Rol(id_empresa=1, nombre=rol, estado="activo")
+        db.session.add(r); db.session.commit()
+        datos_base["roles"][rol] = r
+    admin = _entrar_como_admin(app)
+    r = admin.post("/usuarios/api/crear", data=_form(usuario=usuario, id_rol=datos_base["roles"][rol].id_rol, password="4821"))
+    assert r.status_code == 200, r.get_json()
+    cliente = app.test_client()
+    assert _login(cliente, usuario, "4821").status_code == 302
+    return cliente
+
+
+def _seguir(cliente, url, maximo=6):
+    """Sigue las redirecciones a mano. Devuelve (saltos, url_final, respuesta_final); falla si hay ciclo."""
+    saltos = 0
+    for _ in range(maximo):
+        r = cliente.get(url, follow_redirects=False)
+        if r.status_code not in (301, 302):
+            return saltos, url, r
+        saltos += 1
+        url = r.headers["Location"].replace("http://localhost", "")
+    raise AssertionError(f"ciclo de redirecciones en {url}")
+
+
+INICIO = {"Admin": "/dashboard", "Cajero": "/ventas/pos", "Mesero": "/mesas/", "Cocinero": "/cocina/pendientes",
+          "Inventario": "/inventario/", "Bodeguero": "/configuracion/"}
+PROHIBIDAS = {"Cajero": ["/dashboard", "/reportes/", "/usuarios/", "/cocina/pendientes"],
+              "Mesero": ["/dashboard", "/reportes/", "/caja/", "/inventario/", "/usuarios/"],
+              "Cocinero": ["/dashboard", "/mesas/", "/ventas/pos", "/caja/", "/usuarios/"],
+              "Inventario": ["/dashboard", "/reportes/", "/usuarios/", "/mesas/"],
+              "Bodeguero": ["/dashboard", "/caja/", "/mesas/", "/usuarios/"]}
+
+
+@pytest.mark.parametrize("rol", ["Cajero", "Mesero", "Cocinero", "Inventario", "Bodeguero"])
+def test_quien_abre_una_pantalla_que_no_es_suya_cae_en_su_inicio_sin_ciclos(app, db, datos_base, rol):
+    cliente = _usuario_con_rol(app, db, datos_base, rol, f"u_{rol.lower()}")
+    for pagina in PROHIBIDAS[rol]:
+        saltos, final, r = _seguir(cliente, pagina)
+        assert final == INICIO[rol] and r.status_code == 200, f"{rol}: {pagina} termino en {final} ({r.status_code})"
+        assert saltos <= 2
+
+
+@pytest.mark.parametrize("rol", ["Admin", "Cajero", "Mesero", "Cocinero", "Inventario", "Bodeguero"])
+def test_con_la_sesion_ya_abierta_la_raiz_y_el_login_van_al_inicio_del_rol(app, db, datos_base, rol):
+    if rol == "Admin":
+        cliente = _entrar_como_admin(app)
+    else:
+        cliente = _usuario_con_rol(app, db, datos_base, rol, f"i_{rol.lower()}")
+    for url in ("/", "/login"):
+        r = cliente.get(url, follow_redirects=False)
+        assert r.status_code == 302 and r.headers["Location"].endswith(INICIO[rol]), (rol, url, r.status_code)
+
+
+def test_sin_sesion_la_raiz_sigue_mostrando_el_login(app, db, datos_base):
+    assert app.test_client().get("/").status_code == 200
+
+
+def test_las_llamadas_de_api_de_quien_no_es_admin_siguen_dando_403_json(app, db, datos_base):
+    cliente = _usuario_con_rol(app, db, datos_base, "Mesero", "api_mesero")
+    r = cliente.get("/api/dashboard_charts", headers={"Accept": "application/json"})
+    assert r.status_code == 403 and r.get_json()["success"] is False
+
+
+def test_si_ni_su_pantalla_de_inicio_le_dan_se_muestra_acceso_denegado_y_no_un_ciclo(app, db, datos_base, monkeypatch):
+    """Rol mal configurado: su inicio es una pantalla a la que no tiene permiso."""
+    from app.utils import decorators
+    monkeypatch.setitem(decorators.DESTINO_POR_ROL, "cocinero", "caja.index")      # Cocinero no entra a Caja
+    cliente = _usuario_con_rol(app, db, datos_base, "Cocinero", "mal_config")
+    r = cliente.get("/caja/", follow_redirects=False)
+    assert r.status_code == 403

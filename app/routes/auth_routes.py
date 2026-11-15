@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, session
-from flask_login import login_user, logout_user, login_required
+from flask_login import current_user, login_user, logout_user, login_required
 from datetime import datetime, timedelta
 import random
 import string
@@ -12,16 +12,9 @@ from app.services.auth_service import verificar_password, generar_password
 from app.services.auditoria_service import registrar_auditoria
 from app.services.email_service import enviar_codigo_recuperacion
 from app.utils.date_utils import nicaragua_now
+from app.utils.decorators import destino_inicial
 
 auth_bp = Blueprint("auth", __name__)
-
-DESTINO_POR_ROL = {
-    "admin": "dashboard.dashboard",
-    "administrador": "dashboard.dashboard",
-    "cajero": "venta.pos",
-    "mesero": "venta.pos",
-    "cocinero": "cocina.pendientes",
-}
 
 MAX_INTENTOS_LOGIN = 5
 BLOQUEO_LOGIN_MINUTOS = 15
@@ -70,6 +63,11 @@ def _registrar_intento_codigo_fallido(user):
     methods=["POST"],
 )
 def login():
+    # Quien ya tiene sesion y abre la app (el icono instalado abre "/") va
+    # directo a su pantalla de inicio, no al formulario de entrada.
+    if request.method == "GET" and current_user.is_authenticated:
+        return redirect(url_for(destino_inicial()))
+
     if request.method == "POST":
         usuario = request.form.get("usuario")
         password = request.form.get("password")
@@ -117,7 +115,7 @@ def login():
             db.session.commit()
             registrar_auditoria("INICIO SESION", "Auth", "Usuario logueado exitosamente")
 
-            destino = DESTINO_POR_ROL.get(user.rol_nombre, "dashboard.dashboard")
+            destino = destino_inicial(user)
             return redirect(url_for(destino))
 
         if user:
@@ -164,7 +162,7 @@ def verify_2fa_view():
             user.ultimo_acceso = nicaragua_now()
             db.session.commit()
             registrar_auditoria("INICIO SESION", "Auth", "Usuario logueado exitosamente (2FA)")
-            destino = DESTINO_POR_ROL.get(user.rol_nombre, "dashboard.dashboard")
+            destino = destino_inicial(user)
             return redirect(url_for(destino))
 
         flash("Código incorrecto.", "danger")

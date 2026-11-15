@@ -6,7 +6,7 @@ from datetime import timedelta
 from sqlalchemy import func, text
 from app.utils.date_utils import nicaragua_now
 
-from app.utils.decorators import require_roles
+from app.utils.decorators import require_roles, destino_inicial, _es_api
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -15,12 +15,12 @@ from flask_login import current_user
 
 @dashboard_bp.before_request
 def check_roles():
-    if current_user.is_authenticated and current_user.rol:
-        if current_user.rol.nombre == 'Cajero':
-            return redirect(url_for('venta.historial'))
-        elif current_user.rol.nombre == 'Inventario':
-            return redirect(url_for('producto.lista'))
-            
+    if current_user.is_authenticated and current_user.rol and not _es_api():
+        destino = destino_inicial()
+        if destino != "dashboard.dashboard":
+            # No es administrador: va a la pantalla de inicio de su rol.
+            return redirect(url_for(destino))
+
     return require_roles('Administrador')
 
 
