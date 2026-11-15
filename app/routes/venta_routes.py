@@ -158,6 +158,23 @@ def api_verificar_stock():
         return jsonify({"success": False, "faltantes": e.faltantes, "message": str(e)})
 
 
+def _imprimir_factura_en_caja(venta):
+    """Al cobrar, manda la factura a la impresora de caja SIN pedir ninguna
+    confirmacion. El cobro ya quedo guardado: si no hay agente de impresion
+    conectado o algo falla, se ignora y la factura se reimprime desde
+    Historial de ventas. Devuelve True si se mando al agente."""
+    try:
+        from app.services.impresion_service import ImpresionService
+
+        return ImpresionService.emitir_ticket_caja(
+            ImpresionService.armar_ticket_caja("factura", venta))
+    except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger("impresion").exception("No se pudo mandar la factura a caja")
+        return False
+
+
 @venta_bp.route("/api/cobrar", methods=["POST"])
 # 30/min es generoso para el negocio (100-300 tickets/dia entre hasta 5
 # cajeros/meseros -- ni en la hora mas ocupada se acerca a ese ritmo por
@@ -187,10 +204,12 @@ def api_cobrar():
             "NUEVA VENTA", "Ventas",
             {"venta_id": venta.id_venta, "numero": venta.numero_venta, "total": float(venta.total)},
         )
+        impreso = _imprimir_factura_en_caja(venta)
         online = NetworkService.is_online()
         return jsonify(
             {
                 "success": True,
+                "impreso": impreso,
                 "message": "Venta procesada exitosamente"
                 if online
                 else "Venta guardada localmente. Se sincronizará al recuperar la conexión.",

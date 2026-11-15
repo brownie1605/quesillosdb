@@ -188,6 +188,23 @@ def api_quitar_item(id_mesa, id_detalle):
         return jsonify({"success": False, "message": str(e)}), 400
 
 
+def _imprimir_factura_en_caja(venta):
+    """Al cobrar, manda la factura a la impresora de caja SIN pedir ninguna
+    confirmacion. El cobro ya quedo guardado: si no hay agente de impresion
+    conectado o algo falla, se ignora y la factura se reimprime desde
+    Historial de ventas. Devuelve True si se mando al agente."""
+    try:
+        from app.services.impresion_service import ImpresionService
+
+        return ImpresionService.emitir_ticket_caja(
+            ImpresionService.armar_ticket_caja("factura", venta))
+    except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger("impresion").exception("No se pudo mandar la factura a caja")
+        return False
+
+
 @mesa_bp.route("/api/<int:id_mesa>/cobrar", methods=["POST"])
 @login_required
 def api_cobrar(id_mesa):
@@ -212,11 +229,13 @@ def api_cobrar(id_mesa):
             "COBRAR MESA", "Mesas",
             {"mesa": mesa.nombre, "venta": venta.id_venta, "total": float(venta.total)},
         )
+        impreso = _imprimir_factura_en_caja(venta)
         return jsonify({
             "success": True, "venta_id": venta.id_venta,
             "numero_venta": venta.numero_venta, "total": float(venta.total),
             "cambio": float(venta.cambio or 0),
             "cuentas_restantes": len(VentaService.cuentas_de_mesa(mesa)),
+            "impreso": impreso,
         })
     except VentaError as e:
         db.session.rollback()
