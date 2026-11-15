@@ -24,9 +24,12 @@ SERVIDOR_URL = "http://localhost:5000"
 # Las 4 impresoras. Para cada una pon el TIPO de conexion y sus datos; deja
 # None la que todavia no tengas (se ignora).
 #
-#   "tipo": "usb"        -> impresora de cable instalada en Windows.
+#   "tipo": "usb"        -> impresora de cable (USB, serial o paralelo) YA
+#                           INSTALADA en Windows con su driver.
 #                           "nombre" = el nombre EXACTO que sale en
 #                           Windows (Configuracion -> Impresoras).
+#   "tipo": "serial"     -> impresora serial por puerto COM directo
+#                           ("puerto": "COM1", "baudios": 38400).
 #   "tipo": "bluetooth"  -> impresora Bluetooth ya EMPAREJADA con esta PC.
 #                           "puerto" = el COM que le asigna Windows (COM5...).
 #   "tipo": "red"        -> impresora de red (Wi-Fi o cable de red).
@@ -53,6 +56,7 @@ import os
 import socket
 import sys
 import textwrap
+import threading
 import time
 import unicodedata
 
@@ -250,22 +254,109 @@ def _enviar_red(cfg, datos):
         s.sendall(datos)
 
 
+def _winspool():
+    """winspool.drv (el spooler de Windows) con los tipos bien declarados.
+    Sirve en Windows 7 en adelante y no necesita instalar nada."""
+    import ctypes
+    from ctypes import wintypes
+
+    if sys.platform != "win32":
+        raise RuntimeError("Imprimir por USB (nombre de Windows) solo existe en Windows")
+
+    class DOC_INFO_1(ctypes.Structure):
+        _fields_ = [("pDocName", wintypes.LPWSTR), ("pOutputFile", wintypes.LPWSTR),
+                    ("pDatatype", wintypes.LPWSTR)]
+
+    w = ctypes.WinDLL("winspool.drv", use_last_error=True)
+    w.OpenPrinterW.argtypes = [wintypes.LPWSTR, ctypes.POINTER(wintypes.HANDLE), ctypes.c_void_p]
+    w.OpenPrinterW.restype = wintypes.BOOL
+    w.StartDocPrinterW.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(DOC_INFO_1)]
+    w.StartDocPrinterW.restype = wintypes.DWORD
+    w.StartPagePrinter.argtypes = [wintypes.HANDLE]
+    w.StartPagePrinter.restype = wintypes.BOOL
+    w.WritePrinter.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+    w.WritePrinter.restype = wintypes.BOOL
+    w.EndPagePrinter.argtypes = [wintypes.HANDLE]
+    w.EndPagePrinter.restype = wintypes.BOOL
+    w.EndDocPrinter.argtypes = [wintypes.HANDLE]
+    w.EndDocPrinter.restype = wintypes.BOOL
+    w.ClosePrinter.argtypes = [wintypes.HANDLE]
+    w.ClosePrinter.restype = wintypes.BOOL
+    w.EnumPrintersW.argtypes = [wintypes.DWORD, wintypes.LPWSTR, wintypes.DWORD, ctypes.c_void_p,
+                                wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD)]
+    w.EnumPrintersW.restype = wintypes.BOOL
+    return w, DOC_INFO_1
+
+
+def listar_impresoras_windows():
+    """Nombres de las impresoras instaladas en Windows (para el campo "nombre")."""
+    import ctypes
+    from ctypes import wintypes
+
+    w, _ = _winspool()
+
+    class PRINTER_INFO_4(ctypes.Structure):
+        _fields_ = [("pPrinterName", wintypes.LPWSTR), ("pServerName", wintypes.LPWSTR),
+                    ("Attributes", wintypes.DWORD)]
+
+    banderas = 0x2 | 0x4                                   # LOCAL | CONNECTIONS
+    necesita, devueltas = wintypes.DWORD(0), wintypes.DWORD(0)
+    w.EnumPrintersW(banderas, None, 4, None, 0, ctypes.byref(necesita), ctypes.byref(devueltas))
+    if not necesita.value:
+        return []
+    buf = ctypes.create_string_buffer(necesita.value)
+    if not w.EnumPrintersW(banderas, None, 4, buf, necesita.value, ctypes.byref(necesita), ctypes.byref(devueltas)):
+        raise RuntimeError("Windows no pudo listar las impresoras (error %d)" % ctypes.get_last_error())
+    filas = (PRINTER_INFO_4 * devueltas.value).from_buffer(buf)
+    return [f.pPrinterName for f in filas]
+
+
 def _enviar_usb(cfg, datos):
+    """Trabajo RAW al spooler de Windows. Usa pywin32 si esta instalado y, si
+    no, habla directo con winspool.drv (no hace falta instalar nada)."""
     try:
         import win32print
     except ImportError:
-        raise RuntimeError("Falta pywin32 (pip install pywin32) o esta PC no es Windows")
-    h = win32print.OpenPrinter(cfg["nombre"])
-    try:
-        win32print.StartDocPrinter(h, 1, ("Quesillos POS", None, "RAW"))
+        win32print = None
+    if win32print is not None:
+        h = win32print.OpenPrinter(cfg["nombre"])
         try:
-            win32print.StartPagePrinter(h)
-            win32print.WritePrinter(h, datos)
-            win32print.EndPagePrinter(h)
+            win32print.StartDocPrinter(h, 1, ("Quesillos POS", None, "RAW"))
+            try:
+                win32print.StartPagePrinter(h)
+                win32print.WritePrinter(h, datos)
+                win32print.EndPagePrinter(h)
+            finally:
+                win32print.EndDocPrinter(h)
         finally:
-            win32print.EndDocPrinter(h)
+            win32print.ClosePrinter(h)
+        return
+
+    import ctypes
+    from ctypes import wintypes
+
+    w, DOC_INFO_1 = _winspool()
+    h = wintypes.HANDLE()
+    if not w.OpenPrinterW(cfg["nombre"], ctypes.byref(h), None):
+        raise RuntimeError(
+            "Windows no encuentra la impresora '%s' (error %d). Revisa el nombre con: "
+            "python probar_impresoras.py listar" % (cfg["nombre"], ctypes.get_last_error()))
+    try:
+        doc = DOC_INFO_1("Quesillos POS", None, "RAW")
+        if not w.StartDocPrinterW(h, 1, ctypes.byref(doc)):
+            raise RuntimeError("La impresora no acepta trabajos RAW (error %d)" % ctypes.get_last_error())
+        try:
+            if not w.StartPagePrinter(h):
+                raise RuntimeError("No se pudo iniciar la pagina (error %d)" % ctypes.get_last_error())
+            escritos = wintypes.DWORD(0)
+            if not w.WritePrinter(h, datos, len(datos), ctypes.byref(escritos)) or escritos.value != len(datos):
+                raise RuntimeError("Solo se enviaron %d de %d bytes (error %d)"
+                                   % (escritos.value, len(datos), ctypes.get_last_error()))
+            w.EndPagePrinter(h)
+        finally:
+            w.EndDocPrinter(h)
     finally:
-        win32print.ClosePrinter(h)
+        w.ClosePrinter(h)
 
 
 def _enviar_bluetooth(cfg, datos):
@@ -281,7 +372,23 @@ def _enviar_bluetooth(cfg, datos):
         time.sleep(0.5)                           # deja vaciar antes de cerrar
 
 
-ENVIADORES = {"red": _enviar_red, "usb": _enviar_usb, "bluetooth": _enviar_bluetooth}
+# "usb" = cualquier impresora INSTALADA EN WINDOWS (por su nombre), sin importar
+# el cable: USB, serial o paralelo. "serial" y "bluetooth" abren un puerto COM
+# directo (la serial de Epson suele ir a 38400 baudios: "baudios": 38400).
+ENVIADORES = {"red": _enviar_red, "usb": _enviar_usb, "bluetooth": _enviar_bluetooth, "serial": _enviar_bluetooth}
+
+# Una impresora fisica atiende un ticket a la vez. Varias categorias
+# (cocina, quesillo, bebidas) pueden apuntar a la MISMA impresora y sus
+# comandas llegan casi juntas, cada una en su hilo: sin este candado dos
+# hilos abren el mismo puerto Bluetooth a la vez y el segundo falla.
+_CANDADOS = {}
+_CANDADOS_LOCK = threading.Lock()
+
+
+def _candado(cfg):
+    clave = (cfg.get("tipo", "red"), cfg.get("nombre") or cfg.get("puerto") or cfg.get("ip"))
+    with _CANDADOS_LOCK:
+        return _CANDADOS.setdefault(clave, threading.Lock())
 
 
 def imprimir(nombre, constructor, payload):
@@ -290,9 +397,19 @@ def imprimir(nombre, constructor, payload):
         print(f"  [aviso] la impresora '{nombre}' no esta configurada, se ignora")
         return False
     tipo = cfg.get("tipo", "red")
+    # El Bluetooth a veces falla la primera vez (la impresora "dormida"): 1 reintento.
+    intentos = 2 if tipo == "bluetooth" else 1
     try:
         datos = constructor(payload, int(cfg.get("ancho", 48)))
-        ENVIADORES[tipo](cfg, datos)
+        with _candado(cfg):
+            for intento in range(intentos):
+                try:
+                    ENVIADORES[tipo](cfg, datos)
+                    break
+                except Exception:  # noqa: BLE001
+                    if intento == intentos - 1:
+                        raise
+                    time.sleep(2)
         print(f"  [OK] Impreso en '{nombre}' ({tipo})")
         return True
     except Exception as e:  # noqa: BLE001

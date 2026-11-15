@@ -17,15 +17,13 @@ import agente
 def listar():
     print("== Impresoras instaladas en Windows (usa este nombre EXACTO en 'nombre'):")
     try:
-        import win32print
-        flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-        nombres = [p[2] for p in win32print.EnumPrinters(flags)]
+        nombres = agente.listar_impresoras_windows()
         for n in nombres:
             print("   -", n)
         if not nombres:
-            print("   (ninguna)")
-    except ImportError:
-        print("   (falta pywin32: pip install pywin32)")
+            print("   (ninguna: instala primero el driver de la impresora)")
+    except Exception as e:  # noqa: BLE001
+        print("   (no se pudo listar:", e, ")")
     print()
     print("== Puertos COM (las impresoras Bluetooth emparejadas aparecen aqui):")
     try:
