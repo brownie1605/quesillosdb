@@ -14,7 +14,7 @@ cliente_bp = Blueprint("cliente", __name__, url_prefix="/clientes")
 
 @cliente_bp.before_request
 def check_roles():
-    return require_roles("Admin", "Administrador", "Cajero", "Mesero")
+    return require_roles("Admin", "Administrador", "Cajero")
 
 
 @cliente_bp.route("/")

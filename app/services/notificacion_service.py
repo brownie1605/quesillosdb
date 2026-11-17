@@ -49,6 +49,32 @@ class NotificacionService:
 
     # -----------------------------------------------------------------
     @staticmethod
+    def borrar_de_mesa(mesa):
+        """Borra todos los avisos de una mesa que se acaba de cerrar: pedido
+        demorado, nuevo pedido, etc. NO hace commit (lo hace quien cierra la
+        mesa, en la misma transaccion). Los avisos de stock bajo no se tocan.
+        Devuelve cuantos borro."""
+        from sqlalchemy import and_, or_
+
+        condiciones = [
+            Notificacion.url_accion == f"/mesas/{mesa.id_mesa}/pedido",
+            Notificacion.url_accion == f"/cocina/pendientes?mesa={mesa.id_mesa}",
+            # Avisos de "nuevo pedido" creados antes de guardar la mesa en el
+            # enlace: solo se reconocen por el nombre al inicio del mensaje.
+            and_(
+                Notificacion.url_accion == "/cocina/pendientes",
+                Notificacion.mensaje.like(f"{mesa.nombre}: %"),
+            ),
+        ]
+        return (
+            Notificacion.query
+            .filter(Notificacion.id_empresa == (mesa.id_empresa or 1))
+            .filter(or_(*condiciones))
+            .delete(synchronize_session=False)
+        )
+
+    # -----------------------------------------------------------------
+    @staticmethod
     def _ya_avisado(url_accion):
         """True si ya existe una notificacion sin leer para esa misma
         referencia -- evita mandar el mismo aviso en cada corrida del job.
@@ -135,7 +161,7 @@ class NotificacionService:
             titulo="🍳 Nuevo pedido para preparar",
             mensaje=f'{nombre_mesa}: se agregaron productos a la cuenta{quien}.',
             tipo="info",
-            url_accion="/cocina/pendientes",
+            url_accion=f"/cocina/pendientes?mesa={id_mesa}",
         )
 
     # -----------------------------------------------------------------

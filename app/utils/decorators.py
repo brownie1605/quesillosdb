@@ -16,7 +16,7 @@ ADMIN_ALIASES = ("admin", "administrador")
 DESTINO_POR_ROL = {
     "admin": "dashboard.dashboard",
     "administrador": "dashboard.dashboard",
-    "cajero": "venta.pos",
+    "cajero": "mesa.lista",
     "mesero": "mesa.lista",
     "cocinero": "cocina.pendientes",
     "inventario": "inventario.lista",       # puede abrir Inventario, Compras y Proveedores (no Productos)

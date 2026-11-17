@@ -448,7 +448,7 @@ def test_quien_tiene_un_rol_de_otra_empresa_se_ve_con_el_rol_propio_del_mismo_no
 
 
 # ------------------------------------------------------------------ a donde entra cada rol
-@pytest.mark.parametrize("rol,destino", [("Mesero", "/mesas/"), ("Cajero", "/ventas/pos"), ("Cocinero", "/cocina/pendientes"), ("Admin", "/dashboard")])
+@pytest.mark.parametrize("rol,destino", [("Mesero", "/mesas/"), ("Cajero", "/mesas/"), ("Cocinero", "/cocina/pendientes"), ("Admin", "/dashboard")])
 def test_cada_rol_entra_a_su_pantalla(app, db, datos_base, rol, destino):
     admin = _entrar_como_admin(app)
     r = admin.post("/usuarios/api/crear", data=_form(usuario=f"rol_{rol.lower()}", id_rol=datos_base["roles"][rol].id_rol, password="4821"))
@@ -485,7 +485,7 @@ def _seguir(cliente, url, maximo=6):
     raise AssertionError(f"ciclo de redirecciones en {url}")
 
 
-INICIO = {"Admin": "/dashboard", "Cajero": "/ventas/pos", "Mesero": "/mesas/", "Cocinero": "/cocina/pendientes",
+INICIO = {"Admin": "/dashboard", "Cajero": "/mesas/", "Mesero": "/mesas/", "Cocinero": "/cocina/pendientes",
           "Inventario": "/inventario/", "Bodeguero": "/configuracion/"}
 PROHIBIDAS = {"Cajero": ["/dashboard", "/reportes/", "/usuarios/", "/cocina/pendientes"],
               "Mesero": ["/dashboard", "/reportes/", "/caja/", "/inventario/", "/usuarios/"],

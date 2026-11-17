@@ -454,9 +454,59 @@ class VentaService:
         VentaService._recalcular_totales(venta)
         venta.timestamp_local_actualizacion = nicaragua_now()
         venta.estado_sync = "pendiente"
+
+        # Si ya no queda ningun producto, la mesa no tiene nada adentro:
+        # la cuenta vacia se cierra y la mesa vuelve a estar disponible.
+        if not venta.detalles:
+            VentaService._cerrar_cuenta_vacia(venta)
+
         db.session.commit()
         VentaService._push_si_hay_internet()
         return venta
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def _cerrar_cuenta_vacia(venta):
+        """Cuenta pendiente sin productos: se marca anulada (sin movimiento de
+        inventario, no tiene nada que devolver) y su mesa se libera."""
+        venta.estado = "anulada"
+        venta.motivo_anulacion = "Cuenta vacia (sin productos)"
+        venta.estado_sync = "pendiente"
+        venta.timestamp_local_actualizacion = nicaragua_now()
+        db.session.flush()
+        if venta.id_mesa:
+            VentaService._soltar_mesa(venta)
+
+    # -----------------------------------------------------------------
+    @staticmethod
+    def limpiar_cuentas_vacias():
+        """Deja Disponible toda mesa que no tenga productos adentro: cierra las
+        cuentas pendientes sin detalle y libera las mesas marcadas como
+        ocupadas que ya no tienen ninguna cuenta abierta. Devuelve cuantas
+        mesas se liberaron."""
+        from app.models.mesa import Mesa
+        from app.services.mesa_service import MesaService
+
+        liberadas = 0
+        vacias = (Venta.query
+                  .filter(Venta.estado == "pendiente", Venta.id_mesa.isnot(None))
+                  .filter(~Venta.detalles.any())
+                  .all())
+        for venta in vacias:
+            VentaService._cerrar_cuenta_vacia(venta)
+            liberadas += 1
+
+        for mesa in Mesa.query.filter_by(estado="ocupada", activa=True).all():
+            hay_cuenta = (Venta.query
+                          .filter_by(id_mesa=mesa.id_mesa, estado="pendiente")
+                          .first())
+            if not hay_cuenta:
+                MesaService.liberar(mesa.id_mesa)
+                liberadas += 1
+
+        if liberadas:
+            db.session.commit()
+        return liberadas
 
     # -----------------------------------------------------------------
     @staticmethod

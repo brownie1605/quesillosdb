@@ -30,6 +30,12 @@
 <div class="mesas-wrap">
     <h3 class="mesas-titulo">🍽️ Mesas</h3>
 
+    {% if not caja_abierta %}
+    <div role="alert" style="background:#fff4e5;border:1px solid #f0b86e;color:#7a4a05;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:14px;">
+        🔒 <strong>La caja está cerrada.</strong> Un cajero debe abrir caja para poder atender mesas nuevas.
+    </div>
+    {% endif %}
+
     <div class="seccion-titulo">Salón</div>
     <div class="row g-3" id="mesas-salon">
         {% for m in mesas %}

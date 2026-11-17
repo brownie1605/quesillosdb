@@ -22,6 +22,15 @@ class MesaService:
         mesa.estado = "libre"
         mesa.id_venta_actual = None
         mesa.estado_sync = "pendiente"
+
+        # Mesa cerrada: sus avisos (nuevo pedido, pedido demorado...) ya no
+        # sirven. Los de stock bajo no pertenecen a ninguna mesa y se quedan.
+        try:
+            from app.services.notificacion_service import NotificacionService
+
+            NotificacionService.borrar_de_mesa(mesa)
+        except Exception:  # noqa: BLE001
+            pass  # un fallo al limpiar avisos nunca debe impedir cerrar la mesa
         return mesa
 
     # -----------------------------------------------------------------

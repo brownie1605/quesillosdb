@@ -29,7 +29,9 @@
         <div class="menu-label">🍽️ ATENCIÓN</div>
         <a href="{{ url_for('mesa.lista') }}" class="{% if request.blueprint == 'mesa' %}active{% endif %}">🍽️ Mesas</a>
         <a href="{{ url_for('venta.historial') }}" class="{% if request.endpoint == 'venta.historial' %}active{% endif %}">🧾 Historial de ventas</a>
+        {% if es_admin or rol == 'cajero' %}
         <a href="{{ url_for('cliente.lista') }}" class="{% if request.blueprint == 'cliente' %}active{% endif %}">🙂 Clientes</a>
+        {% endif %}
         {% endif %}
 
         {% if es_admin or rol == 'cocinero' %}

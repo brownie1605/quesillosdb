@@ -129,6 +129,8 @@
 
 {% block scripts %}
 <script>
+    // Los meseros no pueden anular facturas (el servidor tambien lo bloquea).
+    const PUEDE_ANULAR = {{ 'true' if (current_user.rol and current_user.rol.nombre|lower in ['admin', 'administrador', 'cajero']) else 'false' }};
     let ventasList = [];
     let clientesList = [];
     const pagVentas = crearPaginador('paginacionVentas', 20);
@@ -203,7 +205,7 @@
                     <button class="btn-icon" title="Ver Factura" onclick="window.open('/ventas/factura/${v.id_venta}', '_blank')">🧾</button>
                     ${v.estado === 'completada' ? `<button class="btn-icon" title="Imprimir en la impresora de caja" onclick="imprimirFactura(${v.id_venta})">🖨️</button>` : ''}
                     ${v.estado === 'completada' ? `<button class="btn-icon" title="Editar cliente / método de pago" onclick="abrirModalEditarVenta(${v.id_venta})">✏️</button>` : ''}
-                    ${v.estado === 'completada' ? `<button class="btn-icon delete" title="Anular factura" onclick="anularVenta(${v.id_venta}, '${escapeHtml(v.numero_venta)}')">🚫</button>` : ''}
+                    ${v.estado === 'completada' && PUEDE_ANULAR ? `<button class="btn-icon delete" title="Anular factura" onclick="anularVenta(${v.id_venta}, '${escapeHtml(v.numero_venta)}')">🚫</button>` : ''}
                 </td>
             `;
             tbody.appendChild(tr);

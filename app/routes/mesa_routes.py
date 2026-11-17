@@ -1,9 +1,10 @@
 """Mesas: Mesas -> Pedido (cuenta abierta) -> Cobrar."""
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for
 from flask_login import login_required, current_user
 
 from app.extensions import db
 from app.models import Mesa, Venta, DetalleVenta
+from app.services.caja_service import CajaService
 from app.services.mesa_service import MesaService, MesaError
 from app.services.venta_service import VentaService, VentaError
 from app.services.inventario_service import StockInsuficiente
@@ -23,19 +24,30 @@ def check_roles():
 @mesa_bp.route("/")
 @login_required
 def lista():
+    # Una mesa sin productos no debe verse ocupada: se liberan las que
+    # quedaron vacias (por ejemplo, al quitarles todo lo que tenian).
+    VentaService.limpiar_cuentas_vacias()
     mesas = MesaService.listar()
     return render_template(
         "mesas/lista.html",
         mesas=[m for m in mesas if m.tipo == "mesa"],
         para_llevar=[m for m in mesas if m.tipo == "llevar"],
         barra=[m for m in mesas if m.tipo == "barra"],
+        caja_abierta=bool(CajaService.apertura_actual()),
     )
+
+
+MENSAJE_CAJA_CERRADA = "La caja está cerrada. Un cajero debe abrir caja antes de atender una mesa."
 
 
 @mesa_bp.route("/<int:id_mesa>/pedido")
 @login_required
 def pedido(id_mesa):
     mesa = Mesa.query.get_or_404(id_mesa)
+    # Una mesa libre solo se puede empezar a atender con la caja abierta.
+    # Las que ya tienen cuenta abierta se siguen viendo y cobrando igual.
+    if not mesa.id_venta_actual and not CajaService.apertura_actual():
+        return redirect(url_for("mesa.lista"))
     return render_template("mesas/pedido.html", mesa=mesa)
 
 
@@ -44,6 +56,8 @@ def pedido(id_mesa):
 @login_required
 def api_atender(id_mesa):
     mesa = Mesa.query.get_or_404(id_mesa)
+    if not mesa.id_venta_actual and not CajaService.apertura_actual():
+        return jsonify({"success": False, "message": MENSAJE_CAJA_CERRADA}), 400
     try:
         venta = VentaService.abrir_mesa(mesa, current_user, cart=[])
         registrar_auditoria("ATENDER MESA", "Mesas", {"mesa": mesa.nombre, "venta": venta.id_venta})
@@ -149,6 +163,9 @@ def api_agregar(id_mesa):
     items = data.get("items", [])
     if not items:
         return jsonify({"success": False, "message": "No hay productos que agregar"}), 400
+
+    if not mesa.id_venta_actual and not CajaService.apertura_actual():
+        return jsonify({"success": False, "message": MENSAJE_CAJA_CERRADA}), 400
 
     try:
         if not mesa.id_venta_actual:

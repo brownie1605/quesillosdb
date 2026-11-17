@@ -165,7 +165,7 @@ def armar_comanda(payload, ancho):
             for linea in _envolver(f"* {item['comentario']}", ancho, 3):
                 p.append(_txt(linea + "\n"))
     p.append(_sep(ancho))
-    p.append(FEED * 3)
+    p.append(FEED * 14)   # ~4 cm mas de papel antes del corte (antes: 3 lineas)
     p.append(CORTE)
     return b"".join(p)
 

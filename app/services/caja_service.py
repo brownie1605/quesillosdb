@@ -162,6 +162,29 @@ class CajaService:
         if not apertura:
             raise CajaError("No hay un turno de caja abierto")
 
+        # Todas las mesas deben estar cerradas. Primero se sueltan las que
+        # solo quedaron abiertas sin productos; las que si tienen cuenta
+        # impiden cerrar la caja hasta cobrarse.
+        from app.models.mesa import Mesa
+        from app.models.venta import Venta
+        from app.services.venta_service import VentaService
+
+        VentaService.limpiar_cuentas_vacias()
+        abiertas = (
+            db.session.query(Mesa.nombre)
+            .join(Venta, Venta.id_mesa == Mesa.id_mesa)
+            .filter(Venta.estado == "pendiente")
+            .distinct()
+            .order_by(Mesa.orden, Mesa.id_mesa)
+            .all()
+        )
+        if abiertas:
+            nombres = ", ".join(n for (n,) in abiertas)
+            raise CajaError(
+                "No se puede cerrar la caja: hay %d mesa(s) con cuenta abierta (%s). "
+                "Cóbralas antes de cerrar." % (len(abiertas), nombres)
+            )
+
         resumen = CajaService.resumen_turno(apertura)
         monto_real = Decimal(str(monto_real or 0))
         diferencia = monto_real - resumen["monto_esperado"]
